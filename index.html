@@ -508,7 +508,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.11.2';
+const APP_VERSION = '1.11.3';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -3401,7 +3401,7 @@ function publicData() {
   };
 }
 async function updateShareFile(force) {
-  if (VIEW || !dbxReady() || !shared.share?.enabled) return;
+  if (VIEW || !dbxReady() || (!shared.share?.enabled && !force)) return; // beim ersten Einschalten (force) gibt es noch keine Freigabe
   const data = publicData(); const body = JSON.stringify(Object.assign({}, data, { at: 0 }));
   const h = hash(body);
   if (!force && meta.shareHash === h) return;
