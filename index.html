@@ -422,6 +422,28 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .spine.hit{outline:2px solid #fbbf24;outline-offset:1px}
 .dragghost{position:fixed;z-index:80;pointer-events:none;opacity:.92;box-shadow:0 12px 24px rgba(0,0,0,.45);transition:none;margin:0}
 .dropmark{position:fixed;z-index:79;width:4px;border-radius:2px;background:#fbbf24;box-shadow:0 0 10px #fbbf24;pointer-events:none}
+.coverbox2{grid-column:1/-1;display:flex;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+.imgslot{display:grid;gap:6px;justify-items:start}
+.imgslot .thumb{width:84px;height:110px}
+.imgslot .spinethumb{width:34px;height:110px}
+.imgslot .thumb img{width:100%;height:100%;object-fit:cover}
+.imgslot .spinethumb img{object-fit:contain;background:#3d2614}
+.imgslot .acts{display:flex;gap:4px}
+.imgslot .acts .btn{height:34px;min-width:36px;padding:0 8px}
+.ie-stage{height:min(58vh,560px);background:#18130e;border-radius:12px;display:grid;place-items:center;overflow:hidden;touch-action:none;margin-bottom:10px}
+.ie-wrap{position:relative;overflow:hidden}
+.ie-wrap canvas{display:block}
+.ie-crop{position:absolute;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.55);cursor:move;touch-action:none}
+.ie-crop i{position:absolute;background:rgba(255,255,255,.45);pointer-events:none}
+.ie-crop .g1,.ie-crop .g2{top:0;bottom:0;width:1px}.ie-crop .g1{left:33.3%}.ie-crop .g2{left:66.6%}
+.ie-crop .g3,.ie-crop .g4{left:0;right:0;height:1px}.ie-crop .g3{top:33.3%}.ie-crop .g4{top:66.6%}
+.ie-crop b{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;touch-action:none}
+.ie-crop b::after{content:"";position:absolute;inset:8px;background:#fff;border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.ie-crop .h-nw{left:0;top:0;cursor:nwse-resize}.ie-crop .h-n{left:50%;top:0;cursor:ns-resize}.ie-crop .h-ne{left:100%;top:0;cursor:nesw-resize}.ie-crop .h-e{left:100%;top:50%;cursor:ew-resize}
+.ie-crop .h-se{left:100%;top:100%;cursor:nwse-resize}.ie-crop .h-s{left:50%;top:100%;cursor:ns-resize}.ie-crop .h-sw{left:0;top:100%;cursor:nesw-resize}.ie-crop .h-w{left:0;top:50%;cursor:ew-resize}
+.ie-ctl{display:grid;gap:6px}
+.ie-rot{display:flex;gap:8px;align-items:center}.ie-rot input{flex:1;accent-color:var(--accent)}
+.ie-row{display:flex;gap:8px;align-items:center}.ie-row .hint{min-width:56px;font-variant-numeric:tabular-nums}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -477,7 +499,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.9';
+const APP_VERSION = '1.10';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -658,63 +680,131 @@ async function persist() {
 }
 async function saveMeta() { await idb.set('meta', meta); }
 
+// Ähnliche Autorennamen erkennen ("J.K. Rowling" ↔ "J. K. Rowling", "Stephen Kng" ↔ "Stephen King") und nachfragen
+function levDist(a, b) { if (a === b) return 0; const m = a.length, n = b.length; if (!m || !n) return m || n; let prev = Array.from({ length: n + 1 }, (_, j) => j); for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; } return prev[n]; }
+function nameParts(n) { const t = String(n).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.\-]/g, ' ').split(/\s+/).filter(Boolean); return { last: (t[t.length - 1] || '').replace(/[^a-z]/g, ''), first: t.slice(0, -1).map(x => x.replace(/[^a-z]/g, '')).filter(Boolean) }; }
+function similarAuthor(a, b) {
+  const na = normAuthor(a), nb = normAuthor(b); if (!na || !nb || na === nb) return false;
+  const pa = nameParts(a), pb = nameParts(b);
+  const lastSame = pa.last === pb.last || (pa.last.length >= 5 && levDist(pa.last, pb.last) <= 1);
+  if (lastSame) {
+    if (!pa.first.length || !pb.first.length) return true;
+    if (pa.first[0][0] === pb.first[0][0]) return true;
+  }
+  return Math.min(na.length, nb.length) >= 8 && levDist(na, nb) <= 2;
+}
+async function checkAuthorName(autor) {
+  const names = authorNames(autor); if (!names.length) return autor;
+  const known = new Map();
+  for (const i of allLive()) if (i.typ === 'buch') for (const n of authorNames(i.autor)) { const k = normAuthor(n); const e = known.get(k) || { name: n, n: 0 }; e.n++; known.set(k, e); }
+  const distinct = new Set(shared.authorDistinct || []);
+  let changed = false;
+  for (let i = 0; i < names.length; i++) {
+    const n = names[i]; const same = known.get(normAuthor(n));
+    if (same) { if (same.name !== n) { names[i] = same.name; changed = true; } continue; } // gleiche Person, nur andere Schreibweise (Punkte/Leerzeichen)
+    const cands = [...known.values()].filter(e => similarAuthor(n, e.name) && !distinct.has([normAuthor(n), normAuthor(e.name)].sort().join('|'))).sort((a, b) => b.n - a.n);
+    if (!cands.length) continue;
+    const pick = await askSameAuthor(n, cands.slice(0, 3));
+    if (pick === undefined) continue;
+    if (pick) { names[i] = pick; changed = true; }
+    else { cands.slice(0, 3).forEach(c => distinct.add([normAuthor(n), normAuthor(c.name)].sort().join('|'))); shared.authorDistinct = [...distinct]; await saveShared(); }
+  }
+  return changed ? names.join(', ') : autor;
+}
+function askSameAuthor(name, cands) {
+  return new Promise(res => {
+    let done = false; const fin = v => { if (!done) { done = true; res(v); } };
+    const s = openSheet(`${sheetHead('Ähnlicher Autor')}
+      <p style="margin-top:0">Eingetragen ist <b>„${esc(name)}“</b>. In eurer Sammlung gibt es schon:</p>
+      <div class="menu">${cands.map((c, i) => `<button data-same="${i}"><span class="mi">✓</span><span><b>Ja, das ist ${esc(c.name)}</b><small>${c.n} ${c.n === 1 ? 'Buch' : 'Bücher'} – diese Schreibweise übernehmen</small></span></button>`).join('')}
+      <button data-same="no"><span class="mi">✕</span><span><b>Nein, „${esc(name)}“ ist jemand anderes</b><small>Wird nicht wieder gefragt</small></span></button></div>`, { onClose: () => fin(undefined) });
+    s.onclick = async e => { const b = e.target.closest('[data-same]'); if (!b) return; const v = b.dataset.same === 'no' ? null : cands[+b.dataset.same].name; fin(v); await closeSheet(); };
+  });
+}
 async function upsertItem(data) {
+  if (!VIEW && data.typ === 'buch' && data.autor && !data._noAuthorCheck) {
+    const prev = data.id && items.find(i => i.id === data.id);
+    if (!prev || prev.autor !== data.autor) data.autor = await checkAuthorName(data.autor);
+  }
   const now = Date.now();
   let it = data.id && items.find(i => i.id === data.id);
-  const coverData = data._coverData; const removeCover = data._removeCover; const spine = data._coverSpine;
+  let coverData = data._coverData, spineData = data._spineData, spineAspect = data._spineAspect;
+  if (coverData && data._coverSpine) { spineData = coverData; spineAspect = data._coverAspect; coverData = null; } // Buchrücken-Ausschnitt aus der Foto-Erkennung
+  const removeCover = data._removeCover, removeSpine = data._removeSpine;
   const clean = {};
   for (const [k, v] of Object.entries(data)) if (!k.startsWith('_') && v !== '' && v != null) clean[k] = v;
   if (it) {
-    const keep = { id: it.id, createdAt: it.createdAt, cover: it.cover, coverLocal: it.coverLocal, coverSpine: it.coverSpine, coverAspect: it.coverAspect };
+    const keep = { id: it.id, createdAt: it.createdAt, cover: it.cover, coverLocal: it.coverLocal, coverSpine: it.coverSpine, coverAspect: it.coverAspect, spineLocal: it.spineLocal, imgAt: it.imgAt, spineAt: it.spineAt };
     for (const k of Object.keys(it)) delete it[k];
     Object.assign(it, keep, clean, { updatedAt: now });
   } else {
     it = Object.assign({ createdAt: now }, clean, { id: uid(), updatedAt: now });
     items.push(it);
   }
+  // Früher lag ein Buchrücken-Foto im Cover-Platz (coverSpine) – bei Änderungen in den eigenen Rücken-Platz umziehen
+  if ((coverData || removeCover || spineData || removeSpine) && it.coverLocal && it.coverSpine) await migrateLegacySpine(it, !!coverData);
   if (coverData) {
-    await idb.set('cover:' + it.id, coverData); coverCache.set(it.id, coverData);
-    it.coverLocal = true;
-    if (spine) { it.coverSpine = true; if (data._coverAspect) it.coverAspect = data._coverAspect; } // Buchrücken-Ausschnitt: Online-Cover (URL) bleibt fürs Vorschaubild
-    else { delete it.cover; delete it.coverSpine; delete it.coverAspect; }
-    if (!meta.pendingCovers.includes(it.id)) meta.pendingCovers.push(it.id);
+    await idb.set('cover:' + it.id, coverData); coverCache.set('cover:' + it.id, coverData);
+    it.coverLocal = true; it.imgAt = Date.now(); delete it.cover; delete it.coverSpine; imgQueue(it.id, 'cover');
   } else if (removeCover) {
-    if (it.coverLocal) { await idb.del('cover:' + it.id); coverCache.delete(it.id); meta.pendingCoverDeletes.push(it.id); }
-    delete it.coverLocal; delete it.cover; delete it.coverSpine; delete it.coverAspect;
+    if (it.coverLocal) { await idb.del('cover:' + it.id); coverCache.delete('cover:' + it.id); imgQueueDel(it.id, 'cover'); }
+    delete it.coverLocal; delete it.cover; delete it.coverSpine;
+  }
+  if (spineData) {
+    await idb.set('spine:' + it.id, spineData); coverCache.set('spine:' + it.id, spineData);
+    it.spineLocal = true; it.spineAt = Date.now(); if (spineAspect) it.coverAspect = spineAspect; imgQueue(it.id, 'spine');
+  } else if (removeSpine) {
+    if (it.spineLocal) { await idb.del('spine:' + it.id); coverCache.delete('spine:' + it.id); imgQueueDel(it.id, 'spine'); }
+    delete it.spineLocal; delete it.coverAspect;
   }
   await persist();
   return it;
 }
 async function deleteItem(id) {
   const it = items.find(i => i.id === id); if (!it) return;
-  const wasLocal = it.coverLocal;
+  const wasLocal = it.coverLocal, wasSpine = it.spineLocal;
   for (const k of Object.keys(it)) if (!['id', 'createdAt'].includes(k)) delete it[k];
   Object.assign(it, { deleted: true, updatedAt: Date.now() });
-  if (wasLocal) { await idb.del('cover:' + id); coverCache.delete(id); meta.pendingCoverDeletes.push(id); }
+  if (wasLocal) { await idb.del('cover:' + id); coverCache.delete('cover:' + id); imgQueueDel(id, 'cover'); }
+  if (wasSpine) { await idb.del('spine:' + id); coverCache.delete('spine:' + id); imgQueueDel(id, 'spine'); }
   await persist();
 }
 
 /* ---------- Cover ---------- */
 const coverCache = new Map();
 const coverQueue = []; let coverBusy = 0;
-const hasCover = it => !!(it.cover || it.coverLocal);
-async function coverURL(it, localOnly) {
-  if (it.cover && !localOnly) return it.cover;
-  if (!it.coverLocal) return null;
-  if (coverCache.has(it.id)) return coverCache.get(it.id);
-  const d = await idb.get('cover:' + it.id);
-  if (d) { coverCache.set(it.id, d); return d; }
+// Zwei Bild-Plätze je Medium: Vorderseite (cover:<id>, online it.cover) und Buchrücken (spine:<id>).
+// Ältere Einträge: Rücken-Foto im Cover-Platz mit coverSpine=true.
+const hasCover = it => !!(it.cover || (it.coverLocal && !it.coverSpine)); // Vorderseite vorhanden
+const hasSpine = it => !!(it.spineLocal || (it.coverLocal && it.coverSpine));
+const IMG_Q = { cover: ['pendingCovers', 'pendingCoverDeletes'], spine: ['pendingSpines', 'pendingSpineDeletes'] };
+const imgPath = (id, kind) => '/covers/' + id + (kind === 'spine' ? '_ruecken' : '') + '.jpg';
+function imgQueue(id, kind) { const [up, del] = IMG_Q[kind]; meta[up] = [...new Set([...(meta[up] || []), id])]; meta[del] = (meta[del] || []).filter(x => x !== id); }
+function imgQueueDel(id, kind) { const [up, del] = IMG_Q[kind]; meta[up] = (meta[up] || []).filter(x => x !== id); meta[del] = [...new Set([...(meta[del] || []), id])]; }
+async function localImg(kind, id) {
+  const key = kind + ':' + id;
+  if (coverCache.has(key)) return coverCache.get(key);
+  const d = await idb.get(key); if (d) { coverCache.set(key, d); return d; }
   if (!dbxReady()) return null;
-  return new Promise(res => { coverQueue.push({ id: it.id, res }); pumpCovers(); });
+  return new Promise(res => { coverQueue.push({ key, path: imgPath(id, kind), res }); pumpCovers(); });
+}
+async function coverURL(it) { if (it.cover) return it.cover; if (!it.coverLocal || it.coverSpine) return null; return localImg('cover', it.id); }
+async function spineURL(it) { if (it.spineLocal) return localImg('spine', it.id); if (it.coverLocal && it.coverSpine) return localImg('cover', it.id); return null; }
+async function migrateLegacySpine(it, frontFollows) {
+  const d = await localImg('cover', it.id);
+  if (d) { await idb.set('spine:' + it.id, d); coverCache.set('spine:' + it.id, d); it.spineLocal = true; it.spineAt = Date.now(); imgQueue(it.id, 'spine'); }
+  await idb.del('cover:' + it.id); coverCache.delete('cover:' + it.id);
+  if (!frontFollows) imgQueueDel(it.id, 'cover');
+  delete it.coverLocal; delete it.coverSpine;
 }
 async function pumpCovers() {
   while (coverBusy < 3 && coverQueue.length) {
     const job = coverQueue.shift(); coverBusy++;
     (async () => {
       try {
-        const blob = await dbxDownload(P('/covers/' + job.id + '.jpg'));
+        const blob = await dbxDownload(P(job.path));
         const d = blob ? await blobToDataURL(blob) : null;
-        if (d) { await idb.set('cover:' + job.id, d); coverCache.set(job.id, d); }
+        if (d) { await idb.set(job.key, d); coverCache.set(job.key, d); }
         job.res(d);
       } catch { job.res(null); } finally { coverBusy--; pumpCovers(); }
     })();
@@ -1035,7 +1125,7 @@ function appendMore() {
 function hydrateSpines(root) {
   $$('[data-spine]', root).forEach(async el => {
     const it = items.find(i => i.id === el.dataset.spine); if (!it) return;
-    const url = await coverURL(it, true); if (!url) return;
+    const url = await spineURL(it); if (!url) return;
     el.style.backgroundImage = `linear-gradient(90deg,rgba(0,0,0,.28),rgba(255,255,255,.12) 18%,transparent 40%,rgba(0,0,0,.22)),url("${url}")`;
     el.classList.add('img');
   });
@@ -1092,7 +1182,7 @@ function renderVideothek(list, typ) {
 function spineDims(it) {
   const pages = +it.seiten || (180 + hash(it.titel) % 300);
   let w = Math.round(Math.min(48, Math.max(17, pages / 13)));
-  if (it.coverSpine && it.coverAspect) { const h0 = /Hardcover/.test(it.ausgabe || '') ? 172 : 150; return { w: Math.round(Math.min(64, Math.max(14, h0 * it.coverAspect))), h: h0, hc: false, img: true }; }
+  if (hasSpine(it) && it.coverAspect) { const h0 = /Hardcover/.test(it.ausgabe || '') ? 172 : 150; return { w: Math.round(Math.min(64, Math.max(14, h0 * it.coverAspect))), h: h0, hc: false, img: true }; }
   const a = it.ausgabe || '';
   let h = /Hardcover/.test(a) ? 162 + hash(it.id) % 22 : /Comic|Bildband/.test(a) ? 176 : 132 + hash(it.id) % 24;
   if (/Hörbuch/.test(a)) { h = 126; w = Math.max(w, 28); }
@@ -1338,8 +1428,20 @@ const normAuthor = n => String(n || '').toLowerCase().normalize('NFD').replace(/
 const booksOfAuthor = name => allLive().filter(i => i.typ === 'buch' && !i.geliehen && authorNames(i.autor).some(n => normAuthor(n) === normAuthor(name)));
 const WD_WRITER = ['Q36180', 'Q6625963', 'Q4853732', 'Q49757', 'Q11774202', 'Q28389', 'Q1930187', 'Q18844224', 'Q3658608', 'Q15949613', 'Q214917'];
 // Werke eines Autors online: Wikidata (deutsche Titel, Reihen mit Nummer), sonst Open Library
-async function fetchAuthorWorks(name) {
-  const ck = 'author:' + normAuthor(name);
+// Sprache der eigenen Bücher erraten: Feld „Sprache“, sonst typische Wörter im Titel
+function guessLang(books) {
+  let en = 0, de = 0;
+  for (const b of books) {
+    const sp = String(b.sprache || '').toLowerCase();
+    if (/engl/.test(sp)) { en += 2; continue; } if (/deut|german/.test(sp)) { de += 2; continue; }
+    const w = ' ' + String(b.titel || '').toLowerCase().replace(/[^a-zäöüß' ]/g, ' ') + ' ';
+    if (/ (the|of|and|a|an|in|to|with|for|my|your|is|on) /.test(w)) en++;
+    if (/ (der|die|das|und|von|im|mit|ein|eine|zum|zur|des|dem|den|auf|aus) /.test(w) || /[äöüß]/.test(w)) de++;
+  }
+  return en > de ? 'en' : 'de';
+}
+async function fetchAuthorWorks(name, lang = 'de') {
+  const ck = 'author:' + lang + ':' + normAuthor(name);
   const c = await idb.get(ck); if (c && Date.now() - c.at < 14 * 864e5) return c;
   let works = [], src = '', qid = null;
   const sr = await fetchJSON(WD + 'action=wbsearchentities&type=item&limit=7&language=de&uselang=de&search=' + encodeURIComponent(name), 7000);
@@ -1356,7 +1458,7 @@ async function fetchAuthorWorks(name) {
       FILTER NOT EXISTS { ?w wdt:P31 ?t . VALUES ?t { wd:Q3331189 wd:Q13442814 wd:Q1980247 wd:Q277759 wd:Q1667921 wd:Q7725310 wd:Q191067 wd:Q17518557 wd:Q737498 } }
       OPTIONAL { ?w wdt:P577 ?d }
       OPTIONAL { ?w p:P179 ?st . ?st ps:P179 ?s . OPTIONAL { ?st pq:P1545 ?o } }
-      SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en,mul". }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang === 'en' ? 'en,de' : 'de,en'},mul". }
     } LIMIT 800`;
     const j = await fetchJSON('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q), 15000);
     const map = new Map();
@@ -1385,7 +1487,7 @@ async function fetchAuthorWorks(name) {
   return res;
 }
 function openAuthor(name) {
-  let sort = lsGet('mt_authsort', 'serie'), showMissing = false, online = null, loading = false;
+  let sort = lsGet('mt_authsort', 'serie'), showMissing = false, online = null, loading = false, lang = 'de';
   const s = openSheet(`${sheetHead(name)}
     <p class="hint" id="auSum" style="margin-top:0"></p>
     <div class="au-tools"><div class="seg" id="auSort" style="width:auto">${[['alpha', 'A–Z'], ['serie', 'Serie'], ['jahr', 'Jahr']].map(([k, l]) => `<button data-s="${k}" aria-pressed="${sort === k}">${l}</button>`).join('')}</div>
@@ -1394,7 +1496,7 @@ function openAuthor(name) {
   const own = () => booksOfAuthor(name);
   function draw() {
     const mine = own();
-    $('#auSum', s).textContent = `${((n) => n === 1 ? '1 Buch' : n + ' Bücher')(mine.filter(i => !i.wunsch).length)} bei euch${mine.some(i => i.wunsch) ? `, ${mine.filter(i => i.wunsch).length} auf der Wunschliste` : ''}` + (showMissing && online ? ` · ${online.missing.length} weitere bekannt (Quelle: ${online.src || '–'})` : '');
+    $('#auSum', s).textContent = `${((n) => n === 1 ? '1 Buch' : n + ' Bücher')(mine.filter(i => !i.wunsch).length)} bei euch${mine.some(i => i.wunsch) ? `, ${mine.filter(i => i.wunsch).length} auf der Wunschliste` : ''}` + (showMissing && online ? ` · ${online.missing.length} weitere bekannt (Quelle: ${online.src || '–'}${lang === 'en' ? ', englische Titel' : ''})` : '');
     let entries = mine.map(it => ({ it, titel: it.titel, jahr: it.jahr, reihe: it.reihe, band: it.band }));
     if (showMissing && online) entries = entries.concat(online.missing.map(w => ({ w, titel: w.titel, jahr: w.jahr, reihe: w.reihe, band: w.band })));
     const pseudo = e => ({ titel: e.titel, jahr: e.jahr, reihe: e.reihe, band: e.band, typ: 'buch' });
@@ -1422,7 +1524,8 @@ function openAuthor(name) {
   async function loadOnline() {
     if (online || loading) return; loading = true; draw();
     try {
-      const r = await fetchAuthorWorks(name);
+      lang = guessLang(own().filter(i => !i.wunsch).length ? own().filter(i => !i.wunsch) : own());
+      const r = await fetchAuthorWorks(name, lang);
       const mine = own(); const keys = new Set(mine.map(i => normDup(i.titel)));
       const serNo = new Set(mine.filter(i => i.reihe && i.band).map(i => seriesKey(i.reihe) + '#' + seriesNo(i)));
       const missing = r.works.filter(w => { const k = normDup(w.titel); if (keys.has(k) || [...keys].some(x => x.length > 5 && (k.includes(x) || x.includes(k)))) return false; if (w.reihe && w.band && serNo.has(seriesKey(w.reihe) + '#' + seriesNo({ typ: 'buch', band: w.band }))) return false; return true; });
@@ -1636,7 +1739,8 @@ function inputHTML(typ, f, val) {
 function openForm({ item, prefill, typ, onSaved, title } = {}) {
   let data = Object.assign({}, item || prefill || {});
   data.typ = data.typ || typ || (TYPES[ui.type] ? ui.type : 'buch');
-  let coverData = data._coverData || null, removeCover = false;
+  let coverData = data._coverData || null, removeCover = false, spineData = null, spineAspect = null, removeSpine = false;
+  if (coverData && data._coverSpine) { spineData = coverData; spineAspect = data._coverAspect; coverData = null; }
   const s = openSheet(`${sheetHead(title || (item ? 'Bearbeiten' : 'Neues Medium'))}
     <div class="seg" id="fType" style="margin-bottom:10px">${TYPE_KEYS.map(t => `<button type="button" data-t="${t}" aria-pressed="${data.typ === t}">${TYPES[t].single.replace(' / Film', '')}</button>`).join('')}</div>
     <div class="seg" id="fStatus" style="margin-bottom:12px"><button type="button" data-st="own" aria-pressed="${!data.wunsch && !data.geliehen}">In unserer Sammlung</button><button type="button" data-st="wish" aria-pressed="${!!data.wunsch}">★ Wunschliste</button><button type="button" data-st="borrow" aria-pressed="${!!data.geliehen}">↙ Von anderen geliehen</button></div>
@@ -1655,22 +1759,32 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     if (data.geliehen && !data.geliehenAm) data.geliehenAm = todayISO();
     lendState = { am: data.verliehenAm };
     const thumbIt = { id: item?.id || '_new', titel: data.titel };
-    form.innerHTML = `<div class="coverbox"><div class="thumb" id="fThumb" style="background:${colorFor(data.titel)}"><span class="ph">${esc(initials(data.titel))}</span></div>
-      <div><div class="hint" style="margin-bottom:8px">Cover (optional)</div><div class="acts">
-      <label class="btn">📷 Foto<input type="file" accept="image/*" capture="environment" hidden id="fCam"></label>
-      <label class="btn">🖼 Galerie<input type="file" accept="image/*" hidden id="fGal"></label>
-      <button type="button" class="btn ghost" id="fRm">Entfernen</button></div></div></div>` + fields.map(f => inputHTML(data.typ, f, data[f.k])).join('');
+    const slot = (k, label) => `<div class="imgslot" data-slot="${k}"><div class="hint">${label}</div><div class="${k === 'spine' ? 'thumb spinethumb' : 'thumb'}" id="f${k}Thumb" style="background:${colorFor(data.titel)}"><span class="ph">${k === 'spine' ? '' : esc(initials(data.titel))}</span></div>
+      <div class="acts"><label class="btn" title="Foto aufnehmen" aria-label="Foto aufnehmen">📷<input type="file" accept="image/*" capture="environment" hidden data-file="${k}"></label><label class="btn" title="Aus Galerie oder Datei" aria-label="Aus Galerie">🖼<input type="file" accept="image/*" hidden data-file="${k}"></label><button type="button" class="btn" data-edit="${k}" title="Zuschneiden und drehen" aria-label="Zuschneiden und drehen">✂️</button><button type="button" class="btn ghost" data-rm="${k}" title="Entfernen" aria-label="Entfernen">✕</button></div></div>`;
+    form.innerHTML = `<div class="coverbox2">${slot('cover', 'Cover (Vorderseite)')}${data.typ === 'buch' ? slot('spine', 'Buchrücken (fürs Regal)') : ''}</div>` + fields.map(f => inputHTML(data.typ, f, data[f.k])).join('');
     showThumb();
     autoKeys.forEach(k => form.querySelector(`[data-f="${k}"]`)?.classList.add('autofilled'));
     wireLend(form);
-    const onFile = async e => { const f = e.target.files[0]; if (!f) return; coverData = await resizeImage(f, 500, .78); removeCover = false; showThumb(); };
-    $('#fCam', form).onchange = onFile; $('#fGal', form).onchange = onFile;
-    $('#fRm', form).onclick = () => { coverData = null; removeCover = true; data.cover = null; showThumb(); };
+    const setImg = (k, r) => { if (!r) return; if (k === 'cover') { coverData = r.data; removeCover = false; } else { spineData = r.data; spineAspect = r.aspect; removeSpine = false; } showThumb(); };
+    $$('[data-file]', form).forEach(inp => inp.onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; const k = inp.dataset.file; const src = await resizeImage(f, 2000, .9); setImg(k, await openImageEditor(src, { kind: k })); });
+    $$('[data-edit]', form).forEach(b => b.onclick = async () => {
+      const k = b.dataset.edit; const src = await curImg(k);
+      if (!src) return toast('Erst ein Bild aufnehmen oder auswählen');
+      const usable = await imageForEditing(src); if (!usable) return toast('Dieses Online-Bild lässt sich nicht bearbeiten – bitte als Foto oder aus der Galerie hochladen', 4500);
+      setImg(k, await openImageEditor(usable, { kind: k }));
+    });
+    $$('[data-rm]', form).forEach(b => b.onclick = () => { if (b.dataset.rm === 'cover') { coverData = null; removeCover = true; data.cover = null; } else { spineData = null; removeSpine = true; } showThumb(); });
+  }
+  async function curImg(k) {
+    if (k === 'cover') return coverData || (!removeCover && (data.cover || (item && await coverURL(item)))) || null;
+    return spineData || (!removeSpine && item && await spineURL(item)) || null;
   }
   async function showThumb() {
-    const t = $('#fThumb', form); if (!t) return;
-    let url = coverData || (!removeCover && (data.cover || (item && await coverURL(item))));
-    t.innerHTML = url ? `<img src="${esc(url)}" referrerpolicy="no-referrer" alt="">` : `<span class="ph">${esc(initials(data.titel))}</span>`;
+    for (const k of ['cover', 'spine']) {
+      const t = $(`#f${k}Thumb`, form); if (!t) continue;
+      const url = await curImg(k);
+      t.innerHTML = url ? `<img src="${esc(url)}" referrerpolicy="no-referrer" alt="">` : `<span class="ph">${k === 'spine' ? '–' : esc(initials(data.titel))}</span>`;
+    }
   }
   draw();
   $('#fStatus', s).onclick = e => { const b = e.target.closest('[data-st]'); if (!b) return; data = Object.assign(data, collect(), { wunsch: b.dataset.st === 'wish', geliehen: b.dataset.st === 'borrow' }); $$('#fStatus button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); draw(); };
@@ -1696,7 +1810,7 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     }
   });
   form.addEventListener('change', e => { const l = e.target.closest('.fld'); if (l?.classList.contains('autofilled')) { l.classList.remove('autofilled'); autoKeys.delete(l.dataset.f); } });
-  form.addEventListener('input', e => { if (e.target.name === 'titel') { data.titel = e.target.value; if (!coverData && !data.cover) showThumb(); } });
+  form.addEventListener('input', e => { if (e.target.name === 'titel') { data.titel = e.target.value; if (!coverData && !data.cover) $$('.imgslot .ph', form).forEach((p, i) => { if (i === 0) p.textContent = initials(data.titel); }); } });
   $('#fFill', s).onclick = async e => {
     const b = e.currentTarget; const cur = Object.assign({}, data, collect(), { typ: data.typ });
     if (!cur.titel) return toast('Bitte zuerst den Titel eingeben');
@@ -1723,14 +1837,13 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     if ($('#lendChk', form)?.checked && !vals.verliehenAn) { const l = form.querySelector('[data-f="verliehenAn"]'); l.classList.add('err'); bad = bad || l; }
     if (bad) { bad.scrollIntoView({ block: 'center', behavior: 'smooth' }); return toast(linkMsg || 'Bitte Pflichtfelder ausfüllen'); }
     const zurueck = vals._zurueckAm; delete vals._zurueckAm;
-    const rec = Object.assign({ typ: data.typ }, vals, { id: item?.id, _coverData: coverData, _removeCover: removeCover });
+    const rec = Object.assign({ typ: data.typ }, vals, { id: item?.id, _coverData: coverData, _removeCover: removeCover, _spineData: spineData, _spineAspect: spineAspect, _removeSpine: removeSpine });
     if (data.verleihHistorie?.length) rec.verleihHistorie = data.verleihHistorie;
     if (data.wunsch) rec.wunsch = true;
     if (data.geliehen) rec.geliehen = true;
     // Angaben, die nicht im Formular stehen (z. B. Aussortieren-Markierung), beibehalten
-    for (const [k, v] of Object.entries(data)) if (!(k in rec) && !k.startsWith('_') && !fieldDef(data.typ, k) && !['typ', 'id', 'createdAt', 'updatedAt', 'wunsch', 'geliehen', 'cover', 'coverLocal', 'coverSpine', 'coverAspect', 'auto', 'autoAt'].includes(k)) rec[k] = v;
+    for (const [k, v] of Object.entries(data)) if (!(k in rec) && !k.startsWith('_') && !fieldDef(data.typ, k) && !['typ', 'id', 'createdAt', 'updatedAt', 'wunsch', 'geliehen', 'cover', 'coverLocal', 'coverSpine', 'coverAspect', 'spineLocal', 'imgAt', 'spineAt', 'auto', 'autoAt'].includes(k)) rec[k] = v;
     if (rec.wunsch || rec.geliehen) delete rec.weg;
-    if (data.coverSpine && !coverData && !removeCover) { rec.coverSpine = true; if (data.coverAspect) rec.coverAspect = data.coverAspect; }
     if ($('#retChk', form)?.checked) rec.verleihHistorie = applyReturn(rec, data.verleihHistorie, zurueck);
     if (rec.verliehenAn && !rec.verliehenAm) rec.verliehenAm = todayISO();
     // "online ergänzt"-Markierung nur für Felder, deren Wert noch dem ergänzten entspricht
@@ -1747,6 +1860,83 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     if (!item && !prefill?._checked && settings.autoFill && (missingFields(saved).length || !hasCover(saved))) autoCompleteItem(saved.id);
     onSaved?.(saved);
   };
+}
+
+/* ---------- Bild zuschneiden & stufenlos drehen ---------- */
+// Online-Bilder lassen sich nur bearbeiten, wenn der Server das erlaubt (CORS) – sonst null
+async function imageForEditing(src) {
+  if (String(src).startsWith('data:')) return src;
+  try { const r = await fetch(src, { mode: 'cors', referrerPolicy: 'no-referrer' }); if (!r.ok) return null; return await blobToDataURL(await r.blob()); } catch { return null; }
+}
+function openImageEditor(src, { kind = 'cover' } = {}) {
+  return new Promise(async resolve => {
+    let done = false; const finish = v => { if (done) return; done = true; resolve(v); };
+    const img = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+    if (!img) { toast('Bild konnte nicht geladen werden'); return finish(null); }
+    const W = img.naturalWidth, H = img.naturalHeight;
+    let quarter = 0, fine = 0, crop = { x: 0, y: 0, w: 1, h: 1 };
+    const s = openSheet(`${sheetHead(kind === 'spine' ? 'Buchrücken zuschneiden' : 'Cover zuschneiden')}
+      <div class="ie-stage" id="ieStage"><div class="ie-wrap" id="ieWrap"><canvas id="ieCan"></canvas>
+        <div class="ie-crop" id="ieCrop"><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i>${['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(h => `<b data-h="${h}" class="h-${h}"></b>`).join('')}</div></div></div>
+      <div class="ie-ctl">
+        <div class="ie-rot"><button class="btn" id="ieL" aria-label="90 Grad nach links">⟲ 90°</button><input type="range" id="ieFine" min="-45" max="45" step="0.1" value="0" aria-label="Feindrehung"><button class="btn" id="ieR" aria-label="90 Grad nach rechts">90° ⟳</button></div>
+        <div class="ie-row"><span class="hint" id="ieDeg">0°</span><button class="btn ghost" id="ieStraight">Gerade</button><button class="btn ghost" id="ieAll">Ganzes Bild</button></div>
+        <p class="hint" style="margin:4px 0 0">Ecken und Kanten des Rahmens ziehen zum Zuschneiden, Rahmen in der Mitte ziehen zum Verschieben. Der Regler dreht stufenlos – die Hilfslinien helfen beim Geraderichten.</p>
+      </div>
+      <div class="formfoot"><button class="btn" data-close>Abbrechen</button><button class="btn primary" id="ieOk">Übernehmen</button></div>`, { full: true, onClose: () => finish(null) });
+    const can = $('#ieCan', s), wrap = $('#ieWrap', s), stage = $('#ieStage', s), box = $('#ieCrop', s);
+    let BW = W, BH = H, cw = 1, ch = 1;
+    const angle = () => quarter * 90 + fine;
+    function layout() {
+      const a = angle() * Math.PI / 180, c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
+      BW = W * c + H * sn; BH = W * sn + H * c;
+      const SW = stage.clientWidth - 16, SH = stage.clientHeight - 16;
+      const sc = Math.min(SW / BW, SH / BH); cw = Math.max(40, BW * sc); ch = Math.max(40, BH * sc);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      can.width = Math.round(cw * dpr); can.height = Math.round(ch * dpr); can.style.width = cw + 'px'; can.style.height = ch + 'px';
+      wrap.style.width = cw + 'px'; wrap.style.height = ch + 'px';
+      const x = can.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, can.width, can.height);
+      x.translate(can.width / 2, can.height / 2); x.rotate(a); const k = can.width / BW; x.scale(k, k); x.drawImage(img, -W / 2, -H / 2);
+      $('#ieDeg', s).textContent = (Math.round(angle() * 10) / 10).toString().replace('.', ',') + '°';
+      placeBox();
+    }
+    function placeBox() { Object.assign(box.style, { left: crop.x * cw + 'px', top: crop.y * ch + 'px', width: crop.w * cw + 'px', height: crop.h * ch + 'px' }); }
+    const clamp = () => { const m = .04; crop.w = Math.max(m, Math.min(1, crop.w)); crop.h = Math.max(m, Math.min(1, crop.h)); crop.x = Math.max(0, Math.min(1 - crop.w, crop.x)); crop.y = Math.max(0, Math.min(1 - crop.h, crop.y)); };
+    box.addEventListener('pointerdown', e => {
+      e.preventDefault(); const h = e.target.dataset.h || 'move'; const st = { ...crop }, sx = e.clientX, sy = e.clientY;
+      box.setPointerCapture(e.pointerId);
+      const mv = ev => {
+        const dx = (ev.clientX - sx) / cw, dy = (ev.clientY - sy) / ch; let { x, y, w, h: hh } = st;
+        if (h === 'move') { x += dx; y += dy; }
+        else {
+          if (h.includes('w')) { const nx = Math.max(0, Math.min(x + w - .04, x + dx)); w += x - nx; x = nx; }
+          if (h.includes('e')) w = Math.max(.04, Math.min(1 - x, w + dx));
+          if (h.includes('n')) { const ny = Math.max(0, Math.min(y + hh - .04, y + dy)); hh += y - ny; y = ny; }
+          if (h.includes('s')) hh = Math.max(.04, Math.min(1 - y, hh + dy));
+        }
+        crop = { x, y, w, h: hh }; clamp(); placeBox();
+      };
+      const up = () => { box.removeEventListener('pointermove', mv); box.removeEventListener('pointerup', up); box.removeEventListener('pointercancel', up); };
+      box.addEventListener('pointermove', mv); box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+    });
+    $('#ieFine', s).oninput = e => { fine = +e.target.value; layout(); };
+    $('#ieL', s).onclick = () => { quarter = (quarter + 3) % 4; crop = { x: 0, y: 0, w: 1, h: 1 }; layout(); };
+    $('#ieR', s).onclick = () => { quarter = (quarter + 1) % 4; crop = { x: 0, y: 0, w: 1, h: 1 }; layout(); };
+    $('#ieStraight', s).onclick = () => { fine = 0; $('#ieFine', s).value = 0; layout(); };
+    $('#ieAll', s).onclick = () => { crop = { x: 0, y: 0, w: 1, h: 1 }; placeBox(); };
+    $('#ieOk', s).onclick = async () => {
+      const a = angle() * Math.PI / 180; const pw = crop.w * BW, ph = crop.h * BH;
+      const max = kind === 'spine' ? 700 : 900; const sc = Math.min(1, max / Math.max(pw, ph));
+      const out = document.createElement('canvas'); out.width = Math.max(1, Math.round(pw * sc)); out.height = Math.max(1, Math.round(ph * sc));
+      const x = out.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, out.width, out.height);
+      x.scale(sc, sc); x.translate(-crop.x * BW, -crop.y * BH); x.translate(BW / 2, BH / 2); x.rotate(a); x.drawImage(img, -W / 2, -H / 2);
+      const res = { data: out.toDataURL('image/jpeg', .85), aspect: pw / ph };
+      finish(res); await closeSheet();
+    };
+    const ro = new ResizeObserver(() => layout()); ro.observe(stage);
+    s.parentElement._onClose = () => { ro.disconnect(); finish(null); };
+    layout();
+  });
 }
 
 /* ---------- Hinzufügen-Menü ---------- */
@@ -2163,6 +2353,40 @@ async function autoCompleteItem(id, { quiet = false } = {}) {
   await persist(); render();
   if (!quiet) toast(`„${cur.titel}“: ${applied.length || 'Cover'}${applied.length ? ' Angaben' : ''} online ergänzt`);
   return applied.length || 1;
+}
+// Vorderseite automatisch aus dem Internet holen, wo nur ein Rücken-Foto oder gar kein Bild da ist (nur kostenlose Quellen)
+const imgOk = url => new Promise(res => { const i = new Image(); i.referrerPolicy = 'no-referrer'; i.onload = () => res(i.naturalWidth > 20 && i.naturalHeight > 20); i.onerror = () => res(false); i.src = url; setTimeout(() => res(false), 8000); });
+async function findFrontCover(it) {
+  const rec = Object.assign({}, it); let url;
+  try {
+    if (it.typ === 'buch') {
+      url = (await bookLookup(rec))?.cover;
+      const isbn = String(it.isbn || it.barcode || '').replace(/[^0-9Xx]/g, '');
+      if (!url && isbn.length >= 10) { const ol = `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`; if (await imgOk(ol)) url = ol; }
+    }
+    if (!url && it.typ === 'bluray' && settings.tmdbKey) url = (await tmdbLookup(rec))?.cover;
+    if (!url && it.typ === 'game' && settings.rawgKey) url = (await rawgLookup(rec))?.cover;
+    if (!url && it.typ === 'vinyl') url = (await mbLookup(rec))?.cover;
+    if (!url) url = (await wikidataLookup(rec))?.cover;
+  } catch { }
+  return url || null;
+}
+let frontBusy = false;
+async function fetchMissingFronts() {
+  if (frontBusy || VIEW || !navigator.onLine) return; frontBusy = true;
+  try {
+    const tried = meta.frontTried || (meta.frontTried = {});
+    const todo = allLive().filter(i => TYPES[i.typ] && i.titel && !hasCover(i) && Date.now() - (tried[i.id] || 0) > 20 * 864e5).slice(0, 40);
+    let n = 0;
+    for (const it of todo) {
+      tried[it.id] = Date.now();
+      const url = await findFrontCover(it); const cur = byId(it.id);
+      if (url && cur && !cur.deleted && !hasCover(cur)) { cur.cover = url; cur.updatedAt = Date.now(); n++; if (n % 10 === 0) { await persist(); render(); } }
+      await sleep(700);
+    }
+    await saveMeta();
+    if (n % 10) { await persist(); render(); }
+  } finally { frontBusy = false; }
 }
 async function completeAll(list) {
   const todo = list ? list.filter(i => !i.deleted) : allLive().filter(i => ((missingFields(i).length || !hasCover(i)) && (!i.autoAt || i.autoAt < (settings.sourcesAt || 0))) || (i.typ === 'brettspiel' && !i.bgg && !i.bggTried));
@@ -2594,7 +2818,10 @@ function mergeRemote(remoteItems) {
     const l = map.get(r.id);
     if (!l || (r.updatedAt || 0) > (l.updatedAt || 0)) {
       if (l && r.coverLocal && !l.coverLocal) { } // Cover wird bei Bedarf geladen
-      if (l && l.coverLocal && !r.coverLocal) { idb.del('cover:' + l.id); coverCache.delete(l.id); }
+      if (l && l.coverLocal && (!r.coverLocal || r.coverSpine !== l.coverSpine)) { idb.del('cover:' + l.id); coverCache.delete('cover:' + l.id); }
+      if (l && l.spineLocal && !r.spineLocal) { idb.del('spine:' + l.id); coverCache.delete('spine:' + l.id); }
+      if (r.updatedAt > (l?.updatedAt || 0) && l && r.coverLocal && l.coverLocal && r.imgAt !== l.imgAt) { idb.del('cover:' + l.id); coverCache.delete('cover:' + l.id); }
+      if (r.updatedAt > (l?.updatedAt || 0) && l && r.spineLocal && l.spineLocal && r.spineAt !== l.spineAt) { idb.del('spine:' + l.id); coverCache.delete('spine:' + l.id); }
       map.set(r.id, r); changed = true;
     } else if ((l.updatedAt || 0) > (r.updatedAt || 0)) localAhead = true;
   }
@@ -2640,10 +2867,17 @@ async function sync() {
       } catch (e) { if (e.conflict) { await sleep(400); continue; } throw e; }
     }
     // Cover hoch-/löschen
-    for (const id of [...meta.pendingCovers]) {
-      const d = await idb.get('cover:' + id);
-      if (d) await dbxUpload(P('/covers/' + id + '.jpg'), await dataURLToBlob(d), { '.tag': 'overwrite' });
-      meta.pendingCovers = meta.pendingCovers.filter(x => x !== id);
+    for (const kind of ['cover', 'spine']) {
+      const [up] = IMG_Q[kind];
+      for (const id of [...(meta[up] || [])]) {
+        const d = await idb.get(kind + ':' + id);
+        if (d) await dbxUpload(P(imgPath(id, kind)), await dataURLToBlob(d), { '.tag': 'overwrite' });
+        meta[up] = meta[up].filter(x => x !== id);
+      }
+    }
+    for (const id of [...(meta.pendingSpineDeletes || [])]) {
+      try { await dbxRpc('files/delete_v2', { path: P(imgPath(id, 'spine')) }); } catch { }
+      meta.pendingSpineDeletes = meta.pendingSpineDeletes.filter(x => x !== id);
     }
     for (const id of [...meta.pendingCoverDeletes]) {
       try { await dbxRpc('files/delete_v2', { path: P('/covers/' + id + '.jpg') }); } catch { }
@@ -2809,7 +3043,7 @@ function openSettings() {
   });
   $('#sExcel', s).onclick = async e => { const b = e.target; b.disabled = true; b.textContent = 'Erstelle …'; try { await exportExcel(); } catch (err) { alert(err.message); } b.disabled = false; b.textContent = 'Excel-Liste herunterladen'; };
   $('#sBackup', s).onclick = async () => {
-    const covers = {}; for (const it of allLive()) if (it.coverLocal) { const d = await idb.get('cover:' + it.id); if (d) covers[it.id] = d; }
+    const covers = {}; for (const it of allLive()) { if (it.coverLocal) { const d = await idb.get('cover:' + it.id); if (d) covers[it.id] = d; } if (it.spineLocal) { const d = await idb.get('spine:' + it.id); if (d) covers[it.id + '#ruecken'] = d; } }
     const blob = new Blob([JSON.stringify({ app: 'mediathek', version: 1, shared, items, covers })], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Mediathek-Sicherung_${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
@@ -2818,7 +3052,7 @@ function openSettings() {
     try {
       const j = JSON.parse(await f.text()); if (!Array.isArray(j.items)) throw new Error('Keine Mediathek-Sicherung');
       if (!confirm(`${j.items.filter(i => !i.deleted).length} Medien aus der Sicherung übernehmen? Bestehende Einträge bleiben erhalten, neuere Stände gewinnen.`)) return;
-      for (const [id, d] of Object.entries(j.covers || {})) { await idb.set('cover:' + id, d); if (!meta.pendingCovers.includes(id)) meta.pendingCovers.push(id); }
+      for (const [k, d] of Object.entries(j.covers || {})) { const sp = k.endsWith('#ruecken'); const id = k.replace('#ruecken', ''); await idb.set((sp ? 'spine:' : 'cover:') + id, d); imgQueue(id, sp ? 'spine' : 'cover'); }
       mergeRemote(j.items); if (j.shared && (j.shared.updatedAt || 0) > (shared.updatedAt || 0)) { shared = j.shared; await idb.set('shared', shared); }
       await persist(); render(); toast('Sicherung geladen');
     } catch (err) { alert('Fehler: ' + err.message); }
@@ -3039,7 +3273,7 @@ const SHARE_FILE = () => P('/freigabe/sammlung.json');
 const b64urlStr = str => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64urlStr = b => decodeURIComponent(escape(atob(b.replace(/-/g, '+').replace(/_/g, '/'))));
 function publicData() {
-  const PRIVATE = ['wert', 'weg', 'bggTried', 'kaufpreis', 'kaufdatum', 'notizen', 'verliehenAm', 'verleihHistorie', 'auto', 'autoAt', 'standort', 'barcode', 'updatedAt', 'coverLocal', 'coverSpine', 'coverAspect', 'preisCa'];
+  const PRIVATE = ['wert', 'weg', 'bggTried', 'kaufpreis', 'kaufdatum', 'notizen', 'verliehenAm', 'verleihHistorie', 'auto', 'autoAt', 'standort', 'barcode', 'updatedAt', 'coverLocal', 'coverSpine', 'coverAspect', 'spineLocal', 'imgAt', 'spineAt', 'preisCa'];
   return {
     app: 'mediathek-ansicht', at: Date.now(),
     title: [shared.person1, shared.person2].filter(Boolean).join(' & '),
@@ -3560,9 +3794,10 @@ async function mergeItems(keepId, otherIds) {
   const rec = Object.assign({}, keep);
   for (const oid of otherIds) {
     const o = byId(oid); if (!o) continue;
-    for (const [k, v] of Object.entries(o)) if (isEmpty(rec[k]) && !['id', 'createdAt', 'updatedAt', 'deleted', 'coverLocal', 'coverSpine', 'coverAspect', 'keinDuplikat'].includes(k)) rec[k] = v;
+    for (const [k, v] of Object.entries(o)) if (isEmpty(rec[k]) && !['id', 'createdAt', 'updatedAt', 'deleted', 'coverLocal', 'coverSpine', 'coverAspect', 'spineLocal', 'imgAt', 'spineAt', 'keinDuplikat'].includes(k)) rec[k] = v;
     if ((o.verleihHistorie || []).length) rec.verleihHistorie = [...(rec.verleihHistorie || []), ...o.verleihHistorie];
-    if (!rec.cover && !rec.coverLocal && o.coverLocal) { const d = await idb.get('cover:' + o.id); if (d) { rec._coverData = d; if (o.coverSpine) { rec._coverSpine = true; rec._coverAspect = o.coverAspect; } } }
+    if (!hasCover(rec) && !rec._coverData && o.coverLocal && !o.coverSpine) { const d = await localImg('cover', o.id); if (d) rec._coverData = d; }
+    if (!hasSpine(rec) && !rec._spineData && hasSpine(o)) { const d = await spineURL(o); if (d) { rec._spineData = d; rec._spineAspect = o.coverAspect; } }
     rec.createdAt = Math.min(rec.createdAt || Date.now(), o.createdAt || Date.now());
   }
   const created = rec.createdAt; await upsertItem(rec); const it = byId(keepId) || items.find(i => i.id === keepId); if (it) it.createdAt = created;
@@ -3731,6 +3966,7 @@ addEventListener('resize', () => { if (Math.abs(innerWidth - lastW) < 30) return
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleSync(300); });
 addEventListener('online', () => scheduleSync(300));
 setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 60000);
+setTimeout(() => fetchMissingFronts(), 6000); setInterval(() => { if (document.visibilityState === 'visible') fetchMissingFronts(); }, 15 * 60000);
 window.addEventListener('error', e => console.error(e.message));
 // Link angetippt, während die App schon offen ist (nur der Teil nach # ändert sich)
 addEventListener('hashchange', () => {
