@@ -508,7 +508,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.11';
+const APP_VERSION = '1.11.2';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2401,6 +2401,27 @@ async function fetchMissingFronts() {
 }
 /* ---------- Cover im Internet suchen (mit Rückfrage) ---------- */
 // Mehrere Vorschläge aus kostenlosen Quellen (+ TMDb/RAWG mit Schlüssel), damit ihr das richtige auswählen könnt
+// Wikipedia-Artikelbilder (englische Wikipedia zeigt bei Spielen, Filmen und Alben meist das Cover; pilicense=any schließt diese ein)
+const WP_HINT = { game: ['video game', 'Computerspiel'], brettspiel: ['board game', 'Brettspiel'], bluray: ['film', 'Film'], vinyl: ['album', 'Album'], buch: ['novel', 'Roman'] };
+async function wikipediaCovers(it) {
+  const [en, de] = WP_HINT[it.typ] || ['', ''];
+  const clean = t => String(t || '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[^a-z0-9äöüß]/g, '');
+  const nt = clean(it.titel); const out = [];
+  const extra = it.typ === 'vinyl' && it.interpret ? ' ' + it.interpret : '';
+  for (const [lang, hint] of [['en', en], ['de', de]]) {
+    const url = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrlimit=5&gsrsearch=${encodeURIComponent(it.titel + extra + ' ' + hint)}&prop=pageimages&piprop=thumbnail&pithumbsize=500&pilicense=any`;
+    const j = await fetchJSON(url, 7000);
+    const pages = Object.values(j?.query?.pages || {}).filter(p => p.thumbnail?.source).sort((a, b) => (a.index || 0) - (b.index || 0));
+    const match = pages.filter(p => { const k = clean(p.title); return k && nt && (k === nt || (nt.length >= 4 && (k.includes(nt) || nt.includes(k)))); });
+    for (const p of match) out.push(p.thumbnail.source);
+    if (!match.length && pages[0]) out.push(pages[0].thumbnail.source); // bester Suchtreffer als Vorschlag
+  }
+  if (it.typ === 'brettspiel' && out.length < 2) { // Fotos von Spielschachteln auf Wikimedia Commons
+    const j = await fetchJSON(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=4&gsrsearch=${encodeURIComponent(it.titel + ' board game')}&prop=imageinfo&iiprop=url&iiurlwidth=500`, 7000);
+    for (const p of Object.values(j?.query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0))) { const u = p.imageinfo?.[0]?.thumburl; if (u && /\.(jpe?g|png|webp)/i.test(u)) out.push(u); }
+  }
+  return out;
+}
 async function findCoverCandidates(it) {
   const out = []; const add = u => { if (u && !out.includes(u) && out.length < 6) out.push(u); };
   const rec = Object.assign({}, it);
@@ -2418,7 +2439,8 @@ async function findCoverCandidates(it) {
     if (it.typ === 'bluray' && settings.tmdbKey) add((await tmdbLookup(rec))?.cover);
     if (it.typ === 'game' && settings.rawgKey) add((await rawgLookup(rec))?.cover);
     if (it.typ === 'vinyl') add((await mbLookup(rec))?.cover);
-    if (!out.length || ['brettspiel', 'game'].includes(it.typ)) add((await wikidataLookup(rec))?.cover);
+    if (!out.length || ['brettspiel', 'game'].includes(it.typ)) add((await wikidataLookup(rec).catch(() => null))?.cover);
+    if (out.length < 4) for (const u of await wikipediaCovers(it).catch(() => [])) add(u);
   } catch { }
   // nur Bilder, die wirklich laden
   const ok = await Promise.all(out.map(u => imgOk(u)));
@@ -2736,19 +2758,23 @@ const dbxConnected = () => !!(settings.dbxAppKey && settings.dbxRefresh);
 const dbxReady = () => dbxConnected() && typeof settings.dbxFolder === 'string';
 const P = sub => (settings.dbxFolder || '') + sub;
 const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const DBX_SCOPES = ['account_info.read', 'files.metadata.read', 'files.content.read', 'files.content.write', 'sharing.read', 'sharing.write'];
+const dbxMissingScopes = () => settings.dbxScope ? DBX_SCOPES.filter(x => x !== 'account_info.read' && !settings.dbxScope.split(' ').includes(x)) : [];
 async function dbxStartAuth() {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
   const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
   sessionStorage.setItem('dbx_verifier', verifier);
-  window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${encodeURIComponent(settings.dbxAppKey)}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&token_access_type=offline`, '_blank');
+  // Berechtigungen ausdrücklich anfordern: Fehlt eine in der Dropbox-App, meldet Dropbox das sofort beim Anmelden
+  window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${encodeURIComponent(settings.dbxAppKey)}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&token_access_type=offline&force_reapprove=true&scope=${encodeURIComponent(DBX_SCOPES.join(' '))}`, '_blank');
 }
 async function dbxFinishAuth(code) {
   const body = new URLSearchParams({ code: code.trim(), grant_type: 'authorization_code', client_id: settings.dbxAppKey, code_verifier: sessionStorage.getItem('dbx_verifier') || '' });
   const r = await fetch('https://api.dropboxapi.com/oauth2/token', { method: 'POST', body });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.refresh_token) throw new Error(j.error_description || j.error || 'Anmeldung fehlgeschlagen');
-  settings.dbxRefresh = j.refresh_token; saveSettings();
+  settings.dbxRefresh = j.refresh_token; settings.dbxScope = j.scope || ''; saveSettings();
   dbxAccess = { token: j.access_token, exp: Date.now() + (j.expires_in - 60) * 1000 };
+  const miss = dbxMissingScopes(); if (miss.length) alert('Achtung: Der Dropbox-App fehlen noch Berechtigungen: ' + miss.join(', ') + '.\n\nIn der Dropbox-App-Konsole unter „Permissions“ anhaken, „Submit“ klicken, dann hier Dropbox trennen und neu verbinden.');
   settings.dbxFolder = null; saveSettings();
   meta.remoteRev = null; await saveMeta();
 }
@@ -2758,6 +2784,7 @@ async function dbxToken() {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { if (r.status === 400 || r.status === 401) { settings.dbxRefresh = ''; saveSettings(); } throw new Error('Dropbox-Anmeldung abgelaufen – bitte neu verbinden'); }
   dbxAccess = { token: j.access_token, exp: Date.now() + (j.expires_in - 60) * 1000 };
+  if (j.scope && j.scope !== settings.dbxScope) { settings.dbxScope = j.scope; saveSettings(); }
   return dbxAccess.token;
 }
 async function dbxRpc(ep, body) {
@@ -2853,6 +2880,7 @@ async function dbxDiagnose(out) {
   const errTxt = e => String(e.message || e) + (e.raw && !String(e.message).includes(e.raw.slice(0, 40)) ? ' | ' + e.raw.slice(0, 400) : '');
   add(null, 'Mediathek ' + APP_VERSION + ', Ordner „' + (settings.dbxFolder || '(Wurzel)') + '“');
   try { await dbxToken(); add(true, 'Anmeldung'); } catch (e) { add(false, 'Anmeldung', errTxt(e)); return lines; }
+  if (settings.dbxScope) { const miss = dbxMissingScopes(); add(!miss.length, 'Berechtigungen dieser Anmeldung', miss.length ? 'es fehlen ' + miss.join(', ') + ' → in der Dropbox-App-Konsole anhaken, „Submit“, dann hier trennen und neu verbinden' : 'vollständig'); }
   try {
     const a = await dbxRpc('users/get_current_account', null);
     add(true, 'Konto', `${a.account_type?.['.tag'] || '?'}, E-Mail bestätigt: ${a.email_verified ? 'ja' : 'NEIN'}${a.root_info && a.root_info.root_namespace_id !== a.root_info.home_namespace_id ? ', Team-Bereich' : ''}`);
@@ -3087,7 +3115,7 @@ function openSettings() {
         <div class="inrow">${dbxReady() ? '<button class="btn primary" id="dNow" style="flex:1">Jetzt synchronisieren</button>' : ''}<button class="btn danger" id="dOff" style="flex:1">Trennen</button></div>`;
       $('#dFolder', c).onclick = () => openFolderPicker(drawDbx);
       const now = $('#dNow', c); if (now) now.onclick = async () => { await sync(); drawDbx(); toast('Synchronisiert'); };
-      $('#dOff', c).onclick = () => { if (!confirm('Dropbox auf diesem Gerät trennen? Die Daten bleiben auf dem Gerät und in der Dropbox erhalten.')) return; settings.dbxRefresh = ''; settings.dbxFolder = null; dbxAccess = null; saveSettings(); syncLabel(); drawDbx(); };
+      $('#dOff', c).onclick = () => { if (!confirm('Dropbox auf diesem Gerät trennen? Die Daten bleiben auf dem Gerät und in der Dropbox erhalten.')) return; settings.dbxRefresh = ''; settings.dbxScope = ''; settings.dbxFolder = null; dbxAccess = null; saveSettings(); syncLabel(); drawDbx(); };
     } else {
       c.innerHTML = `<p class="hint" style="margin:0">Jeder meldet sich mit <b>seinem eigenen</b> Dropbox-Konto an und wählt danach euren <b>gemeinsam geteilten Ordner</b>. Die Datenbank liegt dort als Datei <code>mediathek.json</code> und gleicht sich zwischen allen Geräten ab.</p>
         <label class="fld"><span>1. App-Key (aus der Dropbox-App-Konsole)</span><input id="dKey" value="${esc(settings.dbxAppKey)}" autocomplete="off"></label>
