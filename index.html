@@ -508,7 +508,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.11.3';
+const APP_VERSION = '1.12';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2260,6 +2260,74 @@ async function wikidataLookup(rec) {
   return out;
 }
 
+// --- BoardGameGeek XML API (Token einer registrierten, nicht-kommerziellen Anwendung nötig) ---
+// Regeln von BGG: höchstens 1 Anfrage alle 2 Sekunden, Ergebnisse zwischenspeichern, „Powered by BGG“ verlinken.
+let bggChain = Promise.resolve(), bggLast = 0;
+function bggFetch(path) {
+  const run = async () => {
+    const wait = 2100 - (Date.now() - bggLast); if (wait > 0) await sleep(wait);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      bggLast = Date.now();
+      let r;
+      try { r = await fetch('https://boardgamegeek.com/xmlapi2/' + path, { headers: { Authorization: 'Bearer ' + settings.bggToken } }); }
+      catch (e) { const err = new Error('BoardGameGeek nicht erreichbar (Netzwerk oder vom Browser blockiert)'); err.net = true; throw err; }
+      if (r.status === 401 || r.status === 403) { const err = new Error('BoardGameGeek lehnt den Token ab (' + r.status + ')'); err.auth = true; throw err; }
+      if (r.status === 202 || r.status === 429 || r.status >= 500) { await sleep([2000, 5000, 10000, 20000][attempt]); continue; }
+      if (!r.ok) throw new Error('BoardGameGeek: Fehler ' + r.status);
+      return new DOMParser().parseFromString(await r.text(), 'text/xml');
+    }
+    throw new Error('BoardGameGeek ist gerade überlastet – später erneut versuchen');
+  };
+  const p = bggChain.then(run, run); bggChain = p.catch(() => { }); return p;
+}
+const bggIdFromUrl = u => (String(u || '').match(/boardgamegeek\.com\/boardgame(?:expansion)?\/(\d+)/) || [])[1];
+async function bggSearchIds(title) {
+  const ck = 'bggs:' + normDup(title); const c = await idb.get(ck); if (c && Date.now() - c.at < 30 * 864e5) return c.ids;
+  const doc = await bggFetch('search?type=boardgame,boardgameexpansion&query=' + encodeURIComponent(title));
+  const nt = normDup(title);
+  const hits = [...doc.querySelectorAll('item')].map(x => ({ id: x.getAttribute('id'), name: x.querySelector('name')?.getAttribute('value') || '', year: +(x.querySelector('yearpublished')?.getAttribute('value') || 0) }));
+  // genaue Treffer zuerst, dann Teiltreffer
+  const score = h => { const k = normDup(h.name); return k === nt ? 3 : (k.startsWith(nt) || nt.startsWith(k)) ? 2 : k.includes(nt) ? 1 : 0; };
+  const ids = hits.map(h => [h, score(h)]).filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([h]) => h.id);
+  await idb.set(ck, { at: Date.now(), ids });
+  return ids;
+}
+async function bggThings(ids) {
+  if (!ids.length) return [];
+  const out = [], need = [];
+  for (const id of ids) { const c = await idb.get('bggt:' + id); if (c && Date.now() - c.at < 30 * 864e5) out.push(c.t); else need.push(id); }
+  if (need.length) {
+    const doc = await bggFetch('thing?stats=1&id=' + need.join(','));
+    for (const x of doc.querySelectorAll('item')) {
+      const v = sel => x.querySelector(sel)?.getAttribute('value');
+      const t = { id: x.getAttribute('id'), name: x.querySelector('name[type=primary]')?.getAttribute('value'), image: x.querySelector('image')?.textContent?.trim(), thumb: x.querySelector('thumbnail')?.textContent?.trim(),
+        jahr: +v('yearpublished') || undefined, spielerMin: +v('minplayers') || undefined, spielerMax: +v('maxplayers') || undefined, dauer: +v('playingtime') || undefined, alterAb: +v('minage') || undefined,
+        autor: [...x.querySelectorAll('link[type=boardgamedesigner]')].slice(0, 2).map(l => l.getAttribute('value')).join(', ') || undefined,
+        weight: +x.querySelector('averageweight')?.getAttribute('value') || 0 };
+      await idb.set('bggt:' + t.id, { at: Date.now(), t }); out.push(t);
+    }
+  }
+  return ids.map(id => out.find(t => t.id === id)).filter(Boolean);
+}
+async function bggLookup(rec) {
+  if (!settings.bggToken || rec.typ !== 'brettspiel' || !rec.titel) return null;
+  const direct = bggIdFromUrl(rec.bgg);
+  const ids = direct ? [direct] : await bggSearchIds(rec.titel);
+  const t = (await bggThings(ids.slice(0, 1)))[0]; if (!t) return null;
+  return { bgg: 'https://boardgamegeek.com/boardgame/' + t.id, jahr: t.jahr, spielerMin: t.spielerMin, spielerMax: t.spielerMax, dauer: t.dauer, alterAb: t.alterAb, autor: t.autor,
+    komplexitaet: t.weight ? (t.weight < 2 ? 'Leicht' : t.weight < 3.2 ? 'Mittel' : 'Schwer') : undefined, cover: t.image || t.thumb };
+}
+async function bggCoverCands(it) {
+  if (!settings.bggToken) return [];
+  const direct = bggIdFromUrl(it.bgg);
+  const ids = direct ? [direct] : (await bggSearchIds(it.titel)).slice(0, 3);
+  return (await bggThings(ids)).map(t => t.image || t.thumb).filter(Boolean);
+}
+async function bggTest() {
+  try { const doc = await bggFetch('search?type=boardgame&query=Catan'); const n = doc.querySelectorAll('item').length; return n ? [true, `Verbindung funktioniert (${n} Treffer für „Catan“)`] : [false, 'Verbindung steht, aber keine Treffer – Token prüfen']; }
+  catch (e) { return [false, e.auth ? 'Token wird abgelehnt. Bitte unter boardgamegeek.com/applications einen neuen Token erzeugen und hier einfügen.' : e.net ? 'BoardGameGeek lässt sich von der App aus nicht abfragen. Das liegt vermutlich daran, dass BGG Anfragen direkt aus dem Browser blockiert. Dann geht es leider nur mit einem eigenen Server.' : e.message]; }
+}
+
 // --- RAWG (optional, kostenloser Schlüssel) – Videospiele inkl. Cover ---
 async function rawgLookup(rec) {
   const key = settings.rawgKey; if (!key || !rec.titel) return null;
@@ -2341,6 +2409,7 @@ async function completeRecord(rec, { useAI = true } = {}) {
     if (rec.typ === 'buch') fillMissing(rec, await bookLookup(rec), filled);
     if (rec.typ === 'bluray' && settings.tmdbKey) fillMissing(rec, await tmdbLookup(rec), filled);
     if (rec.typ === 'game' && settings.rawgKey) fillMissing(rec, await rawgLookup(rec), filled);
+    if (rec.typ === 'brettspiel' && settings.bggToken) fillMissing(rec, await bggLookup(rec).catch(() => null), filled);
     if (rec.typ === 'vinyl') fillMissing(rec, await mbLookup(rec), filled);
     if (missingFields(rec).length || !hasCover(rec)) fillMissing(rec, await wikidataLookup(rec), filled);
     if (useAI && settings.provider !== 'barcode' && aiKey()) { const miss = missingFields(rec).filter(f => f.ai); if (miss.length) fillMissing(rec, await aiComplete(rec, miss).catch(() => null), filled); }
@@ -2438,6 +2507,7 @@ async function findCoverCandidates(it) {
     }
     if (it.typ === 'bluray' && settings.tmdbKey) add((await tmdbLookup(rec))?.cover);
     if (it.typ === 'game' && settings.rawgKey) add((await rawgLookup(rec))?.cover);
+    if (it.typ === 'brettspiel' && settings.bggToken) for (const u of await bggCoverCands(it).catch(() => [])) add(u);
     if (it.typ === 'vinyl') add((await mbLookup(rec))?.cover);
     if (!out.length || ['brettspiel', 'game'].includes(it.typ)) add((await wikidataLookup(rec).catch(() => null))?.cover);
     if (out.length < 4) for (const u of await wikipediaCovers(it).catch(() => [])) add(u);
@@ -3041,6 +3111,9 @@ function openSettings() {
       <p class="hint" style="margin:0">Token: <a href="https://www.discogs.com/settings/developers" target="_blank" rel="noopener">discogs.com → Einstellungen → Entwickler</a> → „Generate new token“.</p>
       <label class="fld"><span>RAWG-Schlüssel (optional, kostenlos – für Spiele-Cover)</span><input id="sRawg" type="password" value="${esc(settings.rawgKey || '')}" placeholder="API-Key" autocomplete="off"></label>
       <p class="hint" style="margin:0">Schlüssel: <a href="https://rawg.io/apidocs" target="_blank" rel="noopener">rawg.io/apidocs</a> → „Get API Key“ (kostenloses Konto). Brettspiel-Fotos kommen ohne Schlüssel aus Wikimedia Commons.</p>
+      <label class="fld"><span>BoardGameGeek-Token (optional, kostenlos – Brettspiel-Cover & Daten)</span><input id="sBgg" type="password" value="${esc(settings.bggToken || '')}" placeholder="Token der registrierten Anwendung" autocomplete="off"></label>
+      <div class="inrow"><button class="btn" id="sBggTest" style="flex:1">BGG-Verbindung testen</button></div>
+      <p class="hint" style="margin:0">Token: Mit dem BGG-Konto auf <a href="https://boardgamegeek.com/applications" target="_blank" rel="noopener">boardgamegeek.com/applications</a> eine Anwendung registrieren (nicht-kommerziell, z. B. „Private Mediathek“). Nach der Freigabe durch BGG (kann eine Woche dauern) dort unter „Tokens“ einen Token erzeugen. <a href="https://boardgamegeek.com" target="_blank" rel="noopener"><b>Powered by BGG</b></a></p>
       <button class="btn" id="sFillAll">Bei allen vorhandenen Medien ergänzen</button>
     </div>
 
@@ -3130,6 +3203,8 @@ function openSettings() {
   $('#sAuto', s).onchange = e => { settings.autoFill = e.target.checked; saveSettings(); };
   $('#sTmdb', s).oninput = e => { settings.tmdbKey = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
   $('#sRawg', s).oninput = e => { settings.rawgKey = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
+  $('#sBgg', s).oninput = e => { settings.bggToken = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
+  $('#sBggTest', s).onclick = async e => { const b = e.currentTarget; if (!settings.bggToken) return toast('Bitte zuerst den Token einfügen'); b.disabled = true; b.textContent = 'Teste … (BGG erlaubt nur langsame Abfragen)'; const [ok, msg] = await bggTest(); b.disabled = false; b.textContent = 'BGG-Verbindung testen'; ok ? toast('✓ ' + msg, 4000) : alert(msg); };
   $('#sBkNow', s).onclick = async e => { const b = e.target; b.disabled = true; b.textContent = 'Lege an …'; try { const n = await maybeBackup(true); toast('Backup angelegt: ' + n); } catch (err) { alert('Backup fehlgeschlagen: ' + err.message); } b.disabled = false; b.textContent = 'Jetzt Backup anlegen'; };
   $('#sBkRestore', s).onclick = () => openBackupRestore();
   $('#sClean', s).onclick = () => closeSheet().then(openCleanup);
@@ -3177,7 +3252,7 @@ function openSettings() {
     } catch (err) { alert('Fehler: ' + err.message); }
   };
   $('#sCodeOut', s).onclick = async () => {
-    const payload = { provider: settings.provider, claudeKey: settings.claudeKey, claudeModel: settings.claudeModel, geminiKey: settings.geminiKey, geminiModel: settings.geminiModel, tmdbKey: settings.tmdbKey, rawgKey: settings.rawgKey, autoFill: settings.autoFill, dbxAppKey: settings.dbxAppKey };
+    const payload = { provider: settings.provider, claudeKey: settings.claudeKey, claudeModel: settings.claudeModel, geminiKey: settings.geminiKey, geminiModel: settings.geminiModel, tmdbKey: settings.tmdbKey, rawgKey: settings.rawgKey, bggToken: settings.bggToken, discogsToken: settings.discogsToken, autoFill: settings.autoFill, dbxAppKey: settings.dbxAppKey };
     if (dbxConnected() && confirm('Deine Dropbox-Anmeldung mitgeben?\n\nOK = das andere Gerät nutzt DEIN Dropbox-Konto (z. B. dein Laptop).\nAbbrechen = das Gerät meldet sich mit einem EIGENEN Konto an (z. B. das Handy deiner Frau) und wählt dann euren geteilten Ordner.')) { payload.dbxRefresh = settings.dbxRefresh; payload.dbxFolder = settings.dbxFolder; }
     const code = 'MT1:' + btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
     try { await navigator.clipboard.writeText(code); toast('Code kopiert – z. B. per Messenger an dich selbst schicken'); } catch { prompt('Code kopieren:', code); }
