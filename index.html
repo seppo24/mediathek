@@ -447,7 +447,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.8.1';
+const APP_VERSION = '1.8.2';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2083,20 +2083,20 @@ async function dbxToken() {
 async function dbxRpc(ep, body) {
   const r = await fetch('https://api.dropboxapi.com/2/' + ep, { method: 'POST', headers: { Authorization: 'Bearer ' + await dbxToken(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const txt = await r.text(); let j = {}; try { j = JSON.parse(txt); } catch { }
-  if (!r.ok) { const e = new Error(j.error_summary || txt || r.status); e.status = r.status; e.summary = j.error_summary || ''; throw e; }
+  if (!r.ok) { const e = new Error(ep + ' (' + r.status + '): ' + (j.error_summary || txt || '') + (j.user_message?.text ? ' – ' + j.user_message.text : '')); e.status = r.status; e.summary = j.error_summary || ''; e.raw = txt; throw e; }
   return j;
 }
 async function dbxMeta(path) { try { return await dbxRpc('files/get_metadata', { path }); } catch (e) { if (e.status === 409 && /not_found/.test(e.summary)) return null; throw e; } }
 async function dbxDownload(path) {
   const r = await fetch('https://content.dropboxapi.com/2/files/download', { method: 'POST', headers: { Authorization: 'Bearer ' + await dbxToken(), 'Dropbox-API-Arg': JSON.stringify({ path }) } });
   if (r.status === 409) return null;
-  if (!r.ok) throw new Error('Download fehlgeschlagen (' + r.status + ')');
+  if (!r.ok) { const t = await r.text().catch(() => ''); const e = new Error('files/download (' + r.status + '): ' + t.slice(0, 300)); e.status = r.status; e.raw = t; throw e; }
   return r.blob();
 }
 async function dbxUpload(path, data, mode) {
   const r = await fetch('https://content.dropboxapi.com/2/files/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + await dbxToken(), 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': JSON.stringify({ path, mode, autorename: false, mute: true }) }, body: data });
   const txt = await r.text(); let j = {}; try { j = JSON.parse(txt); } catch { }
-  if (!r.ok) { const e = new Error(j.error_summary || txt || r.status); e.conflict = r.status === 409 && /conflict/.test(j.error_summary || ''); throw e; }
+  if (!r.ok) { const e = new Error('files/upload (' + r.status + '): ' + (j.error_summary || txt || '') + (j.user_message?.text ? ' – ' + j.user_message.text : '')); e.status = r.status; e.summary = j.error_summary || ''; e.raw = txt; e.conflict = r.status === 409 && /conflict/.test(j.error_summary || ''); throw e; }
   return j;
 }
 
@@ -2155,7 +2155,7 @@ async function setDbxFolder(path) {
 let syncing = false, syncAgain = false, syncTimer = null, lastSyncErr = null;
 // Dropbox-Fehler in verständliche Sprache übersetzen (vorher nur als Tooltip sichtbar – am Handy unsichtbar)
 function explainSyncErr(e) {
-  const m = String((e && (e.summary || e.message)) || e || '');
+  const m = String((e && ((e.summary || '') + ' ' + (e.message || ''))) || e || '');
   if (!navigator.onLine) return ['Kein Internet', 'Das Gerät ist offline. Sobald es wieder online ist, synchronisiert die App von selbst.'];
   if (/missing_scope|required_scope|scope/i.test(m)) return ['Der Dropbox-App fehlen Berechtigungen', 'In der Dropbox-App-Konsole (dropbox.com/developers/apps → eure App → Reiter „Permissions“) diese Haken setzen: files.metadata.read, files.content.read, files.content.write, sharing.read, sharing.write. Unten auf „Submit“ klicken. Danach hier unter Einstellungen → Dropbox-Synchronisierung „Trennen“ und neu verbinden – erst dann gelten die neuen Berechtigungen.'];
   if (/abgelaufen|invalid_access_token|expired_access_token|401/i.test(m)) return ['Dropbox-Anmeldung abgelaufen', 'Unter Einstellungen → Dropbox-Synchronisierung neu verbinden. Die Daten auf dem Gerät bleiben erhalten.'];
@@ -2167,14 +2167,45 @@ function explainSyncErr(e) {
   if (/JSON|Unexpected token/i.test(m)) return ['Datei in der Dropbox beschädigt', 'Die Datei mediathek.json im Ordner ist nicht lesbar. In Dropbox über „Versionsverlauf“ eine ältere Version wiederherstellen oder mir die Meldung unten schicken.'];
   return ['Unbekannter Fehler', 'Bitte die technische Meldung unten kopieren und an Claude schicken.'];
 }
+// Schritt-für-Schritt-Prüfung der Dropbox-Verbindung
+async function dbxDiagnose(out) {
+  const lines = [], add = (ok, t, d = '') => { lines.push((ok === true ? '✓ ' : ok === false ? '✗ ' : '• ') + t + (d ? ': ' + d : '')); out(lines); };
+  const errTxt = e => String(e.message || e) + (e.raw && !String(e.message).includes(e.raw.slice(0, 40)) ? ' | ' + e.raw.slice(0, 400) : '');
+  add(null, 'Mediathek ' + APP_VERSION + ', Ordner „' + (settings.dbxFolder || '(Wurzel)') + '“');
+  try { await dbxToken(); add(true, 'Anmeldung'); } catch (e) { add(false, 'Anmeldung', errTxt(e)); return lines; }
+  try {
+    const a = await dbxRpc('users/get_current_account', null);
+    add(true, 'Konto', `${a.account_type?.['.tag'] || '?'}, E-Mail bestätigt: ${a.email_verified ? 'ja' : 'NEIN'}${a.root_info && a.root_info.root_namespace_id !== a.root_info.home_namespace_id ? ', Team-Bereich' : ''}`);
+    if (!a.email_verified) add(false, 'Dropbox erlaubt Apps erst nach bestätigter E-Mail-Adresse das Schreiben');
+  } catch (e) { add(false, 'Konto', errTxt(e)); }
+  try {
+    const f = settings.dbxFolder ? await dbxRpc('files/get_metadata', { path: settings.dbxFolder }) : { '.tag': 'folder' };
+    add(f['.tag'] === 'folder', 'Ordner', f['.tag'] === 'folder' ? (f.sharing_info ? 'geteilt' + (f.sharing_info.read_only ? ', NUR LESEN' : ', bearbeiten erlaubt') : 'nicht geteilt') : 'ist kein Ordner');
+  } catch (e) { add(false, 'Ordner', errTxt(e)); }
+  try { const m = await dbxMeta(P('/mediathek.json')); add(true, 'mediathek.json', m ? `vorhanden, ${Math.round(m.size / 1024)} KB` : 'noch nicht vorhanden (wird angelegt)'); }
+  catch (e) { add(false, 'mediathek.json lesen', errTxt(e)); }
+  try {
+    await dbxUpload(P('/.mediathek-test.txt'), 'Test ' + new Date().toISOString(), { '.tag': 'overwrite' }); add(true, 'Schreiben');
+    try { await dbxRpc('files/delete_v2', { path: P('/.mediathek-test.txt') }); } catch { }
+  } catch (e) { add(false, 'Schreiben', errTxt(e)); }
+  return lines;
+}
 function openSyncError() {
   const [t, d] = explainSyncErr(lastSyncErr);
-  const tech = String((lastSyncErr && (lastSyncErr.summary || lastSyncErr.message)) || lastSyncErr || '');
+  const tech = String((lastSyncErr && (lastSyncErr.message || lastSyncErr.summary)) || lastSyncErr || '');
   const s = openSheet(`${sheetHead('Sync-Fehler')}
     <p style="margin-top:0"><b>${esc(t)}</b></p><p>${esc(d)}</p>
     <p class="hint">Technische Meldung: <code style="word-break:break-all">${esc(tech || '–')}</code></p>
+    <pre id="seDiag" hidden style="white-space:pre-wrap;word-break:break-word;font-size:13px;background:var(--card,#fff);border:1px solid var(--line,#ddd);border-radius:10px;padding:10px;margin:0 0 12px"></pre>
+    <button class="btn" id="seCheck" style="width:100%;margin-bottom:12px">🩺 Verbindung Schritt für Schritt prüfen</button>
     <div class="formfoot"><button class="btn" id="seCopy">Meldung kopieren</button><button class="btn" id="seSet">Einstellungen</button><button class="btn primary" id="seRetry">Erneut versuchen</button></div>`);
-  s.querySelector('#seCopy').onclick = () => navigator.clipboard.writeText(`Mediathek ${APP_VERSION} Sync-Fehler: ${tech}`).then(() => toast('Kopiert'), () => toast(tech, 6000));
+  let diag = '';
+  s.querySelector('#seCheck').onclick = async ev => {
+    const b = ev.currentTarget, pre = s.querySelector('#seDiag'); b.disabled = true; b.textContent = 'Prüfe …'; pre.hidden = false;
+    const lines = await dbxDiagnose(l => { pre.textContent = l.join('\n'); });
+    diag = lines.join('\n'); b.disabled = false; b.textContent = '🩺 Erneut prüfen';
+  };
+  s.querySelector('#seCopy').onclick = () => navigator.clipboard.writeText(`Mediathek ${APP_VERSION} Sync-Fehler: ${tech}${tech.includes(lastSyncErr?.raw || '\u0000') || !lastSyncErr?.raw ? '' : '\nRohtext: ' + lastSyncErr.raw.slice(0, 600)}${diag ? '\n\nPrüfung:\n' + diag : ''}`).then(() => toast('Kopiert'), () => toast(tech, 6000));
   s.querySelector('#seSet').onclick = async () => { await closeSheet(); openSettings(); };
   s.querySelector('#seRetry').onclick = async () => { await closeSheet(); sync(); };
 }
