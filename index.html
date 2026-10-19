@@ -447,7 +447,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.8';
+const APP_VERSION = '1.8.1';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2152,7 +2152,32 @@ async function setDbxFolder(path) {
 }
 
 /* ---------- Synchronisierung ---------- */
-let syncing = false, syncAgain = false, syncTimer = null;
+let syncing = false, syncAgain = false, syncTimer = null, lastSyncErr = null;
+// Dropbox-Fehler in verständliche Sprache übersetzen (vorher nur als Tooltip sichtbar – am Handy unsichtbar)
+function explainSyncErr(e) {
+  const m = String((e && (e.summary || e.message)) || e || '');
+  if (!navigator.onLine) return ['Kein Internet', 'Das Gerät ist offline. Sobald es wieder online ist, synchronisiert die App von selbst.'];
+  if (/missing_scope|required_scope|scope/i.test(m)) return ['Der Dropbox-App fehlen Berechtigungen', 'In der Dropbox-App-Konsole (dropbox.com/developers/apps → eure App → Reiter „Permissions“) diese Haken setzen: files.metadata.read, files.content.read, files.content.write, sharing.read, sharing.write. Unten auf „Submit“ klicken. Danach hier unter Einstellungen → Dropbox-Synchronisierung „Trennen“ und neu verbinden – erst dann gelten die neuen Berechtigungen.'];
+  if (/abgelaufen|invalid_access_token|expired_access_token|401/i.test(m)) return ['Dropbox-Anmeldung abgelaufen', 'Unter Einstellungen → Dropbox-Synchronisierung neu verbinden. Die Daten auf dem Gerät bleiben erhalten.'];
+  if (/not_found|malformed_path/i.test(m)) return ['Ordner nicht gefunden', 'Der gewählte Dropbox-Ordner existiert nicht (mehr) oder wurde umbenannt. Unter Einstellungen → Dropbox-Synchronisierung den Ordner neu wählen.'];
+  if (/no_write_permission|access_denied|read_only/i.test(m)) return ['Keine Schreibrechte im Ordner', 'Der Ordner ist für dieses Konto nur lesbar freigegeben. In Dropbox beim geteilten Ordner die Freigabe auf „Kann bearbeiten“ ändern.'];
+  if (/insufficient_space/i.test(m)) return ['Dropbox ist voll', 'Im Dropbox-Konto ist kein Speicherplatz mehr frei.'];
+  if (/too_many|rate_limit|429/i.test(m)) return ['Dropbox bremst gerade', 'Zu viele Anfragen in kurzer Zeit. In ein paar Minuten klappt es wieder von selbst.'];
+  if (/Failed to fetch|NetworkError|Load failed|TypeError/i.test(m)) return ['Dropbox nicht erreichbar', 'Die Verbindung zu Dropbox wurde blockiert. Häufige Ursachen: Werbeblocker, Datenspar-Modus, VPN oder ein Firmen-/Gast-WLAN. Kurz im Mobilfunknetz probieren.'];
+  if (/JSON|Unexpected token/i.test(m)) return ['Datei in der Dropbox beschädigt', 'Die Datei mediathek.json im Ordner ist nicht lesbar. In Dropbox über „Versionsverlauf“ eine ältere Version wiederherstellen oder mir die Meldung unten schicken.'];
+  return ['Unbekannter Fehler', 'Bitte die technische Meldung unten kopieren und an Claude schicken.'];
+}
+function openSyncError() {
+  const [t, d] = explainSyncErr(lastSyncErr);
+  const tech = String((lastSyncErr && (lastSyncErr.summary || lastSyncErr.message)) || lastSyncErr || '');
+  const s = openSheet(`${sheetHead('Sync-Fehler')}
+    <p style="margin-top:0"><b>${esc(t)}</b></p><p>${esc(d)}</p>
+    <p class="hint">Technische Meldung: <code style="word-break:break-all">${esc(tech || '–')}</code></p>
+    <div class="formfoot"><button class="btn" id="seCopy">Meldung kopieren</button><button class="btn" id="seSet">Einstellungen</button><button class="btn primary" id="seRetry">Erneut versuchen</button></div>`);
+  s.querySelector('#seCopy').onclick = () => navigator.clipboard.writeText(`Mediathek ${APP_VERSION} Sync-Fehler: ${tech}`).then(() => toast('Kopiert'), () => toast(tech, 6000));
+  s.querySelector('#seSet').onclick = async () => { await closeSheet(); openSettings(); };
+  s.querySelector('#seRetry').onclick = async () => { await closeSheet(); sync(); };
+}
 function setSync(state, text) {
   const b = $('#syncBtn'); b.className = 'iconbtn sync ' + (state || '');
   $('#syncText').textContent = text;
@@ -2226,12 +2251,12 @@ async function sync() {
       try { await dbxRpc('files/delete_v2', { path: P('/covers/' + id + '.jpg') }); } catch { }
       meta.pendingCoverDeletes = meta.pendingCoverDeletes.filter(x => x !== id);
     }
-    meta.lastSync = Date.now(); await saveMeta();
+    meta.lastSync = Date.now(); lastSyncErr = null; await saveMeta();
     syncLabel();
     maybeBackup().catch(e => console.warn('Backup', e));
     updateShareFile().catch(e => console.warn('Freigabe', e));
   } catch (e) {
-    console.error(e); setSync('err', navigator.onLine ? 'Sync-Fehler' : 'Offline'); $('#syncBtn').title = e.message;
+    console.error(e); lastSyncErr = e; setSync('err', navigator.onLine ? 'Sync-Fehler' : 'Offline'); $('#syncBtn').title = e.message;
   } finally {
     syncing = false;
     if (syncAgain) { syncAgain = false; scheduleSync(300); }
@@ -3298,7 +3323,7 @@ $('#fab').onclick = openAddMenu;
 $('#settingsBtn').onclick = openSettings;
 $('#checkBtn').onclick = openCheck;
 $('#statsBtn').onclick = openStats;
-$('#syncBtn').onclick = () => dbxReady() ? sync() : dbxConnected() ? openFolderPicker() : openSettings();
+$('#syncBtn').onclick = () => (lastSyncErr && $('#syncBtn').classList.contains('err') && dbxReady()) ? openSyncError() : dbxReady() ? sync() : dbxConnected() ? openFolderPicker() : openSettings();
 $('#content').onclick = e => {
   const ss = e.target.closest('[data-shelfsort]'); if (ss) { ui.shelfSort = ss.dataset.shelfsort; saveUi(); render(); return; }
   const o = e.target.closest('[data-open]'); if (o) openDetail(o.dataset.open);
