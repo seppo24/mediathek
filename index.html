@@ -392,6 +392,36 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .bookend{width:26px;height:120px;flex:none;align-self:flex-end;background:linear-gradient(90deg,#111,#3f3f46);clip-path:polygon(0 0,100% 30%,100% 100%,0 100%);margin-left:6px}
 .plant{flex:none;align-self:flex-end;margin-left:auto;margin-right:4px;font-size:46px;line-height:1;filter:drop-shadow(0 4px 4px rgba(0,0,0,.5))}
 
+.alink{background:none;border:0;padding:0;font:inherit;color:var(--accent,#c2410c);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.au-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.au-h{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 6px;font:600 15px Fraunces,Georgia,serif}
+.au-h span{font:500 12px system-ui;color:var(--ink2)}
+.row.ghost{background:transparent;border-style:dashed;box-shadow:none;cursor:default}
+.row.ghost .thumb,.row.ghost .rt,.row.ghost .rs{opacity:.45}
+.au-miss{font-size:11px;padding:2px 7px;border-radius:999px;background:var(--surface2);color:var(--ink2)}
+.row.ghost .au-wish{height:26px;padding:0 8px;font-size:12px;margin-left:auto}
+.bs-tools{flex-wrap:wrap}.bs-tools .seg{flex-wrap:wrap}
+.home-bar{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-bottom:8px}
+.home-bar .btn{height:38px;padding:0 12px}
+.home-tip{margin:0 0 10px;text-align:right}
+.home-intro p{color:var(--ink2)}
+.fach-h{display:flex;align-items:center;gap:6px;color:#f5deb3;font-size:12px;padding:2px 2px 6px;flex-wrap:wrap}
+.fach-h .fn{background:none;border:0;color:inherit;font:600 13px Fraunces,Georgia,serif;padding:4px 2px;cursor:pointer}
+.fach-h .fc{opacity:.7}
+.fach-h .fa{margin-left:auto;display:flex;gap:4px}
+.fach-h .fa button{background:rgba(255,255,255,.14);color:#f5deb3;border:0;border-radius:6px;height:30px;min-width:30px;padding:0 8px;font:600 12px system-ui;cursor:pointer}
+.fach-h .fa button:disabled{opacity:.35}
+.fach-hint{color:#f5deb3;opacity:.75;font-size:12px;margin:0 0 6px 4px}
+.fach-new .bs-row{background:repeating-linear-gradient(135deg,#2a1a0d 0 14px,#33200f 14px 28px)}
+.fach-empty{margin:auto;color:rgba(245,222,179,.5);font-size:13px;align-self:center;text-align:center;padding:0 10px}
+.spine.edit{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:grab}
+.spine.edit:hover{transform:none}
+.spine.picked{outline:3px solid #fbbf24;outline-offset:1px;transform:translateY(-10px)!important}
+.spine.dragging{opacity:.25}
+.spine.dim{opacity:.22;filter:grayscale(.8)}
+.spine.hit{outline:2px solid #fbbf24;outline-offset:1px}
+.dragghost{position:fixed;z-index:80;pointer-events:none;opacity:.92;box-shadow:0 12px 24px rgba(0,0,0,.45);transition:none;margin:0}
+.dropmark{position:fixed;z-index:79;width:4px;border-radius:2px;background:#fbbf24;box-shadow:0 0 10px #fbbf24;pointer-events:none}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -447,7 +477,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.8.2';
+const APP_VERSION = '1.9';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -506,7 +536,8 @@ const TYPES = {
       { k: 'art', l: 'Art', t: 'select', o: ['Film', 'Serie', 'Dokumentation', 'Konzert', 'Anime'], f: 1, ai: 1 },
       { k: 'format', l: 'Format', t: 'select', o: ['Blu-ray', '4K UHD Blu-ray', '3D Blu-ray', 'DVD', 'VHS'], f: 1, ai: 1 },
       { k: 'edition', l: 'Edition', t: 'select', o: ['Standard', 'Steelbook', 'Mediabook', "Collector's Edition", 'Limited Edition', 'Box-Set'], f: 1, ai: 1 },
-      { k: 'staffel', l: 'Staffel / Teil', t: 'text', ai: 1 },
+      { k: 'reihe', l: 'Filmreihe', t: 'text', f: 1, ai: 1, ph: 'z. B. Harry Potter' },
+      { k: 'staffel', l: 'Staffel / Teil', t: 'text', ai: 1, ph: 'z. B. 3' },
       { k: 'jahr', l: 'Jahr', t: 'year', f: 1, ai: 1 },
       { k: 'genre', l: 'Genre', t: 'select', o: ['Action', 'Abenteuer', 'Animation', 'Dokumentation', 'Drama', 'Fantasy', 'Horror', 'Kinderfilm', 'Komödie', 'Krimi', 'Kriegsfilm', 'Musical', 'Romanze', 'Science-Fiction', 'Thriller', 'Western', 'Sonstiges'], f: 1, ai: 1 },
       { k: 'regie', l: 'Regie', t: 'text', f: 1, ai: 1 },
@@ -773,7 +804,7 @@ function playersText(it) { const a = it.spielerMin, b = it.spielerMax; if (!a &&
 function subtitle(it) {
   const p = [];
   switch (it.typ) {
-    case 'bluray': p.push(it.format, it.staffel, it.jahr, it.regie); break;
+    case 'bluray': p.push(it.format, it.reihe ? it.reihe + (it.staffel ? ' ' + it.staffel : '') : it.staffel, it.jahr, it.regie); break;
     case 'buch': p.push(it.autor, it.reihe ? it.reihe + (it.band ? ' ' + it.band : '') : '', it.jahr); break;
     case 'game': p.push(it.plattform, it.jahr, it.publisher); break;
     case 'brettspiel': p.push(playersText(it), it.dauer ? it.dauer + ' Min.' : '', it.verlag); break;
@@ -790,10 +821,26 @@ const SORTS = {
   neu: { l: 'Zuletzt hinzugefügt', fn: (a, b) => (b.createdAt || 0) - (a.createdAt || 0) },
   jahr: { l: 'Jahr (neueste)', fn: (a, b) => (+b.jahr || 0) - (+a.jahr || 0) },
   bewertung: { l: 'Bewertung', fn: (a, b) => (+b.bewertung || 0) - (+a.bewertung || 0) },
-  autor: { l: 'Autor/in', only: 'buch', fn: (a, b) => surname(a.autor).localeCompare(surname(b.autor), 'de') || sortTitle(a).localeCompare(sortTitle(b), 'de') },
+  autor: { l: 'Autor/in', only: 'buch', fn: (a, b) => surname(a.autor).localeCompare(surname(b.autor), 'de') || cmpSeries(a, b) },
   interpret: { l: 'Interpret/in', only: 'vinyl', fn: (a, b) => (a.interpret || '~').localeCompare(b.interpret || '~', 'de') || (+a.jahr || 0) - (+b.jahr || 0) },
   plattform: { l: 'Plattform', only: 'game', fn: (a, b) => (a.plattform || '~').localeCompare(b.plattform || '~', 'de') || sortTitle(a).localeCompare(sortTitle(b), 'de') },
 };
+// Reihen/Serien: gleiche Reihe zusammen, nach Band/Teil (sonst Erscheinungsjahr) statt alphabetisch
+function seriesKey(r) {
+  return String(r || '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[-–\s]*(film-?reihe|filmserie|buchreihe|romanreihe|reihe|collection|sammlung|saga|zyklus|trilogie|series)\b/g, ' ')
+    .replace(/[-–_:]/g, ' ').replace(/^\s*(der|die|das|the)\s+/, '').replace(/\s+/g, ' ').trim();
+}
+function seriesNo(it) { const m = String((it.typ === 'bluray' || it.typ === 'game' ? it.staffel : it.band) ?? '').match(/\d+(?:[.,]\d+)?/); return m ? parseFloat(m[0].replace(',', '.')) : null; }
+const seriesLabel = it => it.reihe ? seriesKey(it.reihe) : sortTitle(it);
+function cmpSeries(a, b) {
+  const c = seriesLabel(a).localeCompare(seriesLabel(b), 'de', { numeric: true }); if (c) return c;
+  if (a.reihe && b.reihe) {
+    const na = seriesNo(a), nb = seriesNo(b);
+    if (na != null || nb != null) { if (na == null) return 1; if (nb == null) return -1; if (na !== nb) return na - nb; }
+    const ya = +a.jahr || 9999, yb = +b.jahr || 9999; if (ya !== yb) return ya - yb;
+  }
+  return sortTitle(a).localeCompare(sortTitle(b), 'de', { numeric: true });
+}
 function surname(a) { a = String(a || '').split(',')[0].trim(); return a ? a.split(/\s+/).pop().toLowerCase() : '~'; }
 function sortTitle(it) { return String(it.titel || '').replace(/^(der|die|das|the|a|an|ein|eine)\s+/i, '').toLowerCase(); }
 function filtered() {
@@ -927,7 +974,7 @@ function render() {
   if (!list.length) { el.innerHTML = ui.type === 'verliehen' && !Object.keys(ui.filters).length && !ui.q ? `<div class="empty"><div class="big">Alles da</div>Gerade ist nichts verliehen.</div>` : `<div class="empty"><div class="big">Nichts gefunden</div>Passe Suche oder Filter an.</div>`; return; }
   const special = TYPES[ui.type] && ui.special[ui.type];
   if (special) {
-    if (ui.type === 'buch') el.innerHTML = renderBookshelf(list);
+    if (ui.type === 'buch') { el.innerHTML = renderBookshelf(list); if (ui.shelfSort === 'zuhause' && !VIEW) bindHome(el); }
     else if (ui.type === 'brettspiel') el.innerHTML = renderGameStore(list);
     else if (ui.type === 'vinyl') el.innerHTML = renderRecordStore(list);
     else el.innerHTML = renderVideothek(list, ui.type);
@@ -1026,7 +1073,7 @@ function renderVideothek(list, typ) {
   const perRow = Math.max(2, Math.floor((contentWidth() - 40) / 106));
   let html = `<div class="vt"><div class="vt-sign">Videothek</div><div class="vt-sub">${typ === 'game' ? 'Games · Konsolen · Retro' : 'Filme · Serien · Kult'}</div>`;
   for (const [g, arr] of groups) {
-    arr.sort(SORTS.titel.fn);
+    arr.sort(cmpSeries);
     html += `<section class="vt-aisle"><div class="vt-label">${esc(g)}<span>${arr.length}</span></div>`;
     for (const row of chunk(arr, perRow)) {
       html += `<div class="vt-row">${row.map(it => {
@@ -1051,14 +1098,16 @@ function spineDims(it) {
   if (/Hörbuch/.test(a)) { h = 126; w = Math.max(w, 28); }
   return { w, h: Math.min(h, 184), hc: /Hardcover/.test(a) };
 }
+function shelfTools(s) { return `<div class="bs-tools">Sortiert nach <div class="seg" style="width:auto">${[['autor', 'Autor'], ['genre', 'Genre'], ['titel', 'Titel'], ['farbe', 'Farbe'], ...(VIEW ? [] : [['zuhause', '🏠 Wie zuhause']])].map(([k, l]) => `<button data-shelfsort="${k}" aria-pressed="${s === k}">${l}</button>`).join('')}</div></div>`; }
 function renderBookshelf(list) {
-  const s = ui.shelfSort;
+  let s = ui.shelfSort; if (s === 'zuhause' && VIEW) s = 'autor';
+  if (s === 'zuhause') return shelfTools(s) + renderHomeShelf(list);
   if (s === 'farbe') {
     const hue = it => { const c = colorFor(it.titel); const n = parseInt(c.slice(1), 16); const r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx === mn) return 400 + mx; let h = mx === r ? (g - b) / (mx - mn) : mx === g ? 2 + (b - r) / (mx - mn) : 4 + (r - g) / (mx - mn); return (h * 60 + 360) % 360; };
     list.sort((a, b) => hue(a) - hue(b));
   } else if (s === 'genre') list.sort((a, b) => (a.genre || '~').localeCompare(b.genre || '~', 'de') || SORTS.autor.fn(a, b));
-  else if (s === 'titel') list.sort(SORTS.titel.fn);
-  else list.sort((a, b) => SORTS.autor.fn(a, b) || String(a.band || '').localeCompare(String(b.band || ''), 'de', { numeric: true }));
+  else if (s === 'titel') list.sort(cmpSeries);
+  else list.sort(SORTS.autor.fn);
   const avail = contentWidth() - 28 - 20;
   const rows = []; let cur = [], used = 0;
   for (const it of list) {
@@ -1067,7 +1116,7 @@ function renderBookshelf(list) {
     cur.push([it, d]); used += need;
   }
   if (cur.length) rows.push({ books: cur, used });
-  const tools = `<div class="bs-tools">Sortiert nach <div class="seg" style="width:auto">${[['autor', 'Autor'], ['genre', 'Genre'], ['titel', 'Titel'], ['farbe', 'Farbe']].map(([k, l]) => `<button data-shelfsort="${k}" aria-pressed="${s === k}">${l}</button>`).join('')}</div></div>`;
+  const tools = shelfTools(s);
   let html = tools + '<div class="bookcase">';
   rows.forEach((row, ri) => {
     const free = avail - row.used;
@@ -1079,6 +1128,316 @@ function renderBookshelf(list) {
     }).join('')}${ri === rows.length - 1 && free > 90 ? '<div class="bookend"></div><div class="plant">🪴</div>' : ''}</div><div class="bs-board"></div>`;
   });
   return html + '</div>';
+}
+
+/* ----- Bücherregal „Wie zuhause“: eigene Aufstellung mit Fächern, per Drag & Drop ----- */
+// Gespeichert in shared.home.buch (wird über Dropbox synchronisiert), Sicherungen in shared.homeSaves.
+// Die anderen Sortierungen ändern daran nichts.
+let homeEdit = false, homePick = null;
+const HOME_NEW = '_new';
+const homeGet = () => shared.home?.buch?.shelves || null;
+async function saveShared() { shared.updatedAt = Date.now(); await idb.set('shared', shared); meta.seq++; await saveMeta(); scheduleSync(1500); }
+async function homeSet(shelves) { shared.home = Object.assign({}, shared.home, { buch: { shelves, updatedAt: Date.now() } }); await saveShared(); }
+const homeClone = sh => sh.map(f => ({ id: f.id, name: f.name || '', ids: [...f.ids] }));
+function homeBooks() { return live().filter(i => i.typ === 'buch'); }
+function homeLayout() {
+  const books = homeBooks(); const map = new Map(books.map(b => [b.id, b]));
+  const shelves = (homeGet() || []).map(f => ({ ...f, ids: f.ids.filter(id => map.has(id)) }));
+  const placed = new Set(shelves.flatMap(f => f.ids));
+  const rest = books.filter(b => !placed.has(b.id)).sort(SORTS.autor.fn).map(b => b.id);
+  return { shelves, rest, map };
+}
+function spineHTML(it, d, extra = '') {
+  const c = colorFor((it.autor || '') + it.titel); const thin = d.w < 24;
+  return `<button class="spine${d.hc ? ' hc' : ''}${thin ? ' thin' : ''}${extra}" ${d.img ? `data-spine="${it.id}"` : ''} title="${esc(it.titel)}${it.autor ? ' – ' + esc(it.autor) : ''}" style="--w:${d.w}px;--h:${d.h}px;--c:${c};--t:${textOn(c)}"`;
+}
+function renderHomeShelf(list) {
+  const sh = homeGet();
+  if (!sh) return `<div class="card home-intro"><h3 style="margin-top:0">Euer Regal wie zuhause</h3>
+    <p>Stellt eure Bücher genau so auf, wie sie bei euch stehen: Fächer anlegen, Bücher per Drag & Drop an ihren Platz ziehen. Die Aufstellung wird gespeichert und mit allen Geräten abgeglichen. Die anderen Sortierungen ändern daran nichts.</p>
+    <div class="formfoot" style="position:static;margin:0;padding:0;background:none;border:0"><button class="btn" data-home="start-empty">Leer beginnen</button><button class="btn primary" data-home="start-auto">Nach Autor vorsortiert beginnen</button></div></div>`;
+  const { shelves, rest, map } = homeLayout();
+  const hits = new Set(list.map(i => i.id)); const filtering = hits.size < map.size;
+  const avail = contentWidth() - 28 - 20;
+  const draw = (f, ids, i, isNew) => {
+    const label = isNew ? '📥 Noch nicht einsortiert' : (f.name || 'Fach ' + (i + 1));
+    let h = `<div class="fach${isNew ? ' fach-new' : ''}" data-fach="${f.id}">`;
+    if (homeEdit) h += `<div class="fach-h">${isNew ? `<span class="fn">${label}</span>` : `<button class="fn" data-hact="rename" title="Umbenennen">${esc(label)} ✎</button>`}<span class="fc">${ids.length}</span>
+      ${isNew ? '' : `<span class="fa"><button data-hact="up" ${i === 0 ? 'disabled' : ''} aria-label="Fach nach oben">▲</button><button data-hact="down" ${i === shelves.length - 1 ? 'disabled' : ''} aria-label="Fach nach unten">▼</button><button data-hact="add" title="Neues Fach darunter">＋ Fach</button><button data-hact="del" aria-label="Fach entfernen">✕</button></span>`}</div>`;
+    else if (f.name || isNew) h += `<div class="bs-label">${esc(label)}${isNew ? ' · ' + ids.length : ''}</div>`;
+    if (isNew && homeEdit) h += `<p class="fach-hint">Neu hinzugekommen oder noch ohne Platz – einfach in ein Fach ziehen.</p>`;
+    // Fach-Inhalt, bei Bedarf über mehrere Bretter umbrechen
+    const rows = []; let cur = [], used = 0;
+    ids.forEach((id, idx) => { const it = map.get(id); const d = spineDims(it); const need = d.w + 2; if (used + need > avail && cur.length) { rows.push(cur); cur = []; used = 0; } cur.push([it, d, idx]); used += need; });
+    rows.push(cur);
+    rows.forEach((row, ri) => {
+      h += `<div class="bs-row${row.length ? '' : ' empty'}" data-shelf="${f.id}" data-first="${row.length ? row[0][2] : 0}" data-end="${row.length ? row[row.length - 1][2] + 1 : 0}">${row.map(([it, d, idx]) =>
+        spineHTML(it, d, `${homeEdit ? ' edit' : ''}${filtering && !hits.has(it.id) ? ' dim' : ''}${filtering && hits.has(it.id) ? ' hit' : ''}${homePick === it.id ? ' picked' : ''}`) + ` ${homeEdit ? `data-hid="${it.id}" data-shelf="${f.id}" data-idx="${idx}"` : `data-open="${it.id}"`}>
+        ${it.verliehenAn ? '<span class="lentmark"></span>' : ''}<span class="st">${esc(it.titel)}</span><span class="sa">${esc((it.autor || '').split(/[ ,]/).filter(Boolean).pop() || '')}</span></button>`).join('')}${row.length ? '' : `<span class="fach-empty">${homeEdit ? (isNew ? 'Alles einsortiert ✓' : 'Leeres Fach – Bücher hierher ziehen') : 'leer'}</span>`}</div><div class="bs-board"></div>`;
+    });
+    return h + '</div>';
+  };
+  const saves = shared.homeSaves || [];
+  let html = `<div class="home-bar">${homeEdit
+    ? `<button class="btn primary" data-home="done">✓ Fertig</button><button class="btn" data-home="addend">＋ Neues Fach</button>`
+    : `<button class="btn" data-home="edit">✏️ Umstellen</button>`}<button class="btn" data-home="save">💾 Stand sichern</button><button class="btn" data-home="restore" ${saves.length ? '' : 'disabled'}>↺ Wiederherstellen${saves.length ? ' (' + saves.length + ')' : ''}</button></div>`;
+  if (homeEdit) html += `<p class="hint home-tip">Buch <b>gedrückt halten und ziehen</b> (am Laptop: einfach ziehen). Alternativ: Buch antippen, dann das Buch antippen, vor das es soll – oder ein leeres Fach.</p>`;
+  if (filtering) html += `<p class="hint home-tip">🔎 ${hits.size} Treffer im Regal hervorgehoben.</p>`;
+  html += '<div class="bookcase home">' + shelves.map((f, i) => draw(f, f.ids, i, false)).join('');
+  if (rest.length || homeEdit) html += draw({ id: HOME_NEW, name: '' }, rest, shelves.length, true);
+  return html + '</div>';
+}
+function homeAutoShelves() {
+  const books = homeBooks().sort(SORTS.autor.fn); const avail = contentWidth() - 48;
+  const out = []; let cur = [], used = 0;
+  for (const b of books) { const w = spineDims(b).w + 2; if (used + w > avail && cur.length) { out.push(cur); cur = []; used = 0; } cur.push(b.id); used += w; }
+  if (cur.length) out.push(cur);
+  if (!out.length) out.push([]);
+  return out.map(ids => ({ id: uid(), name: '', ids }));
+}
+// Buch an neue Stelle setzen: shelf = Fach-ID (oder HOME_NEW = aus dem Regal nehmen), index = Position im Fach
+async function homeMove(id, shelf, index) {
+  const sh = homeClone(homeGet() || []);
+  let from = null, fromIdx = -1;
+  for (const f of sh) { const i = f.ids.indexOf(id); if (i >= 0) { from = f; fromIdx = i; f.ids.splice(i, 1); } }
+  if (shelf !== HOME_NEW) {
+    const to = sh.find(f => f.id === shelf); if (!to) return;
+    if (from === to && fromIdx < index) index--;
+    to.ids.splice(Math.max(0, Math.min(index, to.ids.length)), 0, id);
+  }
+  await homeSet(sh); render();
+}
+function bindHome(el) {
+  const sh = () => homeClone(homeGet() || []);
+  el.querySelectorAll('[data-home]').forEach(b => b.onclick = async () => {
+    const a = b.dataset.home;
+    if (a === 'start-empty') { await homeSet([{ id: uid(), name: '', ids: [] }]); homeEdit = true; render(); }
+    else if (a === 'start-auto') { await homeSet(homeAutoShelves()); homeEdit = true; render(); toast('Vorsortiert – jetzt Bücher an ihren echten Platz ziehen'); }
+    else if (a === 'edit') { homeEdit = true; homePick = null; render(); }
+    else if (a === 'done') { homeEdit = false; homePick = null; render(); toast('Aufstellung gespeichert'); }
+    else if (a === 'addend') { const x = sh(); x.push({ id: uid(), name: '', ids: [] }); await homeSet(x); render(); setTimeout(() => [...el.querySelectorAll('.fach:not(.fach-new)')].pop()?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }
+    else if (a === 'save') {
+      const n = prompt('Name für diese Sicherung:', 'Stand vom ' + new Date().toLocaleDateString('de-DE')); if (n === null) return;
+      shared.homeSaves = [{ id: uid(), name: n.trim() || 'Sicherung', at: Date.now(), shelves: homeClone(homeGet() || []) }, ...(shared.homeSaves || [])].slice(0, 12);
+      await saveShared(); render(); toast('Aufstellung gesichert');
+    } else if (a === 'restore') openHomeRestore();
+  });
+  el.querySelectorAll('.fach-h [data-hact]').forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    const fid = b.closest('[data-fach]').dataset.fach; const x = sh(); const i = x.findIndex(f => f.id === fid); if (i < 0) return;
+    const a = b.dataset.hact;
+    if (a === 'rename') { const n = prompt('Name für dieses Fach (z. B. „Wohnzimmer oben“), leer = Nummer:', x[i].name || ''); if (n === null) return; x[i].name = n.trim(); }
+    else if (a === 'up' && i > 0) [x[i - 1], x[i]] = [x[i], x[i - 1]];
+    else if (a === 'down' && i < x.length - 1) [x[i + 1], x[i]] = [x[i], x[i + 1]];
+    else if (a === 'add') x.splice(i + 1, 0, { id: uid(), name: '', ids: [] });
+    else if (a === 'del') { if (x[i].ids.length && !confirm(`Fach entfernen? Die ${x[i].ids.length} Bücher darin kommen zu „Noch nicht einsortiert“.`)) return; x.splice(i, 1); if (!x.length) x.push({ id: uid(), name: '', ids: [] }); }
+    await homeSet(x); render();
+  });
+  if (!homeEdit) return;
+  // Antippen-Modus: Buch wählen, dann Ziel antippen
+  const tapSpine = id => {
+    if (!homePick) { homePick = id; el.querySelectorAll('.spine.picked').forEach(x => x.classList.remove('picked')); el.querySelector(`[data-hid="${id}"]`)?.classList.add('picked'); toast('Jetzt das Buch antippen, vor das es soll – oder ein Fach'); return; }
+    if (homePick === id) { homePick = null; el.querySelector(`[data-hid="${id}"]`)?.classList.remove('picked'); return; }
+    const t = el.querySelector(`[data-hid="${id}"]`); const p = homePick; homePick = null; homeMove(p, t.dataset.shelf, +t.dataset.idx);
+  };
+  el.querySelectorAll('.bs-row[data-shelf]').forEach(r => r.addEventListener('click', e => {
+    if (e.target.closest('.spine') || !homePick) return;
+    const p = homePick; homePick = null; homeMove(p, r.dataset.shelf, +r.dataset.end);
+  }));
+  el.querySelectorAll('.spine[data-hid]').forEach(sp => {
+    sp.addEventListener('contextmenu', e => e.preventDefault());
+    sp.addEventListener('pointerdown', e => {
+      if (e.button > 0) return;
+      const id = sp.dataset.hid, sx = e.clientX, sy = e.clientY, touch = e.pointerType !== 'mouse';
+      let drag = null, timer = null, last = e, done = false;
+      const start = () => {
+        const r = sp.getBoundingClientRect();
+        const ghost = sp.cloneNode(true); ghost.className += ' dragghost'; ghost.removeAttribute('data-hid');
+        Object.assign(ghost.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+        const mark = document.createElement('div'); mark.className = 'dropmark'; mark.hidden = true;
+        document.body.append(ghost, mark); sp.classList.add('dragging');
+        drag = { ghost, mark, dx: sx - r.left, dy: sy - r.top, target: null, raf: 0 };
+        if (touch && navigator.vibrate) navigator.vibrate(12);
+        const loop = () => { if (!drag) return; const y = last.clientY; if (y < 80) scrollBy(0, -14); else if (y > innerHeight - 80) scrollBy(0, 14); position(); drag.raf = requestAnimationFrame(loop); };
+        drag.raf = requestAnimationFrame(loop);
+      };
+      const position = () => {
+        const x = last.clientX, y = last.clientY;
+        drag.ghost.style.transform = `translate(${x - drag.dx - parseFloat(drag.ghost.style.left)}px,${y - drag.dy - parseFloat(drag.ghost.style.top)}px) rotate(-4deg)`;
+        const under = document.elementFromPoint(x, y); let t = null;
+        const tsp = under?.closest('.spine[data-hid]');
+        if (tsp && tsp !== sp) { const r = tsp.getBoundingClientRect(); const after = x > r.left + r.width / 2; t = { shelf: tsp.dataset.shelf, index: +tsp.dataset.idx + (after ? 1 : 0), x: after ? r.right + 1 : r.left - 3, top: r.top, h: r.height }; }
+        else { const row = under?.closest('.bs-row[data-shelf]'); if (row) { const r = row.getBoundingClientRect(); const sps = [...row.querySelectorAll('.spine[data-hid]')]; const lastSp = sps[sps.length - 1]; const first = sps[0];
+          if (first && x < first.getBoundingClientRect().left) t = { shelf: row.dataset.shelf, index: +row.dataset.first, x: first.getBoundingClientRect().left - 3, top: r.bottom - 150, h: 140 };
+          else t = { shelf: row.dataset.shelf, index: +row.dataset.end, x: lastSp ? lastSp.getBoundingClientRect().right + 1 : r.left + 12, top: r.bottom - 150, h: 140 }; } }
+        drag.target = t;
+        if (t) Object.assign(drag.mark.style, { left: t.x + 'px', top: t.top + 'px', height: t.h + 'px' }); drag.mark.hidden = !t;
+      };
+      const blockScroll = ev => { if (drag) ev.preventDefault(); };
+      const cleanup = () => {
+        done = true; clearTimeout(timer);
+        document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', cancel);
+        document.removeEventListener('touchmove', blockScroll, { passive: false });
+        if (drag) { cancelAnimationFrame(drag.raf); drag.ghost.remove(); drag.mark.remove(); sp.classList.remove('dragging'); }
+      };
+      const move = ev => {
+        if (ev.pointerId !== e.pointerId) return; last = ev;
+        if (!drag) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) { if (touch) { cleanup(); return; } start(); } else return; } // Touch: Bewegung vor dem Halten = Scrollen
+        ev.preventDefault(); position();
+      };
+      const up = ev => {
+        if (ev.pointerId !== e.pointerId) return;
+        const d = drag; const t = d?.target; cleanup();
+        if (d) { if (t) { homePick = null; homeMove(id, t.shelf, t.index); } }
+        else tapSpine(id);
+      };
+      const cancel = () => cleanup();
+      if (touch) timer = setTimeout(() => { if (!done) start(); }, 280);
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', cancel);
+      document.addEventListener('touchmove', blockScroll, { passive: false });
+    });
+  });
+}
+function openHomeRestore() {
+  const saves = shared.homeSaves || [];
+  const s = openSheet(`${sheetHead('Aufstellung wiederherstellen')}
+    <p class="hint" style="margin-top:0">Bücher, die seit der Sicherung dazugekommen sind, landen im Fach „📥 Noch nicht einsortiert“. Vor dem Wiederherstellen wird der jetzige Stand automatisch gesichert.</p>
+    <div class="list">${saves.map(v => `<div class="row" style="cursor:default"><div class="ri"><div class="rt">${esc(v.name)}</div><div class="rs">${new Date(v.at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })} · ${v.shelves.length} Fächer · ${v.shelves.reduce((n, f) => n + f.ids.length, 0)} Bücher</div></div>
+      <button class="btn" data-rdel="${v.id}" aria-label="Sicherung löschen" style="flex:none">🗑</button><button class="btn primary" data-rres="${v.id}" style="flex:none">Wiederherstellen</button></div>`).join('') || '<p class="hint">Noch keine Sicherungen.</p>'}</div>`);
+  s.onclick = async e => {
+    const r = e.target.closest('[data-rres]'), d = e.target.closest('[data-rdel]');
+    if (r) {
+      const v = saves.find(x => x.id === r.dataset.rres); if (!v) return;
+      if (homeGet()) shared.homeSaves = [{ id: uid(), name: 'Automatisch vor dem Wiederherstellen', at: Date.now(), shelves: homeClone(homeGet()) }, ...saves].slice(0, 12);
+      shared.home = Object.assign({}, shared.home, { buch: { shelves: homeClone(v.shelves), updatedAt: Date.now() } });
+      await saveShared(); await closeSheet(); render();
+      const n = homeLayout().rest.length; toast(n ? `„${v.name}“ wiederhergestellt – ${n} neue Bücher warten im Fach „Noch nicht einsortiert“` : `„${v.name}“ wiederhergestellt`, 4500);
+    } else if (d) {
+      if (!confirm('Diese Sicherung löschen?')) return;
+      shared.homeSaves = saves.filter(x => x.id !== d.dataset.rdel); await saveShared(); await closeSheet(); render(); if (shared.homeSaves.length) openHomeRestore();
+    }
+  };
+}
+
+/* ---------- Autorenseite ---------- */
+// "Rowling, J. K." → "J. K. Rowling"; "Pratchett, Terry & Gaiman, Neil" / "Terry Pratchett, Neil Gaiman" → zwei Namen
+function authorNames(a) {
+  const out = [];
+  for (let part of String(a || '').split(/\s*[;&\/]\s*|\s+und\s+|\s+and\s+/)) {
+    part = part.trim(); if (!part) continue;
+    if (part.includes(',')) {
+      const sub = part.split(',').map(x => x.trim()).filter(Boolean);
+      if (sub.length === 2 && !sub[0].includes(' ') ) { out.push(sub[1] + ' ' + sub[0]); continue; } // Nachname, Vorname
+      out.push(...sub); continue;
+    }
+    out.push(part);
+  }
+  return out.filter(x => x.length > 1);
+}
+const normAuthor = n => String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '');
+const booksOfAuthor = name => allLive().filter(i => i.typ === 'buch' && !i.geliehen && authorNames(i.autor).some(n => normAuthor(n) === normAuthor(name)));
+const WD_WRITER = ['Q36180', 'Q6625963', 'Q4853732', 'Q49757', 'Q11774202', 'Q28389', 'Q1930187', 'Q18844224', 'Q3658608', 'Q15949613', 'Q214917'];
+// Werke eines Autors online: Wikidata (deutsche Titel, Reihen mit Nummer), sonst Open Library
+async function fetchAuthorWorks(name) {
+  const ck = 'author:' + normAuthor(name);
+  const c = await idb.get(ck); if (c && Date.now() - c.at < 14 * 864e5) return c;
+  let works = [], src = '', qid = null;
+  const sr = await fetchJSON(WD + 'action=wbsearchentities&type=item&limit=7&language=de&uselang=de&search=' + encodeURIComponent(name), 7000);
+  const ids = (sr?.search || []).map(x => x.id);
+  if (ids.length) {
+    const ents = await fetchJSON(WD + 'action=wbgetentities&props=claims&ids=' + ids.join('|'), 8000);
+    const humans = ids.map(id => ents?.entities?.[id]).filter(e => e && wdIds(e.claims || {}, 'P31').includes('Q5'));
+    const best = humans.find(e => wdIds(e.claims, 'P106').some(o => WD_WRITER.includes(o))) || humans[0];
+    qid = best?.id;
+  }
+  if (qid) {
+    const q = `SELECT ?w ?wLabel ?d ?s ?sLabel ?o WHERE {
+      ?w wdt:P50 wd:${qid} .
+      FILTER NOT EXISTS { ?w wdt:P31 ?t . VALUES ?t { wd:Q3331189 wd:Q13442814 wd:Q1980247 wd:Q277759 wd:Q1667921 wd:Q7725310 wd:Q191067 wd:Q17518557 wd:Q737498 } }
+      OPTIONAL { ?w wdt:P577 ?d }
+      OPTIONAL { ?w p:P179 ?st . ?st ps:P179 ?s . OPTIONAL { ?st pq:P1545 ?o } }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en,mul". }
+    } LIMIT 800`;
+    const j = await fetchJSON('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q), 15000);
+    const map = new Map();
+    for (const b of j?.results?.bindings || []) {
+      const id = b.w.value; const t = b.wLabel?.value || ''; if (!t || /^Q\d+$/.test(t)) continue;
+      const y = b.d?.value ? parseInt(b.d.value.slice(0, 4), 10) : undefined;
+      const r = map.get(id) || { titel: t, jahr: y };
+      if (y && (!r.jahr || y < r.jahr)) r.jahr = y;
+      if (b.sLabel?.value && !/^Q\d+$/.test(b.sLabel.value) && !r.reihe) { r.reihe = b.sLabel.value.replace(/\s*\((buch|roman)?reihe\)$/i, ''); if (b.o?.value) r.band = b.o.value; }
+      map.set(id, r);
+    }
+    works = [...map.values()]; src = 'Wikidata';
+  }
+  if (works.length < 3) {
+    const ol = await fetchJSON(`https://openlibrary.org/search.json?author=${encodeURIComponent(name)}&fields=title,first_publish_year,author_name&limit=150`, 12000);
+    const seen = new Set(works.map(w => normDup(w.titel)));
+    for (const d of ol?.docs || []) {
+      if (!(d.author_name || []).some(n => normAuthor(n) === normAuthor(name))) continue;
+      const k = normDup(d.title); if (!k || seen.has(k)) continue; seen.add(k);
+      works.push({ titel: d.title, jahr: d.first_publish_year });
+    }
+    if (works.length) src = src ? src + ' + Open Library' : 'Open Library';
+  }
+  const res = { at: Date.now(), works, src, qid };
+  if (works.length) await idb.set(ck, res);
+  return res;
+}
+function openAuthor(name) {
+  let sort = lsGet('mt_authsort', 'serie'), showMissing = false, online = null, loading = false;
+  const s = openSheet(`${sheetHead(name)}
+    <p class="hint" id="auSum" style="margin-top:0"></p>
+    <div class="au-tools"><div class="seg" id="auSort" style="width:auto">${[['alpha', 'A–Z'], ['serie', 'Serie'], ['jahr', 'Jahr']].map(([k, l]) => `<button data-s="${k}" aria-pressed="${sort === k}">${l}</button>`).join('')}</div>
+    <label class="chk" style="margin:0"><input type="checkbox" id="auMiss"> Fehlende Bücher zeigen</label></div>
+    <div id="auList"></div>`, { full: true });
+  const own = () => booksOfAuthor(name);
+  function draw() {
+    const mine = own();
+    $('#auSum', s).textContent = `${((n) => n === 1 ? '1 Buch' : n + ' Bücher')(mine.filter(i => !i.wunsch).length)} bei euch${mine.some(i => i.wunsch) ? `, ${mine.filter(i => i.wunsch).length} auf der Wunschliste` : ''}` + (showMissing && online ? ` · ${online.missing.length} weitere bekannt (Quelle: ${online.src || '–'})` : '');
+    let entries = mine.map(it => ({ it, titel: it.titel, jahr: it.jahr, reihe: it.reihe, band: it.band }));
+    if (showMissing && online) entries = entries.concat(online.missing.map(w => ({ w, titel: w.titel, jahr: w.jahr, reihe: w.reihe, band: w.band })));
+    const pseudo = e => ({ titel: e.titel, jahr: e.jahr, reihe: e.reihe, band: e.band, typ: 'buch' });
+    const row = e => e.it ? rowHTML(e.it) : `<div class="row ghost"><div class="thumb" style="background:#a8a29e">${esc((e.titel.replace(/^(der|die|das|the|ein|eine)\s+/i, '')[0] || '?').toUpperCase())}</div><div class="ri"><div class="rt">${esc(e.titel)}</div><div class="rs">${esc([e.reihe ? e.reihe + (e.band ? ' ' + e.band : '') : '', e.jahr].filter(Boolean).join(' · ')) || '&nbsp;'}</div>
+      <div class="rb"><span class="au-miss">habt ihr nicht</span>${VIEW ? '' : `<button class="btn ghost au-wish" data-wish="${esc(JSON.stringify(pseudo(e)))}">★ Wunschliste</button>`}</div></div></div>`;
+    let html = '';
+    if (sort === 'serie') {
+      const groups = new Map();
+      for (const e of entries) { const k = e.reihe ? seriesKey(e.reihe) : ''; if (!groups.has(k)) groups.set(k, { name: e.reihe, list: [] }); groups.get(k).list.push(e); }
+      const keys = [...groups.keys()].filter(Boolean).sort((a, b) => a.localeCompare(b, 'de')); if (groups.has('')) keys.push('');
+      for (const k of keys) {
+        const g = groups.get(k); g.list.sort((a, b) => cmpSeries(pseudo(a), pseudo(b)));
+        const have = g.list.filter(e => e.it && !e.it.wunsch).length;
+        html += `<h4 class="au-h">${k ? '📚 ' + esc(g.name) : 'Einzelbände'}<span>${k && showMissing && online ? have + ' von ' + g.list.length : g.list.length}</span></h4><div class="list">${g.list.map(row).join('')}</div>`;
+      }
+    } else {
+      entries.sort(sort === 'jahr' ? (a, b) => (+a.jahr || 9999) - (+b.jahr || 9999) || sortTitle(a).localeCompare(sortTitle(b), 'de') : (a, b) => sortTitle(a).localeCompare(sortTitle(b), 'de', { numeric: true }));
+      html = `<div class="list">${entries.map(row).join('')}</div>`;
+    }
+    if (showMissing && loading) html += '<p class="hint" style="text-align:center;padding:16px">Suche weitere Bücher online …</p>';
+    if (showMissing && online && !online.missing.length && !loading) html += `<p class="hint" style="text-align:center;padding:12px">${online.total ? 'Ihr habt alle bekannten Bücher – oder die Online-Liste ist unvollständig.' : 'Online wurden keine weiteren Bücher gefunden.'}</p>`;
+    if (!entries.length) html = '<p class="hint">Keine Bücher gefunden.</p>';
+    $('#auList', s).innerHTML = html; hydrateCovers($('#auList', s));
+  }
+  async function loadOnline() {
+    if (online || loading) return; loading = true; draw();
+    try {
+      const r = await fetchAuthorWorks(name);
+      const mine = own(); const keys = new Set(mine.map(i => normDup(i.titel)));
+      const serNo = new Set(mine.filter(i => i.reihe && i.band).map(i => seriesKey(i.reihe) + '#' + seriesNo(i)));
+      const missing = r.works.filter(w => { const k = normDup(w.titel); if (keys.has(k) || [...keys].some(x => x.length > 5 && (k.includes(x) || x.includes(k)))) return false; if (w.reihe && w.band && serNo.has(seriesKey(w.reihe) + '#' + seriesNo({ typ: 'buch', band: w.band }))) return false; return true; });
+      online = { missing, src: r.src, total: r.works.length };
+    } catch (e) { online = { missing: [], src: '', total: 0 }; toast('Online-Suche fehlgeschlagen'); }
+    loading = false; draw();
+  }
+  $('#auSort', s).onclick = e => { const b = e.target.closest('[data-s]'); if (!b) return; sort = b.dataset.s; lsSet('mt_authsort', sort); $$('#auSort button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); draw(); };
+  $('#auMiss', s).onchange = e => { showMissing = e.target.checked; if (showMissing) loadOnline(); draw(); };
+  $('#auList', s).onclick = async e => {
+    const w = e.target.closest('[data-wish]');
+    if (w) { e.stopPropagation(); const d = JSON.parse(w.dataset.wish); await upsertItem(Object.assign(d, { autor: name, wunsch: true })); render(); toast(`„${d.titel}“ auf die Wunschliste gesetzt`); if (online) online.missing = online.missing.filter(x => x.titel !== d.titel); draw(); return; }
+    const o = e.target.closest('[data-open]'); if (o) openDetail(o.dataset.open);
+  };
+  draw();
 }
 
 /* ----- Spieleladen ----- */
@@ -1162,7 +1521,7 @@ function toast(msg, ms = 2600) { const t = document.createElement('div'); t.clas
 function openDetail(id) {
   const it = items.find(i => i.id === id); if (!it) return;
   const facts = fieldsOf(it.typ).filter(f => !['titel', 'verliehenAn', 'verliehenAm'].includes(f.k) && f.t !== 'url' && it[f.k] != null && it[f.k] !== '')
-    .map(f => `<dt>${esc(f.l)}</dt><dd>${esc(fmt(f, it[f.k]))}${(it.auto || []).includes(f.k) ? ' <span class="autotag" title="Online ergänzt – bitte bei Bedarf prüfen">🌐</span>' : ''}</dd>`).join('');
+    .map(f => `<dt>${esc(f.l)}</dt><dd>${f.k === 'autor' && it.typ === 'buch' ? authorNames(it.autor).map(n => `<button class="alink" data-author="${esc(n)}" title="Autorenseite öffnen">${esc(n)}</button>`).join(', ') : esc(fmt(f, it[f.k]))}${(it.auto || []).includes(f.k) ? ' <span class="autotag" title="Online ergänzt – bitte bei Bedarf prüfen">🌐</span>' : ''}</dd>`).join('');
   const canFill = !VIEW && missingFields(it).length > 0;
   const s = openSheet(`${sheetHead(TYPES[it.typ]?.single || 'Medium')}
     <div class="detail-top">${thumbHTML(it)}<div><h3>${esc(it.titel)}</h3><div class="hint">${esc(subtitle(it))}</div>
@@ -1181,6 +1540,7 @@ function openDetail(id) {
       : it.weg ? `<div class="formfoot"><button class="btn" id="dWeg">🏷 Ändern</button><button class="btn" id="dEdit">Bearbeiten</button><button class="btn ok" id="dGone">✓ ${it.weg.art === 'Verkaufen' ? 'Verkauft' : 'Weggegeben'}</button></div>`
       : `<div class="formfoot"><button class="btn danger" id="dDel">Löschen</button><button class="btn" id="dLend">${it.verliehenAn ? 'Zurückbekommen' : 'Verleihen'}</button><button class="btn" id="dWeg" title="Aussortieren" aria-label="Aussortieren" style="flex:0 0 48px">🏷</button><button class="btn primary" id="dEdit">Bearbeiten</button></div>`}`);
   hydrateCovers(s);
+  $$('[data-author]', s).forEach(b => b.onclick = () => openAuthor(b.dataset.author));
   const dr = $('#dRules', s); if (dr) dr.onclick = () => openRules(it.id);
   if (VIEW) {
     if (!it.wunsch) {
@@ -1657,7 +2017,7 @@ async function wikidataLookup(rec) {
   }).filter(Boolean).sort((a, b) => b.score - a.score);
   if (!scored.length) return null;
   const { e, p31 } = scored[0]; const cl = e.claims || {};
-  const refIds = [...new Set(['P57', 'P161', 'P136', 'P1981', 'P272', 'P178', 'P123', 'P914', 'P287', 'P50', 'P170', 'P175', 'P264'].flatMap(p => wdIds(cl, p).slice(0, 6)))];
+  const refIds = [...new Set(['P179', 'P57', 'P161', 'P136', 'P1981', 'P272', 'P178', 'P123', 'P914', 'P287', 'P50', 'P170', 'P175', 'P264'].flatMap(p => wdIds(cl, p).slice(0, 6)))];
   const labels = {};
   if (refIds.length) {
     const lj = await fetchJSON(WD + 'action=wbgetentities&props=labels&languages=de|en&ids=' + refIds.slice(0, 50).join('|'), 8000);
@@ -1685,6 +2045,12 @@ async function wikidataLookup(rec) {
     Object.assign(out, { interpret: L('P175', 2).join(', '), label: L('P264', 1)[0], genre: mapGenre('vinyl', L('P136', 6)) });
   } else if (rec.typ === 'buch') {
     Object.assign(out, { autor: L('P50', 2).join(', '), verlag: L('P123', 1)[0], genre: mapGenre('buch', L('P136', 4)) });
+  }
+  // Reihe (P179) mit Nummer (Qualifikator P1545)
+  if (['bluray', 'buch'].includes(rec.typ) && cl.P179?.length) {
+    const ser = L('P179', 1)[0]; if (ser) out.reihe = ser.replace(/\s*\((film-?)?reihe\)$/i, '').replace(/[-\s]*filmreihe$/i, '').trim();
+    const ord = cl.P179[0].qualifiers?.P1545?.[0]?.datavalue?.value;
+    if (ord && rec.typ === 'buch') out.band = String(ord);
   }
   if (out.originaltitel && out.originaltitel.toLowerCase() === String(rec.titel).toLowerCase()) delete out.originaltitel;
   // Bild aus Wikimedia Commons (bei Brettspielen oft ein Foto der Schachtel)
@@ -1733,6 +2099,7 @@ async function tmdbLookup(rec) {
     genre: mapGenre('bluray', (d.genres || []).map(g => g.name)),
     studio: d.production_companies?.[0]?.name,
     cover: d.poster_path ? 'https://image.tmdb.org/t/p/w342' + d.poster_path : undefined,
+    reihe: d.belongs_to_collection?.name ? d.belongs_to_collection.name.replace(/\s*[-–]?\s*(Filmreihe|Collection|Sammlung)$/i, '').trim() : undefined,
   };
   const de = kind === 'movie' ? d.release_dates?.results?.find(r => r.iso_3166_1 === 'DE')?.release_dates?.find(x => x.certification)?.certification : d.content_ratings?.results?.find(r => r.iso_3166_1 === 'DE')?.rating;
   if (de && /^\d+$/.test(de)) out.fsk = String(+de);
@@ -3356,7 +3723,7 @@ $('#checkBtn').onclick = openCheck;
 $('#statsBtn').onclick = openStats;
 $('#syncBtn').onclick = () => (lastSyncErr && $('#syncBtn').classList.contains('err') && dbxReady()) ? openSyncError() : dbxReady() ? sync() : dbxConnected() ? openFolderPicker() : openSettings();
 $('#content').onclick = e => {
-  const ss = e.target.closest('[data-shelfsort]'); if (ss) { ui.shelfSort = ss.dataset.shelfsort; saveUi(); render(); return; }
+  const ss = e.target.closest('[data-shelfsort]'); if (ss) { ui.shelfSort = ss.dataset.shelfsort; homeEdit = false; homePick = null; saveUi(); render(); return; }
   const o = e.target.closest('[data-open]'); if (o) openDetail(o.dataset.open);
 };
 let rzT; let lastW = innerWidth;
