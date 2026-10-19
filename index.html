@@ -444,6 +444,15 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .ie-ctl{display:grid;gap:6px}
 .ie-rot{display:flex;gap:8px;align-items:center}.ie-rot input{flex:1;accent-color:var(--accent)}
 .ie-row{display:flex;gap:8px;align-items:center}.ie-row .hint{min-width:56px;font-variant-numeric:tabular-nums}
+.cands{display:flex;gap:8px;flex-wrap:wrap}
+.cand{width:78px;height:104px;padding:0;border:2px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface2);display:grid;place-items:center;cursor:pointer}
+.cand img{width:100%;height:100%;object-fit:cover}
+.cand[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+.cand.none{font-size:18px;color:var(--ink2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.cand.none small{font-size:11px}
+#csOne .cand{width:120px;height:160px}
+.cslist{display:grid;gap:12px}
+.csrow{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.cst{display:grid}.cst small{color:var(--ink2);font-size:12px}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -499,7 +508,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.10';
+const APP_VERSION = '1.11';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1635,6 +1644,7 @@ function openDetail(id) {
     <dl class="facts">${facts}<dt>Hinzugefügt</dt><dd>${new Date(it.createdAt).toLocaleDateString('de-DE')}</dd></dl>
     ${(it.auto || []).length ? '<p class="hint" style="margin:0 0 8px">🌐 = online ergänzt</p>' : ''}
     ${(it.verleihHistorie || []).length ? `<details class="hist"><summary>Verleih-Verlauf (${it.verleihHistorie.length})</summary><ul>${it.verleihHistorie.map(h => `<li><b>${esc(h.an)}</b> · ${h.am ? esc(deDate(h.am)) : '?'} – ${esc(deDate(h.zurueck))}</li>`).join('')}</ul></details>` : ''}
+    ${!VIEW && !hasCover(it) ? `<button class="btn" id="dCover" style="width:100%;margin-bottom:8px">🔍 Cover im Internet suchen</button>` : ''}
     ${canFill ? `<button class="btn" id="dFill" style="width:100%">🌐 Fehlende Angaben online ergänzen (${missingFields(it).length} leer)</button>` : ''}
     ${it.geliehen ? `<div class="note${isOverdue(it) ? ' warn' : ''}" style="margin-bottom:10px">↙ Geliehen von <b>${esc(it.geliehenVon || '?')}</b>${it.geliehenAm ? ' am ' + esc(deDate(it.geliehenAm)) : ''}${it.rueckgabeBis ? ` · zurückgeben bis <b>${esc(deDate(it.rueckgabeBis))}</b>${isOverdue(it) ? ' – überfällig!' : ''}` : ''}</div>` : ''}
     ${it.weg ? `<div class="note" style="margin-bottom:10px">🏷 <b>${esc(it.weg.art)}</b>${it.weg.preis ? ' für ' + esc(String(it.weg.preis).replace('.', ',')) + ' €' : ''}${it.weg.notiz ? ' · ' + esc(it.weg.notiz) : ''}</div>` : ''}
@@ -1644,6 +1654,7 @@ function openDetail(id) {
       : `<div class="formfoot"><button class="btn danger" id="dDel">Löschen</button><button class="btn" id="dLend">${it.verliehenAn ? 'Zurückbekommen' : 'Verleihen'}</button><button class="btn" id="dWeg" title="Aussortieren" aria-label="Aussortieren" style="flex:0 0 48px">🏷</button><button class="btn primary" id="dEdit">Bearbeiten</button></div>`}`);
   hydrateCovers(s);
   $$('[data-author]', s).forEach(b => b.onclick = () => openAuthor(b.dataset.author));
+  const dc = $('#dCover', s); if (dc) dc.onclick = () => searchCoverFor(it.id, dc);
   const dr = $('#dRules', s); if (dr) dr.onclick = () => openRules(it.id);
   if (VIEW) {
     if (!it.wunsch) {
@@ -2376,7 +2387,7 @@ async function fetchMissingFronts() {
   if (frontBusy || VIEW || !navigator.onLine) return; frontBusy = true;
   try {
     const tried = meta.frontTried || (meta.frontTried = {});
-    const todo = allLive().filter(i => TYPES[i.typ] && i.titel && !hasCover(i) && Date.now() - (tried[i.id] || 0) > 20 * 864e5).slice(0, 40);
+    const todo = allLive().filter(i => TYPES[i.typ] && i.titel && hasSpine(i) && !hasCover(i) && Date.now() - (tried[i.id] || 0) > 20 * 864e5).slice(0, 40); // nur Bücher mit Rücken-Foto; alles andere per Knopf mit Rückfrage
     let n = 0;
     for (const it of todo) {
       tried[it.id] = Date.now();
@@ -2388,6 +2399,84 @@ async function fetchMissingFronts() {
     if (n % 10) { await persist(); render(); }
   } finally { frontBusy = false; }
 }
+/* ---------- Cover im Internet suchen (mit Rückfrage) ---------- */
+// Mehrere Vorschläge aus kostenlosen Quellen (+ TMDb/RAWG mit Schlüssel), damit ihr das richtige auswählen könnt
+async function findCoverCandidates(it) {
+  const out = []; const add = u => { if (u && !out.includes(u) && out.length < 6) out.push(u); };
+  const rec = Object.assign({}, it);
+  try {
+    if (it.typ === 'buch') {
+      const isbn = String(it.isbn || it.barcode || '').replace(/[^0-9Xx]/g, '');
+      if (isbn.length >= 10) { const b = await lookupISBN(isbn).catch(() => null); add(b?.cover); const ol = `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`; if (await imgOk(ol)) add(ol); }
+      const q = `intitle:${it.titel}` + (it.autor ? `+inauthor:${authorNames(it.autor)[0] || ''}` : '');
+      const g = await fetchJSON('https://www.googleapis.com/books/v1/volumes?maxResults=10&q=' + encodeURIComponent(q), 7000);
+      const nt = normDup(it.titel);
+      for (const x of g?.items || []) { const v = x.volumeInfo || {}; const k = normDup(v.title); if (!k || !(k === nt || k.includes(nt) || nt.includes(k))) continue; const img = v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail; if (img) add(img.replace('http://', 'https://').replace('&edge=curl', '')); }
+      const ol = await fetchJSON(`https://openlibrary.org/search.json?title=${encodeURIComponent(it.titel)}${it.autor ? '&author=' + encodeURIComponent(authorNames(it.autor)[0] || '') : ''}&fields=cover_i&limit=5`, 7000);
+      for (const d of ol?.docs || []) if (d.cover_i) add(`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`);
+    }
+    if (it.typ === 'bluray' && settings.tmdbKey) add((await tmdbLookup(rec))?.cover);
+    if (it.typ === 'game' && settings.rawgKey) add((await rawgLookup(rec))?.cover);
+    if (it.typ === 'vinyl') add((await mbLookup(rec))?.cover);
+    if (!out.length || ['brettspiel', 'game'].includes(it.typ)) add((await wikidataLookup(rec))?.cover);
+  } catch { }
+  // nur Bilder, die wirklich laden
+  const ok = await Promise.all(out.map(u => imgOk(u)));
+  return out.filter((u, i) => ok[i]).slice(0, 4);
+}
+async function applyCover(id, url) {
+  const cur = byId(id); if (!cur || cur.deleted || hasCover(cur)) return false;
+  cur.cover = url; cur.updatedAt = Date.now(); return true;
+}
+const candHTML = (id, urls, sel) => `<div class="cands">${urls.map((u, i) => `<button class="cand" data-cid="${id}" data-ci="${i}" aria-pressed="${sel === i}"><img src="${esc(u)}" referrerpolicy="no-referrer" alt="Vorschlag ${i + 1}"></button>`).join('')}<button class="cand none" data-cid="${id}" data-ci="-1" aria-pressed="${sel === -1}">✕<small>keins</small></button></div>`;
+// Ein Medium (aus der Detailansicht)
+async function searchCoverFor(id, btn) {
+  const it = byId(id); if (!it) return;
+  if (btn) { btn.disabled = true; btn.textContent = '🔍 Suche Cover …'; }
+  const urls = await findCoverCandidates(it);
+  if (btn) { btn.disabled = false; btn.textContent = '🔍 Cover im Internet suchen'; }
+  if (!urls.length) return toast('Kein Cover gefunden – du kannst unter „Bearbeiten“ selbst eins hochladen', 4000);
+  let sel = 0;
+  const s = openSheet(`${sheetHead(urls.length > 1 ? 'Cover gefunden – welches passt?' : 'Cover gefunden')}
+    <p class="hint" style="margin-top:0">„${esc(it.titel)}“${it.autor ? ' · ' + esc(it.autor) : ''}. ${urls.length > 1 ? 'Tippe auf das passende Bild.' : 'Passt dieses Bild?'}</p>
+    <div id="csOne">${candHTML(id, urls, sel)}</div>
+    <div class="formfoot"><button class="btn" data-close>Nicht übernehmen</button><button class="btn primary" id="csOk">Übernehmen</button></div>`);
+  $('#csOne', s).onclick = e => { const b = e.target.closest('[data-ci]'); if (!b) return; sel = +b.dataset.ci; $$('[data-ci]', s).forEach(x => x.setAttribute('aria-pressed', +x.dataset.ci === sel)); $('#csOk', s).disabled = sel < 0; };
+  $('#csOk', s).onclick = async () => { if (sel < 0) return; if (await applyCover(id, urls[sel])) { await persist(); } await closeSheet(); await closeSheet(); render(); openDetail(id); toast('Cover übernommen'); };
+}
+// Viele Medien auf einmal: suchen, dann alle Vorschläge zur Bestätigung zeigen
+async function searchCoversBulk(list) {
+  const todo = (list || allLive()).filter(i => !i.deleted && TYPES[i.typ] && i.titel && !hasCover(i));
+  if (!todo.length) return toast('Alle Medien haben schon ein Cover');
+  if (!confirm(`${todo.length} Medien haben noch kein Cover. Jetzt im Internet suchen? Danach entscheidest du bei jedem, ob das gefundene Bild übernommen wird.`)) return;
+  const s = openSheet(`${sheetHead('Cover suchen')}<div id="csBody"><div class="spinner"></div><p class="hint" style="text-align:center" id="csProg"></p></div>
+    <div class="formfoot" id="csFoot"><button class="btn" id="csStop">Suche beenden</button></div>`, { full: true });
+  let stop = false; const found = [];
+  $('#csStop', s).onclick = () => { stop = true; };
+  s.parentElement._onClose = () => { stop = true; };
+  for (let i = 0; i < todo.length && !stop; i++) {
+    const p = $('#csProg', s); if (p) p.textContent = `${i + 1} von ${todo.length} · ${found.length} gefunden · „${todo[i].titel}“`;
+    const urls = await findCoverCandidates(todo[i]);
+    if (urls.length) found.push({ it: todo[i], urls, sel: 0 });
+  }
+  if (!s.isConnected) return;
+  const body = $('#csBody', s), foot = $('#csFoot', s);
+  if (!found.length) { body.innerHTML = '<p class="hint" style="text-align:center;padding:20px">Leider keine Cover gefunden. Unter „Bearbeiten“ kannst du selbst eins hochladen.</p>'; foot.innerHTML = '<button class="btn primary" data-close>Schließen</button>'; return; }
+  const count = () => found.filter(f => f.sel >= 0).length;
+  body.innerHTML = `<p class="hint" style="margin-top:0">Für ${found.length} von ${todo.length} Medien gefunden. Vorausgewählt ist jeweils das erste Bild – tippe ein anderes an oder „✕ keins“, wenn keins passt.</p>
+    <div class="inrow" style="margin-bottom:10px"><button class="btn ghost" id="csAll">Alle auswählen</button><button class="btn ghost" id="csNone">Keins auswählen</button></div>
+    <div class="cslist">${found.map(f => `<div class="csrow"><div class="cst"><b>${esc(f.it.titel)}</b><small>${esc(subtitle(f.it))}</small></div>${candHTML(f.it.id, f.urls, f.sel)}</div>`).join('')}</div>`;
+  const upd = () => { foot.innerHTML = `<button class="btn" data-close>Abbrechen</button><button class="btn primary" id="csApply" ${count() ? '' : 'disabled'}>${count()} Cover übernehmen</button>`; $('#csApply', s).onclick = apply; };
+  const setSel = (f, v) => { f.sel = v; $$(`[data-cid="${f.it.id}"]`, body).forEach(x => x.setAttribute('aria-pressed', +x.dataset.ci === v)); };
+  body.onclick = e => {
+    if (e.target.closest('#csAll')) { found.forEach(f => setSel(f, f.sel >= 0 ? f.sel : 0)); return upd(); }
+    if (e.target.closest('#csNone')) { found.forEach(f => setSel(f, -1)); return upd(); }
+    const b = e.target.closest('[data-ci]'); if (!b) return; const f = found.find(x => x.it.id === b.dataset.cid); if (!f) return; setSel(f, +b.dataset.ci); upd();
+  };
+  const apply = async () => { let n = 0; for (const f of found) if (f.sel >= 0 && await applyCover(f.it.id, f.urls[f.sel])) n++; if (n) await persist(); await closeSheet(); render(); toast(`${n} Cover übernommen`); };
+  upd();
+}
+
 async function completeAll(list) {
   const todo = list ? list.filter(i => !i.deleted) : allLive().filter(i => ((missingFields(i).length || !hasCover(i)) && (!i.autoAt || i.autoAt < (settings.sourcesAt || 0))) || (i.typ === 'brettspiel' && !i.bgg && !i.bggTried));
   if (!todo.length) return toast('Bei allen Medien wurde schon ergänzt');
@@ -2939,6 +3028,7 @@ function openSettings() {
     <div class="card">
       <button class="btn primary" id="sExcel">Excel-Liste herunterladen</button>
       <button class="btn" id="sValue">💶 Was ist die Sammlung wert?</button>
+      <button class="btn" id="sCovers">🖼 Cover für Medien ohne Bild suchen (${allLive().filter(i => TYPES[i.typ] && !hasCover(i)).length})</button>
       <button class="btn" id="sClean">🧹 Aufräum-Assistent</button>
       <div class="inrow"><button class="btn" id="sBackup" style="flex:1">Sicherung (.json) speichern</button><label class="btn" style="flex:1">Sicherung laden<input type="file" accept=".json,application/json" hidden id="sRestore"></label></div>
     </div>
@@ -3015,6 +3105,7 @@ function openSettings() {
   $('#sBkNow', s).onclick = async e => { const b = e.target; b.disabled = true; b.textContent = 'Lege an …'; try { const n = await maybeBackup(true); toast('Backup angelegt: ' + n); } catch (err) { alert('Backup fehlgeschlagen: ' + err.message); } b.disabled = false; b.textContent = 'Jetzt Backup anlegen'; };
   $('#sBkRestore', s).onclick = () => openBackupRestore();
   $('#sClean', s).onclick = () => closeSheet().then(openCleanup);
+  $('#sCovers', s).onclick = () => closeSheet().then(() => searchCoversBulk());
   $('#sValue', s).onclick = () => closeSheet().then(openValue);
   $('#sHelp', s).onclick = () => closeSheet().then(openHelp);
   $('#sTabs', s).onclick = () => closeSheet().then(openTabSettings);
@@ -3835,7 +3926,7 @@ function openCleanup() {
       await persist(); draw();
     });
     b.querySelectorAll('[data-ed]').forEach(x => x.onclick = () => { const it = byId(x.dataset.ed); if (it) openForm({ item: it, onSaved: () => setTimeout(draw, 100) }); });
-    const cc = $('#clCovers', b); if (cc) cc.onclick = async () => { await completeAll(noCover); draw(); };
+    const cc = $('#clCovers', b); if (cc) cc.onclick = async () => { await searchCoversBulk(noCover); };
     const cf = $('#clFill', b); if (cf) cf.onclick = async () => { await completeAll(sparse); draw(); };
   };
   draw();
