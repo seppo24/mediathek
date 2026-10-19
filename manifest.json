@@ -1,0 +1,82 @@
+{
+  "name": "Mediathek – unsere Sammlung",
+  "short_name": "Mediathek",
+  "description": "Blu-rays, Bücher, Games und Brettspiele katalogisieren",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f2ea",
+  "theme_color": "#c2410c",
+  "lang": "de",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Haben wir das schon?",
+      "short_name": "Schnellcheck",
+      "description": "Barcode scannen oder Titel suchen",
+      "url": "./?aktion=check",
+      "icons": [
+        {
+          "src": "sc-check.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Barcode scannen",
+      "short_name": "Scannen",
+      "description": "Medien per Barcode hinzufügen",
+      "url": "./?aktion=scan",
+      "icons": [
+        {
+          "src": "sc-scan.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Wunschliste",
+      "short_name": "Wunschliste",
+      "url": "./?aktion=wunsch",
+      "icons": [
+        {
+          "src": "sc-wish.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Medium hinzufügen",
+      "short_name": "Hinzufügen",
+      "url": "./?aktion=neu",
+      "icons": [
+        {
+          "src": "sc-add.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
