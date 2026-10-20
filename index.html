@@ -514,7 +514,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.13.1';
+const APP_VERSION = '1.13.2';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -3507,6 +3507,18 @@ async function openBackupRestore() {
 const SHARE_FILE = () => P('/freigabe/sammlung.json');
 const b64urlStr = str => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64urlStr = b => decodeURIComponent(escape(atob(b.replace(/-/g, '+').replace(/_/g, '/'))));
+// Selbst fotografierte/hochgeladene Cover als kleines Vorschaubild mitgeben (sonst sehen Freunde nur Online-Cover)
+async function shareThumb(it) {
+  const ck = 'sthumb:' + it.id + ':' + (it.imgAt || 0); const c = await idb.get(ck); if (c) return c;
+  const d = await localImg('cover', it.id); if (!d) return null;
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = d; });
+    const sc = Math.min(1, 260 / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement('canvas'); cv.width = Math.round(img.naturalWidth * sc); cv.height = Math.round(img.naturalHeight * sc);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    const t = cv.toDataURL('image/jpeg', .72); await idb.set(ck, t); return t;
+  } catch { return null; }
+}
 function publicData() {
   const PRIVATE = ['wert', 'weg', 'bggTried', 'kaufpreis', 'kaufdatum', 'notizen', 'verliehenAm', 'verleihHistorie', 'auto', 'autoAt', 'standort', 'barcode', 'updatedAt', 'coverLocal', 'coverSpine', 'coverAspect', 'spineLocal', 'imgAt', 'spineAt', 'preisCa'];
   return {
@@ -3519,7 +3531,9 @@ function publicData() {
 }
 async function updateShareFile(force) {
   if (VIEW || !dbxReady() || (!shared.share?.enabled && !force)) return; // beim ersten Einschalten (force) gibt es noch keine Freigabe
-  const data = publicData(); const body = JSON.stringify(Object.assign({}, data, { at: 0 }));
+  const data = publicData();
+  for (const o of data.items) { const it = byId(o.id); if (it && !it.cover && it.coverLocal && !it.coverSpine) { const t = await shareThumb(it); if (t) o.cover = t; } }
+  const body = JSON.stringify(Object.assign({}, data, { at: 0 }));
   const h = hash(body);
   if (!force && meta.shareHash === h) return;
   await dbxUpload(SHARE_FILE(), JSON.stringify(data), { '.tag': 'overwrite' });
@@ -3549,7 +3563,7 @@ async function disableShare() {
 function drawShare(c) {
   if (!c) return;
   const on = shared.share?.enabled;
-  c.innerHTML = `<p class="hint" style="margin:0">Ein Link, über den Freunde und Familie eure Sammlung und Wunschliste ansehen können – ohne Konto, ohne etwas ändern zu können. <b>Nicht sichtbar:</b> Preise, Kaufdaten, Notizen, Standort und an wen etwas verliehen ist (nur „gerade verliehen“). Selbst fotografierte Cover werden nicht geteilt, Online-Cover schon.</p>
+  c.innerHTML = `<p class="hint" style="margin:0">Ein Link, über den Freunde und Familie eure Sammlung und Wunschliste ansehen können – ohne Konto, ohne etwas ändern zu können. <b>Nicht sichtbar:</b> Preise, Kaufdaten, Notizen, Standort und an wen etwas verliehen ist (nur „gerade verliehen“). Cover werden mitgeteilt (eigene Fotos als kleines Vorschaubild). Änderungen erscheinen dort nach der nächsten Synchronisierung, meist innerhalb einer Minute.</p>
     ${on ? `<label class="fld"><span>Link zum Teilen</span><input readonly value="${esc(shareViewURL())}" id="shUrl"></label>
       <div class="inrow"><button class="btn primary" id="shCopy" style="flex:1">Link kopieren / teilen</button><button class="btn danger" id="shOff" style="flex:1">Freigabe beenden</button></div>
       <p class="hint" style="margin:0">Der Link aktualisiert sich automatisch bei jeder Synchronisierung. „Freigabe beenden“ macht den Link sofort ungültig.</p>`
