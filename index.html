@@ -514,7 +514,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.14';
+const APP_VERSION = '1.14.1';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2349,6 +2349,31 @@ async function bggCoverCands(it) {
   const ids = direct ? [direct] : (await bggSearchIds(it.titel)).slice(0, 3);
   return (await bggThings(ids)).map(t => t.image || t.thumb).filter(Boolean);
 }
+// Verbindungstests für die optionalen Schlüssel (TMDb, RAWG, Discogs)
+async function keyTest(kind) {
+  const why = st => st === 401 || st === 403 ? 'Der Schlüssel wird abgelehnt – bitte prüfen, ob er vollständig und ohne Leerzeichen kopiert wurde.' : st === 429 ? 'Zu viele Anfragen – in einer Minute erneut testen.' : 'Fehler ' + st;
+  try {
+    if (kind === 'tmdb') {
+      const key = settings.tmdbKey; const bearer = key.length > 40;
+      const url = 'https://api.themoviedb.org/3/search/movie?language=de-DE&query=Inception' + (bearer ? '' : '&api_key=' + encodeURIComponent(key));
+      const r = await fetch(url, bearer ? { headers: { Authorization: 'Bearer ' + key } } : {});
+      if (!r.ok) return [false, why(r.status)];
+      const j = await r.json(); const t = j.results?.[0];
+      return [true, t ? `Verbindung funktioniert – Testtreffer: „${t.title}“ (${(t.release_date || '').slice(0, 4)})` : 'Verbindung funktioniert'];
+    }
+    if (kind === 'rawg') {
+      const r = await fetch(`https://api.rawg.io/api/games?key=${encodeURIComponent(settings.rawgKey)}&page_size=1&search=Zelda`);
+      if (!r.ok) return [false, why(r.status)];
+      const t = (await r.json()).results?.[0]; return [true, t ? `Verbindung funktioniert – Testtreffer: „${t.name}“` : 'Verbindung funktioniert'];
+    }
+    if (kind === 'discogs') {
+      const r = await fetch('https://api.discogs.com/database/search?type=release&per_page=1&q=Nirvana%20Nevermind', { headers: { Authorization: 'Discogs token=' + settings.discogsToken } });
+      if (!r.ok) return [false, why(r.status)];
+      const t = (await r.json()).results?.[0]; return [true, t ? `Verbindung funktioniert – Testtreffer: „${t.title}“` : 'Verbindung funktioniert'];
+    }
+  } catch { return [false, 'Der Dienst ist nicht erreichbar. Internetverbindung prüfen; bei Werbeblockern oder Firmen-WLAN kann die Verbindung blockiert sein.']; }
+  return [false, 'Unbekannt'];
+}
 async function bggTest() {
   try { const doc = await bggFetch('search?type=boardgame&query=Catan'); const n = doc.querySelectorAll('item').length; return n ? [true, `Verbindung funktioniert (${n} Treffer für „Catan“)`] : [false, 'Verbindung steht, aber keine Treffer – Token prüfen']; }
   catch (e) { return [false, e.auth ? 'Token wird abgelehnt. Bitte unter boardgamegeek.com/applications einen neuen Token erzeugen und hier einfügen.' : e.net ? 'BoardGameGeek lässt sich von der App aus nicht abfragen. Das liegt vermutlich daran, dass BGG Anfragen direkt aus dem Browser blockiert. Dann geht es leider nur mit einem eigenen Server.' : e.message]; }
@@ -3152,11 +3177,14 @@ function openSettings() {
       <label class="switch" style="height:auto"><input type="checkbox" id="sAuto" ${settings.autoFill ? 'checked' : ''}><span>Neue Medien automatisch online ergänzen</span></label>
       <p class="hint" style="margin:0">Füllt nur <b>leere</b> Felder – eure Eingaben werden nie überschrieben. Quellen: Google Books & Open Library (Bücher), Wikidata (alle Medien), optional TMDb (Filme & Serien mit Cover und FSK). Alles kostenlos. Ist oben eine KI gewählt, füllt sie verbleibende Lücken (Haiku/Gemini unter 0,1 Cent, Sonnet ca. 0,3 Cent pro Medium).</p>
       <label class="fld"><span>TMDb-Schlüssel (optional, kostenlos – für Film-Cover & FSK)</span><input id="sTmdb" type="password" value="${esc(settings.tmdbKey)}" placeholder="API-Key oder Lesezugriffs-Token" autocomplete="off"></label>
-      <p class="hint" style="margin:0">Schlüssel: <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">themoviedb.org → Einstellungen → API</a> (kostenloses Konto).</p>
+      <div class="inrow"><button class="btn" data-ktest="tmdb" data-kf="tmdbKey" style="flex:1">TMDb-Verbindung testen</button></div>
+      <p class="hint" style="margin:0">Schlüssel: <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">themoviedb.org → Einstellungen → API</a> (kostenloses Konto). <i>This product uses the TMDB API but is not endorsed or certified by TMDB.</i></p>
       <label class="fld"><span>Discogs-Token (optional, kostenlos – echte Marktpreise für Vinyl)</span><input id="sDiscogs" type="password" value="${esc(settings.discogsToken || '')}" placeholder="Persönlicher Zugangstoken" autocomplete="off"></label>
-      <p class="hint" style="margin:0">Token: <a href="https://www.discogs.com/settings/developers" target="_blank" rel="noopener">discogs.com → Einstellungen → Entwickler</a> → „Generate new token“.</p>
+      <div class="inrow"><button class="btn" data-ktest="discogs" data-kf="discogsToken" style="flex:1">Discogs-Verbindung testen</button></div>
+      <p class="hint" style="margin:0">Token: <a href="https://www.discogs.com/settings/developers" target="_blank" rel="noopener">discogs.com → Einstellungen → Entwickler</a> → „Generate new token“. Daten von Discogs.</p>
       <label class="fld"><span>RAWG-Schlüssel (optional, kostenlos – für Spiele-Cover)</span><input id="sRawg" type="password" value="${esc(settings.rawgKey || '')}" placeholder="API-Key" autocomplete="off"></label>
-      <p class="hint" style="margin:0">Schlüssel: <a href="https://rawg.io/apidocs" target="_blank" rel="noopener">rawg.io/apidocs</a> → „Get API Key“ (kostenloses Konto). Brettspiel-Fotos kommen ohne Schlüssel aus Wikimedia Commons.</p>
+      <div class="inrow"><button class="btn" data-ktest="rawg" data-kf="rawgKey" style="flex:1">RAWG-Verbindung testen</button></div>
+      <p class="hint" style="margin:0">Schlüssel: <a href="https://rawg.io/apidocs" target="_blank" rel="noopener">rawg.io/apidocs</a> → „Get API Key“ (kostenloses Konto). Daten von RAWG. Brettspiel-Fotos kommen ohne Schlüssel aus Wikimedia Commons.</p>
       <label class="fld"><span>BoardGameGeek-Token (optional, kostenlos – Brettspiel-Cover & Daten)</span><input id="sBgg" type="password" value="${esc(settings.bggToken || '')}" placeholder="Token der registrierten Anwendung" autocomplete="off"></label>
       <div class="inrow"><button class="btn" id="sBggTest" style="flex:1">BGG-Verbindung testen</button></div>
       <p class="hint" style="margin:0">Token: Mit dem BGG-Konto auf <a href="https://boardgamegeek.com/applications" target="_blank" rel="noopener">boardgamegeek.com/applications</a> eine Anwendung registrieren (nicht-kommerziell, z. B. „Private Mediathek“). Nach der Freigabe durch BGG (kann eine Woche dauern) dort unter „Tokens“ einen Token erzeugen. <a href="https://boardgamegeek.com" target="_blank" rel="noopener"><b>Powered by BGG</b></a></p>
@@ -3252,6 +3280,12 @@ function openSettings() {
   $('#sAuto', s).onchange = e => { settings.autoFill = e.target.checked; saveSettings(); };
   $('#sTmdb', s).oninput = e => { settings.tmdbKey = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
   $('#sRawg', s).oninput = e => { settings.rawgKey = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
+  $$('[data-ktest]', s).forEach(b => b.onclick = async () => {
+    if (!settings[b.dataset.kf]) return toast('Bitte zuerst den Schlüssel einfügen');
+    const label = b.textContent; b.disabled = true; b.textContent = 'Teste …';
+    const [ok, msg] = await keyTest(b.dataset.ktest); b.disabled = false; b.textContent = label;
+    ok ? toast('✓ ' + msg, 4500) : alert(msg);
+  });
   $('#sBgg', s).oninput = e => { settings.bggToken = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
   $('#sBggTest', s).onclick = async e => { const b = e.currentTarget; if (!settings.bggToken) return toast('Bitte zuerst den Token einfügen'); b.disabled = true; b.textContent = 'Teste … (BGG erlaubt nur langsame Abfragen)'; const [ok, msg] = await bggTest(); b.disabled = false; b.textContent = 'BGG-Verbindung testen'; ok ? toast('✓ ' + msg, 4000) : alert(msg); };
   $('#sBkNow', s).onclick = async e => { const b = e.target; b.disabled = true; b.textContent = 'Lege an …'; try { const n = await maybeBackup(true); toast('Backup angelegt: ' + n); } catch (err) { alert('Backup fehlgeschlagen: ' + err.message); } b.disabled = false; b.textContent = 'Jetzt Backup anlegen'; };
