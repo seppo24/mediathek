@@ -459,6 +459,10 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .csrow{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 .cst{display:grid}.cst small{color:var(--ink2);font-size:12px}
 .csman{margin-top:12px}.csman summary{cursor:pointer;color:var(--ink2);font-size:14px}
+.inhalt{margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.inhalt h4{margin:0 0 4px;font:600 14px Fraunces,Georgia,serif}
+.inhalt p{margin:0 0 4px;font-size:14px;line-height:1.5;white-space:pre-line}
+.inhalt p.clamp{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -514,7 +518,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.14.1';
+const APP_VERSION = '1.15';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -585,6 +589,7 @@ const TYPES = {
       { k: 'studio', l: 'Studio / Label', t: 'text', f: 1, ai: 1 },
       { k: 'sprachen', l: 'Sprachen', t: 'text', ai: 1 },
       { k: 'gesehen', l: 'Gesehen', t: 'select', o: ['Ja', 'Nein'], f: 1 },
+      { k: 'inhalt', l: 'Inhaltsangabe', t: 'textarea', wide: 1, ai: 1, aiDesc: 'kurze Inhaltsangabe auf Deutsch, 2–4 Sätze, ohne Spoiler' },
     ]
   },
   buch: {
@@ -604,6 +609,7 @@ const TYPES = {
       { k: 'seiten', l: 'Seiten', t: 'number', ai: 1 },
       { k: 'sprache', l: 'Sprache', t: 'text', f: 1, ai: 1 },
       { k: 'gelesen', l: 'Gelesen', t: 'select', o: ['Ungelesen', 'Am Lesen', 'Gelesen'], f: 1 },
+      { k: 'inhalt', l: 'Inhaltsangabe', t: 'textarea', wide: 1, ai: 1, aiDesc: 'kurze Inhaltsangabe auf Deutsch, 2–4 Sätze, ohne Spoiler' },
     ]
   },
   game: {
@@ -621,6 +627,7 @@ const TYPES = {
       { k: 'spieler', l: 'Spieler', t: 'text', ph: 'z. B. 1–4', ai: 1 },
       { k: 'lieferumfang', l: 'Lieferumfang', t: 'select', o: ['Komplett mit Anleitung', 'Spiel + Hülle', 'Nur Spiel / Modul'], f: 1 },
       { k: 'status', l: 'Spielstatus', t: 'select', o: ['Ungespielt', 'Angefangen', 'Durchgespielt', '100 %'], f: 1 },
+      { k: 'inhalt', l: 'Inhaltsangabe', t: 'textarea', wide: 1, ai: 1, aiDesc: 'kurze Inhaltsangabe auf Deutsch, 2–4 Sätze, ohne Spoiler' },
     ]
   },
   brettspiel: {
@@ -642,6 +649,7 @@ const TYPES = {
       { k: 'vollstaendig', l: 'Vollständig', t: 'select', o: ['Ja', 'Teile fehlen'], f: 1 },
       { k: 'gespielt', l: 'Gespielt', t: 'select', o: ['Noch nie', 'Ab und zu', 'Oft', 'Lieblingsspiel'], f: 1 },
       { k: 'bgg', l: 'BoardGameGeek-Link', t: 'url', wide: 1, web: 1, site: 'bgg', ph: 'https://boardgamegeek.com/boardgame/…' },
+      { k: 'inhalt', l: 'Inhaltsangabe', t: 'textarea', wide: 1, ai: 1, aiDesc: 'kurze Inhaltsangabe auf Deutsch, 2–4 Sätze, ohne Spoiler' },
     ]
   },
   vinyl: {
@@ -1644,7 +1652,7 @@ function toast(msg, ms = 2600) { const t = document.createElement('div'); t.clas
 /* ---------- Detailansicht ---------- */
 function openDetail(id) {
   const it = items.find(i => i.id === id); if (!it) return;
-  const facts = fieldsOf(it.typ).filter(f => !['titel', 'verliehenAn', 'verliehenAm'].includes(f.k) && f.t !== 'url' && it[f.k] != null && it[f.k] !== '')
+  const facts = fieldsOf(it.typ).filter(f => !['titel', 'verliehenAn', 'verliehenAm', 'inhalt'].includes(f.k) && f.t !== 'url' && it[f.k] != null && it[f.k] !== '')
     .map(f => `<dt>${esc(f.l)}</dt><dd>${f.k === 'autor' && it.typ === 'buch' ? authorNames(it.autor).map(n => `<button class="alink" data-author="${esc(n)}" title="Autorenseite öffnen">${esc(n)}</button>`).join(', ') : esc(fmt(f, it[f.k]))}${(it.auto || []).includes(f.k) ? ' <span class="autotag" title="Online ergänzt – bitte bei Bedarf prüfen">🌐</span>' : ''}</dd>`).join('');
   const canFill = !VIEW && missingFields(it).length > 0;
   const s = openSheet(`${sheetHead(TYPES[it.typ]?.single || 'Medium')}
@@ -1656,6 +1664,7 @@ function openDetail(id) {
     <dl class="facts">${facts}<dt>Hinzugefügt</dt><dd>${new Date(it.createdAt).toLocaleDateString('de-DE')}</dd></dl>
     ${(it.auto || []).length ? '<p class="hint" style="margin:0 0 8px">🌐 = online ergänzt</p>' : ''}
     ${(it.verleihHistorie || []).length ? `<details class="hist"><summary>Verleih-Verlauf (${it.verleihHistorie.length})</summary><ul>${it.verleihHistorie.map(h => `<li><b>${esc(h.an)}</b> · ${h.am ? esc(deDate(h.am)) : '?'} – ${esc(deDate(h.zurueck))}</li>`).join('')}</ul></details>` : ''}
+    ${it.inhalt ? `<div class="inhalt"><h4>Inhalt${(it.auto || []).includes('inhalt') ? ' <span class="autotag" title="Online ergänzt">🌐</span>' : ''}</h4><p class="clamp" id="dInh">${esc(it.inhalt)}</p>${it.inhalt.length > 260 ? '<button class="btn ghost" id="dInhMore" style="height:30px;padding:0 8px">mehr anzeigen</button>' : ''}</div>` : ''}
     ${!VIEW && !hasCover(it) ? `<button class="btn" id="dCover" style="width:100%;margin-bottom:8px">🔍 Cover im Internet suchen</button>` : ''}
     ${canFill ? `<button class="btn" id="dFill" style="width:100%">🌐 Fehlende Angaben online ergänzen (${missingFields(it).length} leer)</button>` : ''}
     ${it.geliehen ? `<div class="note${isOverdue(it) ? ' warn' : ''}" style="margin-bottom:10px">↙ Geliehen von <b>${esc(it.geliehenVon || '?')}</b>${it.geliehenAm ? ' am ' + esc(deDate(it.geliehenAm)) : ''}${it.rueckgabeBis ? ` · zurückgeben bis <b>${esc(deDate(it.rueckgabeBis))}</b>${isOverdue(it) ? ' – überfällig!' : ''}` : ''}</div>` : ''}
@@ -1666,6 +1675,7 @@ function openDetail(id) {
       : `<div class="formfoot"><button class="btn danger" id="dDel">Löschen</button>${it.digital === 'Ja' && !it.verliehenAn ? '' : `<button class="btn" id="dLend">${it.verliehenAn ? 'Zurückbekommen' : 'Verleihen'}</button>`}<button class="btn" id="dWeg" title="Aussortieren" aria-label="Aussortieren" style="flex:0 0 48px">🏷</button><button class="btn primary" id="dEdit">Bearbeiten</button></div>`}`);
   hydrateCovers(s);
   $$('[data-author]', s).forEach(b => b.onclick = () => openAuthor(b.dataset.author));
+  const im = $('#dInhMore', s); if (im) im.onclick = () => { $('#dInh', s).classList.toggle('clamp'); im.textContent = $('#dInh', s).classList.contains('clamp') ? 'mehr anzeigen' : 'weniger'; };
   const dc = $('#dCover', s); if (dc) dc.onclick = () => searchCoverFor(it.id, dc);
   const dr = $('#dRules', s); if (dr) dr.onclick = () => openRules(it.id);
   if (VIEW) {
@@ -2027,7 +2037,7 @@ function openPhoto() {
   $('#pCam', s).onchange = go; $('#pGal', s).onchange = go;
 }
 function aiPrompt(mode, hint, barcode) {
-  const schema = TYPE_KEYS.map(t => `- "${t}" (${TYPES[t].single}): ` + fieldsOf(t).filter(f => f.ai && f.k !== 'titel').map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]` : f.k).join(', ')).join('\n');
+  const schema = TYPE_KEYS.map(t => `- "${t}" (${TYPES[t].single}): ` + fieldsOf(t).filter(f => f.ai && !['titel', 'inhalt'].includes(f.k)).map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]` : f.k).join(', ')).join('\n');
   return `Du hilfst beim Katalogisieren einer privaten Mediensammlung (Blu-rays/DVDs, Bücher, Videospiele, Brettspiele).
 ${mode === 'multi' ? 'Auf dem Foto sind MEHRERE Medien, z. B. Buchrücken im Regal oder ein Stapel. Erkenne JEDES einzelne erkennbare Medium und liste alle in Lesereihenfolge (links nach rechts, oben nach unten). Lass keines aus, auch wenn nur der Rücken zu sehen ist.' : 'Auf dem Foto ist EIN Medium (Cover, Rückseite oder Rücken). Erkenne genau dieses.'}
 ${hint ? `Alle Medien auf dem Foto sind vom Typ "${hint}".` : ''}${barcode ? `\nDer Barcode/EAN des Mediums lautet ${barcode}.` : ''}
@@ -2117,6 +2127,7 @@ function bookFromGoogle(v, isbn) {
   const i13 = isbn || ids.find(i => i.type === 'ISBN_13')?.identifier || ids.find(i => i.type === 'ISBN_10')?.identifier;
   const r = { typ: 'buch', titel: v.title, untertitel: v.subtitle, autor: (v.authors || []).join(', '), verlag: v.publisher, jahr: parseInt((v.publishedDate || '').slice(0, 4)) || undefined, seiten: v.pageCount || undefined, sprache: { de: 'Deutsch', en: 'Englisch', fr: 'Französisch', es: 'Spanisch', it: 'Italienisch' }[v.language] || v.language, isbn: i13 };
   if (isbn) r.barcode = isbn;
+  if (v.description) r.inhalt = shortText(v.description);
   const img = v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail;
   if (img) r.cover = img.replace('http://', 'https://').replace('&edge=curl', '');
   for (const k of Object.keys(r)) if (r[k] == null || r[k] === '') delete r[k];
@@ -2419,6 +2430,7 @@ async function tmdbLookup(rec) {
     genre: mapGenre('bluray', (d.genres || []).map(g => g.name)),
     studio: d.production_companies?.[0]?.name,
     cover: d.poster_path ? 'https://image.tmdb.org/t/p/w342' + d.poster_path : undefined,
+    inhalt: d.overview ? shortText(d.overview) : undefined,
     reihe: d.belongs_to_collection?.name ? d.belongs_to_collection.name.replace(/\s*[-–]?\s*(Filmreihe|Collection|Sammlung)$/i, '').trim() : undefined,
   };
   const de = kind === 'movie' ? d.release_dates?.results?.find(r => r.iso_3166_1 === 'DE')?.release_dates?.find(x => x.certification)?.certification : d.content_ratings?.results?.find(r => r.iso_3166_1 === 'DE')?.rating;
@@ -2445,13 +2457,32 @@ async function aiComplete(rec, fields) {
   const known = {}; for (const f of fieldsOf(rec.typ)) if (!isEmpty(rec[f.k]) && f.k !== 'notizen') known[f.k] = rec[f.k];
   const prompt = `Ergänze fehlende Angaben zu einem Medium aus einer privaten Sammlung. Medientyp: ${TYPES[rec.typ].single}.
 Bekannte Angaben: ${JSON.stringify(known)}
-Fehlende Felder (bei [..] genau einen dieser Werte verwenden): ${fields.map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]` : f.k).join(', ')}
+Fehlende Felder (bei [..] genau einen dieser Werte verwenden): ${fields.map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]` : f.aiDesc ? `${f.k} (${f.aiDesc})` : f.k).join(', ')}
 Regeln: Fülle nur Felder, bei denen du dir sicher bist (allgemein bekannte Fakten zu genau diesem Titel). Sonst weglassen. Zahlen als Zahlen. Antworte NUR mit JSON: {"felder":{...}}`;
   const text = await aiCall(prompt, null, 800);
   const a = text.indexOf('{'), b = text.lastIndexOf('}'); if (a < 0) return null;
   try { return JSON.parse(text.slice(a, b + 1)).felder || null; } catch { return null; }
 }
 
+// Inhaltsangabe kürzen: HTML entfernen, nach ganzen Sätzen bei ca. 700 Zeichen abschneiden
+function shortText(t, max = 700) {
+  t = String(t || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max); const i = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+  return (i > 200 ? cut.slice(0, i + 1) : cut.replace(/\s+\S*$/, '') + ' …');
+}
+// Kurzfassung aus der deutschen Wikipedia (erster Absatz des Artikels)
+async function wikiSummary(it) {
+  const hint = { bluray: it.art === 'Serie' ? 'Fernsehserie' : 'Film', buch: 'Roman', game: 'Computerspiel', brettspiel: 'Spiel' }[it.typ]; if (!hint) return null;
+  const clean = t => String(t || '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[^a-z0-9äöüß]/g, '');
+  const nt = clean(it.titel);
+  const j = await fetchJSON(`https://de.wikipedia.org/w/api.php?action=query&format=json&origin=*&list=search&srlimit=5&srsearch=${encodeURIComponent(it.titel + ' ' + hint)}`, 7000);
+  const hit = (j?.query?.search || []).find(p => { const k = clean(p.title); return k && nt && (k === nt || (nt.length >= 5 && (k.startsWith(nt) || nt.startsWith(k)))); });
+  if (!hit) return null;
+  const sm = await fetchJSON('https://de.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(hit.title.replace(/ /g, '_')), 7000);
+  if (!sm?.extract || sm.type === 'disambiguation') return null;
+  return shortText(sm.extract);
+}
 // Hauptfunktion: ergänzt rec direkt, gibt Liste der ergänzten Felder zurück
 async function completeRecord(rec, { useAI = true } = {}) {
   const filled = new Set();
@@ -2463,6 +2494,7 @@ async function completeRecord(rec, { useAI = true } = {}) {
     if (rec.typ === 'brettspiel' && settings.bggToken) fillMissing(rec, await bggLookup(rec).catch(() => null), filled);
     if (rec.typ === 'vinyl') fillMissing(rec, await mbLookup(rec), filled);
     if (missingFields(rec).length || !hasCover(rec)) fillMissing(rec, await wikidataLookup(rec), filled);
+    if (fieldDef(rec.typ, 'inhalt') && isEmpty(rec.inhalt)) { const t = await wikiSummary(rec).catch(() => null); if (t) fillMissing(rec, { inhalt: t }, filled); }
     if (useAI && settings.provider !== 'barcode' && aiKey()) { const miss = missingFields(rec).filter(f => f.ai); if (miss.length) fillMissing(rec, await aiComplete(rec, miss).catch(() => null), filled); }
   } catch (e) { console.warn('Ergänzen', e); }
   return [...filled].filter(k => k !== 'cover');
@@ -4461,6 +4493,8 @@ addEventListener('hashchange', () => {
   shared = Object.assign(shared, (await idb.get('shared')) || {});
   extra = (await idb.get('extra')) || [];
   if (new URLSearchParams(location.search).has('demo') && !items.length) await loadDemo();
+  // 1.15: neues Feld „Inhaltsangabe“ – „Bei allen vorhandenen Medien ergänzen“ darf alle Medien noch einmal anfassen
+  if (!settings.inhaltMig) { settings.sourcesAt = Date.now(); settings.inhaltMig = 1; saveSettings(); }
   // 1.12: „Download-Code“ im Lieferumfang wird zum Haken „Digital“
   { let mig = 0; for (const i of items) if (i.lieferumfang === 'Download-Code') { delete i.lieferumfang; i.digital = 'Ja'; i.updatedAt = Date.now(); mig++; } if (mig) await persist(); }
   const aktion = new URLSearchParams(location.search).get('aktion');
