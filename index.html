@@ -518,7 +518,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.15';
+const APP_VERSION = '1.15.1';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1664,7 +1664,7 @@ function openDetail(id) {
     <dl class="facts">${facts}<dt>Hinzugefügt</dt><dd>${new Date(it.createdAt).toLocaleDateString('de-DE')}</dd></dl>
     ${(it.auto || []).length ? '<p class="hint" style="margin:0 0 8px">🌐 = online ergänzt</p>' : ''}
     ${(it.verleihHistorie || []).length ? `<details class="hist"><summary>Verleih-Verlauf (${it.verleihHistorie.length})</summary><ul>${it.verleihHistorie.map(h => `<li><b>${esc(h.an)}</b> · ${h.am ? esc(deDate(h.am)) : '?'} – ${esc(deDate(h.zurueck))}</li>`).join('')}</ul></details>` : ''}
-    ${it.inhalt ? `<div class="inhalt"><h4>Inhalt${(it.auto || []).includes('inhalt') ? ' <span class="autotag" title="Online ergänzt">🌐</span>' : ''}</h4><p class="clamp" id="dInh">${esc(it.inhalt)}</p>${it.inhalt.length > 260 ? '<button class="btn ghost" id="dInhMore" style="height:30px;padding:0 8px">mehr anzeigen</button>' : ''}</div>` : ''}
+    ${it.inhalt ? `<div class="inhalt"><h4>Inhalt${(it.auto || []).includes('inhalt') ? ' <span class="autotag" title="Online ergänzt">🌐</span>' : ''}</h4><p class="clamp" id="dInh">${esc(it.inhalt)}</p>${it.inhalt.length > 260 ? '<button class="btn ghost" id="dInhMore" style="height:30px;padding:0 8px">mehr anzeigen</button>' : ''}${!VIEW && inhaltWrongLang(it) ? `<button class="btn" id="dInhLang" style="width:100%;margin-top:6px">🌐 Inhaltsangabe auf ${esc(LANG_NAME[bookLang(it)] || bookLang(it))} holen</button>` : ''}</div>` : ''}
     ${!VIEW && !hasCover(it) ? `<button class="btn" id="dCover" style="width:100%;margin-bottom:8px">🔍 Cover im Internet suchen</button>` : ''}
     ${canFill ? `<button class="btn" id="dFill" style="width:100%">🌐 Fehlende Angaben online ergänzen (${missingFields(it).length} leer)</button>` : ''}
     ${it.geliehen ? `<div class="note${isOverdue(it) ? ' warn' : ''}" style="margin-bottom:10px">↙ Geliehen von <b>${esc(it.geliehenVon || '?')}</b>${it.geliehenAm ? ' am ' + esc(deDate(it.geliehenAm)) : ''}${it.rueckgabeBis ? ` · zurückgeben bis <b>${esc(deDate(it.rueckgabeBis))}</b>${isOverdue(it) ? ' – überfällig!' : ''}` : ''}</div>` : ''}
@@ -1675,6 +1675,7 @@ function openDetail(id) {
       : `<div class="formfoot"><button class="btn danger" id="dDel">Löschen</button>${it.digital === 'Ja' && !it.verliehenAn ? '' : `<button class="btn" id="dLend">${it.verliehenAn ? 'Zurückbekommen' : 'Verleihen'}</button>`}<button class="btn" id="dWeg" title="Aussortieren" aria-label="Aussortieren" style="flex:0 0 48px">🏷</button><button class="btn primary" id="dEdit">Bearbeiten</button></div>`}`);
   hydrateCovers(s);
   $$('[data-author]', s).forEach(b => b.onclick = () => openAuthor(b.dataset.author));
+  const il = $('#dInhLang', s); if (il) il.onclick = async () => { il.disabled = true; il.textContent = 'Suche …'; const ok = await fixInhaltLang(it); if (ok) { await closeSheet(); render(); openDetail(it.id); toast('Inhaltsangabe ersetzt'); } else { il.disabled = false; il.textContent = '🌐 Erneut versuchen'; } };
   const im = $('#dInhMore', s); if (im) im.onclick = () => { $('#dInh', s).classList.toggle('clamp'); im.textContent = $('#dInh', s).classList.contains('clamp') ? 'mehr anzeigen' : 'weniger'; };
   const dc = $('#dCover', s); if (dc) dc.onclick = () => searchCoverFor(it.id, dc);
   const dr = $('#dRules', s); if (dr) dr.onclick = () => openRules(it.id);
@@ -2454,6 +2455,7 @@ async function bookLookup(rec) {
 
 // --- KI für den Rest (nur wenn eingerichtet) ---
 async function aiComplete(rec, fields) {
+  if (rec.typ === 'buch') { const L = LANG_NAME[bookLang(rec)] || 'Deutsch'; fields = fields.map(f => f.k === 'inhalt' ? Object.assign({}, f, { aiDesc: `kurze Inhaltsangabe auf ${L} (Sprache des Buches), 2–4 Sätze, ohne Spoiler` }) : f); }
   const known = {}; for (const f of fieldsOf(rec.typ)) if (!isEmpty(rec[f.k]) && f.k !== 'notizen') known[f.k] = rec[f.k];
   const prompt = `Ergänze fehlende Angaben zu einem Medium aus einer privaten Sammlung. Medientyp: ${TYPES[rec.typ].single}.
 Bekannte Angaben: ${JSON.stringify(known)}
@@ -2464,6 +2466,26 @@ Regeln: Fülle nur Felder, bei denen du dir sicher bist (allgemein bekannte Fakt
   try { return JSON.parse(text.slice(a, b + 1)).felder || null; } catch { return null; }
 }
 
+// ---- Sprache von Büchern und Texten ----
+const LANG_NAME = { de: 'Deutsch', en: 'Englisch', fr: 'Französisch', es: 'Spanisch', it: 'Italienisch', nl: 'Niederländisch', sv: 'Schwedisch', da: 'Dänisch', no: 'Norwegisch', pl: 'Polnisch', pt: 'Portugiesisch' };
+const LANG_WORDS = {
+  de: ['der', 'die', 'das', 'und', 'ist', 'nicht', 'ein', 'eine', 'mit', 'von', 'sich', 'auf', 'für', 'dem', 'den', 'des', 'wird', 'sie', 'er'],
+  en: ['the', 'and', 'of', 'to', 'is', 'in', 'that', 'with', 'for', 'his', 'her', 'she', 'he', 'a', 'an', 'when', 'from', 'who', 'their'],
+  fr: ['le', 'la', 'les', 'et', 'est', 'une', 'des', 'du', 'dans', 'pour', 'qui', 'il', 'elle', 'au', 'sur', 'pas'],
+  es: ['el', 'la', 'los', 'las', 'y', 'es', 'una', 'del', 'en', 'para', 'que', 'por', 'su', 'con', 'se'],
+  it: ['il', 'la', 'le', 'e', 'è', 'una', 'del', 'della', 'per', 'che', 'non', 'di', 'un', 'gli', 'con'],
+  nl: ['de', 'het', 'een', 'en', 'van', 'is', 'niet', 'dat', 'zijn', 'met', 'voor', 'op'],
+};
+function textLang(t) {
+  const w = String(t || '').toLowerCase().split(/[^a-zäöüßàâçéèêëîïôûùüÿñæœìòóúí]+/).filter(Boolean); if (w.length < 6) return null;
+  let best = null, bn = 0; for (const [l, list] of Object.entries(LANG_WORDS)) { const set = new Set(list); const n = w.filter(x => set.has(x)).length; if (n > bn) { bn = n; best = l; } }
+  return bn >= 2 ? best : null;
+}
+function bookLang(it) {
+  const sp = String(it.sprache || '').toLowerCase();
+  for (const [code, name] of Object.entries(LANG_NAME)) if (sp && (sp.startsWith(name.toLowerCase().slice(0, 5)) || sp === code || sp.startsWith({ de: 'germ', en: 'engl', fr: 'fren', es: 'span', it: 'ital', nl: 'dutc' }[code] || '#'))) return code;
+  return guessLang([it]);
+}
 // Inhaltsangabe kürzen: HTML entfernen, nach ganzen Sätzen bei ca. 700 Zeichen abschneiden
 function shortText(t, max = 700) {
   t = String(t || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
@@ -2472,23 +2494,53 @@ function shortText(t, max = 700) {
   return (i > 200 ? cut.slice(0, i + 1) : cut.replace(/\s+\S*$/, '') + ' …');
 }
 // Kurzfassung aus der deutschen Wikipedia (erster Absatz des Artikels)
-async function wikiSummary(it) {
-  const hint = { bluray: it.art === 'Serie' ? 'Fernsehserie' : 'Film', buch: 'Roman', game: 'Computerspiel', brettspiel: 'Spiel' }[it.typ]; if (!hint) return null;
+async function wikiSummary(it, lang) {
+  lang = lang || (it.typ === 'buch' ? bookLang(it) : 'de'); if (!LANG_NAME[lang]) lang = 'en';
+  const BH = { de: 'Roman', en: 'novel', fr: 'roman', es: 'novela', it: 'romanzo', nl: 'roman', sv: 'roman', da: 'roman', no: 'roman', pl: 'powieść', pt: 'romance' };
+  const hint = { bluray: it.art === 'Serie' ? 'Fernsehserie' : 'Film', buch: BH[lang], game: 'Computerspiel', brettspiel: 'Spiel' }[it.typ]; if (!hint) return null;
   const clean = t => String(t || '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[^a-z0-9äöüß]/g, '');
   const nt = clean(it.titel);
-  const j = await fetchJSON(`https://de.wikipedia.org/w/api.php?action=query&format=json&origin=*&list=search&srlimit=5&srsearch=${encodeURIComponent(it.titel + ' ' + hint)}`, 7000);
+  const j = await fetchJSON(`https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*&list=search&srlimit=5&srsearch=${encodeURIComponent(it.titel + ' ' + hint)}`, 7000);
   const hit = (j?.query?.search || []).find(p => { const k = clean(p.title); return k && nt && (k === nt || (nt.length >= 5 && (k.startsWith(nt) || nt.startsWith(k)))); });
   if (!hit) return null;
-  const sm = await fetchJSON('https://de.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(hit.title.replace(/ /g, '_')), 7000);
+  const sm = await fetchJSON(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/` + encodeURIComponent(hit.title.replace(/ /g, '_')), 7000);
   if (!sm?.extract || sm.type === 'disambiguation') return null;
   return shortText(sm.extract);
+}
+// Inhaltsangabe in der Sprache des Buches holen (Google Books → Wikipedia → KI-Übersetzung)
+async function inhaltInLang(it, lang) {
+  const ok = t => t && textLang(t) === lang;
+  try {
+    const isbn = String(it.isbn || '').replace(/[^0-9Xx]/g, '');
+    if (isbn) { const b = await lookupISBN(isbn).catch(() => null); if (ok(b?.inhalt)) return [b.inhalt, 'Google Books']; }
+    const q = `intitle:${it.titel}` + (it.autor ? `+inauthor:${authorNames(it.autor)[0] || ''}` : '');
+    const g = await fetchJSON(`https://www.googleapis.com/books/v1/volumes?maxResults=8&langRestrict=${lang}&q=` + encodeURIComponent(q), 7000);
+    for (const x of g?.items || []) { const d = x.volumeInfo?.description; if (d && ok(shortText(d))) return [shortText(d), 'Google Books']; }
+    const w = await wikiSummary(it, lang).catch(() => null); if (ok(w)) return [w, 'Wikipedia'];
+  } catch { }
+  if (settings.provider !== 'barcode' && aiKey()) {
+    const L = LANG_NAME[lang] || lang;
+    const prompt = it.inhalt ? `Übersetze diese Inhaltsangabe des Buches „${it.titel}“${it.autor ? ' von ' + it.autor : ''} ins ${L}. Natürlich klingend, gleiche Länge, keine Erklärungen. Antworte NUR mit dem übersetzten Text.\n\n${it.inhalt}`
+      : `Schreibe eine kurze Inhaltsangabe (2–4 Sätze, ohne Spoiler) auf ${L} zum Buch „${it.titel}“${it.autor ? ' von ' + it.autor : ''}. Nur wenn du das Buch sicher kennst, sonst antworte nur mit: UNBEKANNT`;
+    const t = String(await aiCall(prompt, null, 600).catch(() => '')).trim();
+    if (t && !/^UNBEKANNT/i.test(t)) return [shortText(t), 'KI'];
+  }
+  return [null, null];
+}
+const inhaltWrongLang = it => it.typ === 'buch' && it.inhalt && (() => { const got = textLang(it.inhalt), want = bookLang(it); return got && want && got !== want; })();
+async function fixInhaltLang(it, { ask = true } = {}) {
+  const lang = bookLang(it); const [t, src] = await inhaltInLang(it, lang);
+  if (!t) { if (ask) toast(`Keine Inhaltsangabe auf ${LANG_NAME[lang] || lang} gefunden`); return false; }
+  if (ask && !confirm(`Neue Inhaltsangabe auf ${LANG_NAME[lang] || lang} (Quelle: ${src}):\n\n${t}\n\nÜbernehmen?`)) return false;
+  const cur = byId(it.id); if (!cur) return false;
+  cur.inhalt = t; cur.auto = [...new Set([...(cur.auto || []), 'inhalt'])]; cur.updatedAt = Date.now(); await persist(); return true;
 }
 // Hauptfunktion: ergänzt rec direkt, gibt Liste der ergänzten Felder zurück
 async function completeRecord(rec, { useAI = true } = {}) {
   const filled = new Set();
   if (!TYPES[rec.typ] || !rec.titel) return [];
   try {
-    if (rec.typ === 'buch') fillMissing(rec, await bookLookup(rec), filled);
+    if (rec.typ === 'buch') { const b = await bookLookup(rec); if (b?.inhalt) { const want = bookLang(Object.assign({}, b, rec)); const got = textLang(b.inhalt); if (got && got !== want) delete b.inhalt; } fillMissing(rec, b, filled); }
     if (rec.typ === 'bluray' && settings.tmdbKey) fillMissing(rec, await tmdbLookup(rec), filled);
     if (rec.typ === 'game' && settings.rawgKey) fillMissing(rec, await rawgLookup(rec), filled);
     if (rec.typ === 'brettspiel' && settings.bggToken) fillMissing(rec, await bggLookup(rec).catch(() => null), filled);
@@ -3221,6 +3273,7 @@ function openSettings() {
       <div class="inrow"><button class="btn" id="sBggTest" style="flex:1">BGG-Verbindung testen</button></div>
       <p class="hint" style="margin:0">Token: Mit dem BGG-Konto auf <a href="https://boardgamegeek.com/applications" target="_blank" rel="noopener">boardgamegeek.com/applications</a> eine Anwendung registrieren (nicht-kommerziell, z. B. „Private Mediathek“). Nach der Freigabe durch BGG (kann eine Woche dauern) dort unter „Tokens“ einen Token erzeugen. <a href="https://boardgamegeek.com" target="_blank" rel="noopener"><b>Powered by BGG</b></a></p>
       <button class="btn" id="sFillAll">Bei allen vorhandenen Medien ergänzen</button>
+      ${allLive().some(inhaltWrongLang) ? `<button class="btn" id="sInhLang">📖 Inhaltsangaben in Buchsprache bringen (${allLive().filter(inhaltWrongLang).length})</button>` : ''}
     </div>
 
     <h3>Dropbox-Synchronisierung</h3>
@@ -3312,6 +3365,13 @@ function openSettings() {
   $('#sAuto', s).onchange = e => { settings.autoFill = e.target.checked; saveSettings(); };
   $('#sTmdb', s).oninput = e => { settings.tmdbKey = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
   $('#sRawg', s).oninput = e => { settings.rawgKey = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
+  const sil = $('#sInhLang', s); if (sil) sil.onclick = async () => {
+    const list = allLive().filter(inhaltWrongLang);
+    if (!confirm(`${list.length} Bücher haben eine Inhaltsangabe in einer anderen Sprache als das Buch selbst (z. B. englisches Buch, deutsche Inhaltsangabe). Jetzt ersetzen? Wo online nichts zu finden ist, übersetzt die eingerichtete KI (unter 0,1 Cent pro Buch).`)) return;
+    sil.disabled = true; let n = 0;
+    for (let i = 0; i < list.length; i++) { sil.textContent = `Bearbeite ${i + 1} von ${list.length} …`; if (await fixInhaltLang(list[i], { ask: false })) n++; }
+    sil.textContent = `✓ ${n} von ${list.length} ersetzt`; render(); toast(`${n} Inhaltsangaben in Buchsprache`);
+  };
   $$('[data-ktest]', s).forEach(b => b.onclick = async () => {
     if (!settings[b.dataset.kf]) return toast('Bitte zuerst den Schlüssel einfügen');
     const label = b.textContent; b.disabled = true; b.textContent = 'Teste …';
