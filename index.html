@@ -368,6 +368,11 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .fsk.f0{background:#fff}.fsk.f6{background:#facc15}.fsk.f12{background:#22c55e}.fsk.f16{background:#3b82f6;color:#fff}.fsk.f18{background:#ef4444;color:#fff}
 .sticker{position:absolute;top:22%;right:-22px;transform:rotate(38deg);background:#ef4444;color:#fff;font:400 9px Bungee,sans-serif;padding:2px 24px;box-shadow:0 2px 4px rgba(0,0,0,.4)}
 .sticker.new{background:#22c55e}
+.digbadge{position:absolute;right:4px;bottom:6px;background:#6d28d9;color:#fff;font:700 9px/1 system-ui;padding:3px 6px;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.4);letter-spacing:.02em;z-index:2}
+.tb.dig{background:#6d28d9;margin-left:4px}
+.chkfld{flex-direction:row!important;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.chkfld input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.chkfld span{font-weight:600;color:var(--ink)!important}
 .sticker.out{top:auto;bottom:30%;right:auto;left:-20px;transform:rotate(-30deg);background:#ef4444}
 
 /* ====== BÜCHERREGAL ====== */
@@ -453,6 +458,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .cslist{display:grid;gap:12px}
 .csrow{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 .cst{display:grid}.cst small{color:var(--ink2);font-size:12px}
+.csman{margin-top:12px}.csman summary{cursor:pointer;color:var(--ink2);font-size:14px}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -508,7 +514,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.12';
+const APP_VERSION = '1.13';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -566,6 +572,7 @@ const TYPES = {
       { k: 'originaltitel', l: 'Originaltitel', t: 'text', ai: 1 },
       { k: 'art', l: 'Art', t: 'select', o: ['Film', 'Serie', 'Dokumentation', 'Konzert', 'Anime'], f: 1, ai: 1 },
       { k: 'format', l: 'Format', t: 'select', o: ['Blu-ray', '4K UHD Blu-ray', '3D Blu-ray', 'DVD', 'VHS'], f: 1, ai: 1 },
+      { k: 'digital', l: 'Digital', t: 'bool', f: 1, lab: 'Digital vorhanden (Download / Stream-Kauf)' },
       { k: 'edition', l: 'Edition', t: 'select', o: ['Standard', 'Steelbook', 'Mediabook', "Collector's Edition", 'Limited Edition', 'Box-Set'], f: 1, ai: 1 },
       { k: 'reihe', l: 'Filmreihe', t: 'text', f: 1, ai: 1, ph: 'z. B. Harry Potter' },
       { k: 'staffel', l: 'Staffel / Teil', t: 'text', ai: 1, ph: 'z. B. 3' },
@@ -592,6 +599,7 @@ const TYPES = {
       { k: 'verlag', l: 'Verlag', t: 'text', f: 1, ai: 1 },
       { k: 'jahr', l: 'Jahr', t: 'year', f: 1, ai: 1 },
       { k: 'ausgabe', l: 'Ausgabe', t: 'select', o: ['Hardcover', 'Taschenbuch', 'Paperback', 'Comic / Manga', 'Bildband', 'Hörbuch-CD'], f: 1, ai: 1 },
+      { k: 'digital', l: 'Digital', t: 'bool', f: 1, lab: 'Digital vorhanden (E-Book / Hörbuch-Download)' },
       { k: 'genre', l: 'Genre', t: 'select', o: ['Roman', 'Krimi', 'Thriller', 'Fantasy', 'Science-Fiction', 'Horror', 'Liebesroman', 'Historischer Roman', 'Klassiker', 'Sachbuch', 'Biografie', 'Ratgeber', 'Kochbuch', 'Reise', 'Kinderbuch', 'Jugendbuch', 'Comic', 'Manga', 'Lyrik', 'Sonstiges'], f: 1, ai: 1 },
       { k: 'seiten', l: 'Seiten', t: 'number', ai: 1 },
       { k: 'sprache', l: 'Sprache', t: 'text', f: 1, ai: 1 },
@@ -603,6 +611,7 @@ const TYPES = {
     fields: [
       { k: 'titel', l: 'Titel', t: 'text', wide: 1, ai: 1 },
       { k: 'plattform', l: 'Plattform', t: 'select', o: ['PS5', 'PS4', 'PS3', 'PS2', 'PS Vita', 'Xbox Series X|S', 'Xbox One', 'Xbox 360', 'Switch 2', 'Switch', 'Wii U', 'Wii', '3DS', 'DS', 'GameCube', 'PC', 'Retro / Sonstige'], f: 1, ai: 1 },
+      { k: 'digital', l: 'Digital', t: 'bool', f: 1, lab: 'Digital vorhanden (Download / Store-Kauf)' },
       { k: 'edition', l: 'Edition', t: 'select', o: ['Standard', 'Day One', 'Deluxe', 'Gold / GOTY', "Collector's Edition", 'Steelbook'], f: 1, ai: 1 },
       { k: 'jahr', l: 'Jahr', t: 'year', f: 1, ai: 1 },
       { k: 'genre', l: 'Genre', t: 'select', o: ['Action', 'Action-Adventure', 'Adventure', 'Rollenspiel', 'Shooter', 'Jump & Run', 'Rennspiel', 'Sport', 'Strategie', 'Simulation', 'Puzzle', 'Party', 'Kampfspiel', 'Horror', 'Sonstiges'], f: 1, ai: 1 },
@@ -610,7 +619,7 @@ const TYPES = {
       { k: 'publisher', l: 'Publisher', t: 'text', f: 1, ai: 1 },
       { k: 'usk', l: 'USK', t: 'select', o: ['0', '6', '12', '16', '18'], f: 1, ai: 1 },
       { k: 'spieler', l: 'Spieler', t: 'text', ph: 'z. B. 1–4', ai: 1 },
-      { k: 'lieferumfang', l: 'Lieferumfang', t: 'select', o: ['Komplett mit Anleitung', 'Spiel + Hülle', 'Nur Spiel / Modul', 'Download-Code'], f: 1 },
+      { k: 'lieferumfang', l: 'Lieferumfang', t: 'select', o: ['Komplett mit Anleitung', 'Spiel + Hülle', 'Nur Spiel / Modul'], f: 1 },
       { k: 'status', l: 'Spielstatus', t: 'select', o: ['Ungespielt', 'Angefangen', 'Durchgespielt', '100 %'], f: 1 },
     ]
   },
@@ -628,6 +637,7 @@ const TYPES = {
       { k: 'dauer', l: 'Spieldauer (Min.)', t: 'number', ai: 1 },
       { k: 'alterAb', l: 'Alter ab', t: 'number', ai: 1 },
       { k: 'komplexitaet', l: 'Komplexität', t: 'select', o: ['Leicht', 'Mittel', 'Schwer'], f: 1, ai: 1 },
+      { k: 'digital', l: 'Digital', t: 'bool', f: 1, lab: 'Digital vorhanden (z. B. App oder Board Game Arena)' },
       { k: 'sprache', l: 'Sprache', t: 'text', f: 1, ai: 1 },
       { k: 'vollstaendig', l: 'Vollständig', t: 'select', o: ['Ja', 'Teile fehlen'], f: 1 },
       { k: 'gespielt', l: 'Gespielt', t: 'select', o: ['Noch nie', 'Ab und zu', 'Oft', 'Lieblingsspiel'], f: 1 },
@@ -959,6 +969,7 @@ function matchesFilters(it, filters) {
     if (k === '_lent') { if ((v === 'ja') !== !!it.verliehenAn) return false; continue; }
     if (k === '_players') { const n = +v, a = +it.spielerMin || +it.spielerMax || 0, b = +it.spielerMax || +it.spielerMin || 0; if (!(a && n >= a && n <= b)) return false; continue; }
     if (k === 'bewertung') { if ((+it.bewertung || 0) < +v) return false; continue; }
+    if (k === 'digital') { if ((v === 'Ja') !== (it.digital === 'Ja')) return false; continue; }
     if (String(it[k] ?? '') !== String(v)) return false;
   }
   return true;
@@ -981,6 +992,7 @@ function renderChips() {
   counts.wunsch = wishes().length;
   counts.abend = xLive('abend').length;
   counts.anfragen = xLive('anfrage').filter(r => r.status === 'offen').length;
+  if (!VIEW && counts.anfragen !== renderChips.lastReq) { renderChips.lastReq = counts.anfragen; updateAppBadge(); }
   const defs = [['alle', 'Alle'], ...TYPE_KEYS.map(t => [t, TYPES[t].label]), ['verliehen', '↗ Verliehen'], ['wunsch', '★ Wunschliste']];
   counts.geliehen = borrowed().length; counts.weg = live().filter(i => i.weg).length;
   if (!VIEW && counts.geliehen) defs.push(['geliehen', borrowed().some(isOverdue) ? '↙ Geliehen ⚠' : '↙ Geliehen']);
@@ -1141,7 +1153,7 @@ function hydrateSpines(root) {
 }
 function rowHTML(it) {
   return `<button class="row" data-open="${it.id}">${thumbHTML(it)}<div class="ri"><div class="rt">${esc(it.titel || '(ohne Titel)')}</div><div class="rs">${esc(subtitle(it)) || '&nbsp;'}</div>
-  <div class="rb"><span class="tb ${it.typ}">${esc(TYPES[it.typ]?.single || it.typ)}</span>${it.bewertung ? `<span class="stars-s">${'★'.repeat(+it.bewertung)}</span>` : ''}${it.verliehenAn ? `<span class="lent">${esc(lentText(it, true))}</span>` : ''}${it.bgg ? '<span class="mini" title="BoardGameGeek-Link">BGG</span>' : ''}${it.youtube ? '<span class="mini yt" title="YouTube-Link">▶</span>' : ''}${it.geliehen ? `<span class="borrow${isOverdue(it) ? ' late' : ''}">↙ von ${esc(it.geliehenVon || '?')}${it.rueckgabeBis ? ' · bis ' + esc(deDate(it.rueckgabeBis)) : ''}${isOverdue(it) ? ' · überfällig' : ''}</span>` : ''}${it.weg ? `<span class="wegb">🏷 ${esc(it.weg.art)}${it.weg.preis ? ' · ' + esc(String(it.weg.preis).replace('.', ',')) + ' €' : ''}</span>` : ''}${it.wunsch ? `<span class="wish">★ Wunsch${it.wunschVon ? ' von ' + esc(it.wunschVon) : ''}${it.wunschPrio === 'Hoch' ? ' · hohe Priorität' : ''}</span>` : ''}</div></div></button>`;
+  <div class="rb"><span class="tb ${it.typ}">${esc(TYPES[it.typ]?.single || it.typ)}</span>${it.digital === 'Ja' ? '<span class="tb dig">💾 Digital</span>' : ''}${it.bewertung ? `<span class="stars-s">${'★'.repeat(+it.bewertung)}</span>` : ''}${it.verliehenAn ? `<span class="lent">${esc(lentText(it, true))}</span>` : ''}${it.bgg ? '<span class="mini" title="BoardGameGeek-Link">BGG</span>' : ''}${it.youtube ? '<span class="mini yt" title="YouTube-Link">▶</span>' : ''}${it.geliehen ? `<span class="borrow${isOverdue(it) ? ' late' : ''}">↙ von ${esc(it.geliehenVon || '?')}${it.rueckgabeBis ? ' · bis ' + esc(deDate(it.rueckgabeBis)) : ''}${isOverdue(it) ? ' · überfällig' : ''}</span>` : ''}${it.weg ? `<span class="wegb">🏷 ${esc(it.weg.art)}${it.weg.preis ? ' · ' + esc(String(it.weg.preis).replace('.', ',')) + ' €' : ''}</span>` : ''}${it.wunsch ? `<span class="wish">★ Wunsch${it.wunschVon ? ' von ' + esc(it.wunschVon) : ''}${it.wunschPrio === 'Hoch' ? ' · hohe Priorität' : ''}</span>` : ''}</div></div></button>`;
 }
 const contentWidth = () => { const el = $('#content'), cs = getComputedStyle(el); return Math.max(260, el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
 function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
@@ -1179,7 +1191,7 @@ function renderVideothek(list, typ) {
         const [bc, bt] = caseBand(it); const c = colorFor(it.titel); const age = it.fsk || it.usk;
         return `<button class="case" data-open="${it.id}" style="--c:${c}" title="${esc(it.titel)}"><div class="band" style="background:${bc}">${esc(bt)}</div>
           <div class="art" data-cover="${it.id}"><div class="gen ph"><b>${esc(it.titel)}</b><i>${esc(it.jahr || '')}</i></div></div>
-          ${age ? `<span class="fsk f${esc(age)}">${esc(age)}</span>` : ''}${it.verliehenAn ? '<span class="sticker out">Verliehen</span>' : isNew(it) ? '<span class="sticker new">Neu</span>' : ''}</button>`;
+          ${age ? `<span class="fsk f${esc(age)}">${esc(age)}</span>` : ''}${it.verliehenAn ? '<span class="sticker out">Verliehen</span>' : isNew(it) ? '<span class="sticker new">Neu</span>' : ''}${it.digital === 'Ja' ? '<span class="digbadge">💾 Digital</span>' : ''}</button>`;
       }).join('')}</div><div class="vt-board"></div>`;
     }
     html += `</section>`;
@@ -1577,7 +1589,7 @@ function renderGameStore(list) {
         const tag = [playersText(it).replace(' Spieler', ''), it.dauer ? it.dauer + '′' : ''].filter(Boolean);
         return `<button class="gbox" data-open="${it.id}" title="${esc(it.titel)}" style="--bw:${w}px;--bh:${h}px;--c:${c};--d:${shade(d)}">
           <div data-cover="${it.id}" style="position:absolute;inset:0"><div class="gen ph" style="color:${textOn(c)}"><b>${esc(it.titel)}</b>${MEEPLE}</div></div>
-          ${it.erweiterungVon ? '<span class="ribbon">Erweiterung</span>' : ''}${it.verliehenAn ? '<span class="ribbon out">Verliehen</span>' : ''}
+          ${it.erweiterungVon ? '<span class="ribbon">Erweiterung</span>' : ''}${it.verliehenAn ? '<span class="ribbon out">Verliehen</span>' : ''}${it.digital === 'Ja' ? '<span class="digbadge">💾 Digital</span>' : ''}
           ${tag.length ? `<span class="tag">👥 ${esc(tag[0] || '–')}${tag[1] ? ' · ⏱ ' + esc(tag[1]) : ''}</span>` : ''}</button>`;
       }).join('')}</div><div class="gs-board"></div>`;
     }
@@ -1651,12 +1663,13 @@ function openDetail(id) {
     ${VIEW ? '' : it.geliehen ? `<div class="formfoot"><button class="btn" id="dToWish">★ Wunschliste</button><button class="btn" id="dEdit">Bearbeiten</button><button class="btn ok" id="dReturned">✓ Zurückgegeben</button></div>`
       : it.wunsch ? `<div class="formfoot"><button class="btn danger" id="dDel">Löschen</button><button class="btn" id="dEdit">Bearbeiten</button><button class="btn ok" id="dBought">✓ Gekauft</button></div>`
       : it.weg ? `<div class="formfoot"><button class="btn" id="dWeg">🏷 Ändern</button><button class="btn" id="dEdit">Bearbeiten</button><button class="btn ok" id="dGone">✓ ${it.weg.art === 'Verkaufen' ? 'Verkauft' : 'Weggegeben'}</button></div>`
-      : `<div class="formfoot"><button class="btn danger" id="dDel">Löschen</button><button class="btn" id="dLend">${it.verliehenAn ? 'Zurückbekommen' : 'Verleihen'}</button><button class="btn" id="dWeg" title="Aussortieren" aria-label="Aussortieren" style="flex:0 0 48px">🏷</button><button class="btn primary" id="dEdit">Bearbeiten</button></div>`}`);
+      : `<div class="formfoot"><button class="btn danger" id="dDel">Löschen</button>${it.digital === 'Ja' && !it.verliehenAn ? '' : `<button class="btn" id="dLend">${it.verliehenAn ? 'Zurückbekommen' : 'Verleihen'}</button>`}<button class="btn" id="dWeg" title="Aussortieren" aria-label="Aussortieren" style="flex:0 0 48px">🏷</button><button class="btn primary" id="dEdit">Bearbeiten</button></div>`}`);
   hydrateCovers(s);
   $$('[data-author]', s).forEach(b => b.onclick = () => openAuthor(b.dataset.author));
   const dc = $('#dCover', s); if (dc) dc.onclick = () => searchCoverFor(it.id, dc);
   const dr = $('#dRules', s); if (dr) dr.onclick = () => openRules(it.id);
   if (VIEW) {
+    if (!it.wunsch && it.digital === 'Ja') { s.insertAdjacentHTML('beforeend', '<p class="hint" style="text-align:center">💾 Digital – kann nicht verliehen werden</p>'); return; }
     if (!it.wunsch) {
       const inB = basket.some(b => b[0] === it.id);
       s.insertAdjacentHTML('beforeend', `<div class="formfoot"><button class="btn ${inB ? '' : 'primary'}" id="vReq">${inB ? '✓ In deiner Anfrage – entfernen' : '🙋 Ausleihen anfragen'}</button></div>`);
@@ -1708,6 +1721,7 @@ function applyReturn(rec, prevHist, zurueck) {
 }
 function openLend(it) {
   const lent = !!it.verliehenAn;
+  if (!lent && it.digital === 'Ja') return toast('Digitale Medien können nicht verliehen werden');
   const s = openSheet(`${sheetHead(lent ? 'Zurückbekommen' : 'Verleihen')}
     <p style="margin-top:0"><b>${esc(it.titel)}</b>${lent ? `<br><span class="hint">${esc(lentText(it))}</span>` : ''}</p>
     <form class="form" id="lf">${lent ? `<label class="fld wide"><span>Rückgabedatum</span><input type="date" name="zurueck" value="${todayISO()}"></label>`
@@ -1738,6 +1752,7 @@ function inputHTML(typ, f, val) {
     case 'date': inp = `<input type="date" name="${f.k}" value="${esc(v)}">`; break;
     case 'url': inp = `<div class="inrow"><input type="url" inputmode="url" name="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || 'https://…')}" autocomplete="off">${f.site === 'bgg' ? '<button type="button" class="btn" data-bggsearch title="Auf BoardGameGeek suchen">🔍 BGG</button>' : '<button type="button" class="btn" data-ytsearch title="Auf YouTube suchen">🔍 YT</button>'}<button type="button" class="btn" data-openlink="${f.k}" title="Link öffnen">↗</button></div>`; break;
     case 'lend': return lendHTML(v);
+    case 'bool': return `<label class="fld wide chkfld" data-f="${f.k}"><input type="checkbox" name="${f.k}" value="Ja" ${v === 'Ja' ? 'checked' : ''}><span>💾 ${esc(f.lab || f.l)}</span></label>`;
     default: {
       const dl = ['titel', 'notizen', 'barcode', 'isbn'].includes(f.k) ? '' : `list="dl_${f.k}"`;
       inp = `<input type="text" name="${f.k}" value="${esc(v)}" ${f.im ? `inputmode="${f.im}"` : ''} ${f.ph ? `placeholder="${esc(f.ph)}"` : ''} ${dl} autocomplete="off">`;
@@ -1776,6 +1791,8 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     showThumb();
     autoKeys.forEach(k => form.querySelector(`[data-f="${k}"]`)?.classList.add('autofilled'));
     wireLend(form);
+    const dg = form.elements.digital, lb = form.querySelector('[data-f="verliehenAn"]');
+    if (dg && lb) { const upd = () => { lb.hidden = dg.checked; }; dg.onchange = upd; upd(); }
     const setImg = (k, r) => { if (!r) return; if (k === 'cover') { coverData = r.data; removeCover = false; } else { spineData = r.data; spineAspect = r.aspect; removeSpine = false; } showThumb(); };
     $$('[data-file]', form).forEach(inp => inp.onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; const k = inp.dataset.file; const src = await resizeImage(f, 2000, .9); setImg(k, await openImageEditor(src, { kind: k })); });
     $$('[data-edit]', form).forEach(b => b.onclick = async () => {
@@ -1845,7 +1862,8 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
       else vals[f.k] = normLink(vals[f.k]);
     }
     if (data.geliehen && !vals.geliehenVon) { const l = form.querySelector('[data-f="geliehenVon"]'); l?.classList.add('err'); bad = bad || l; }
-    if ($('#lendChk', form)?.checked && !vals.verliehenAn) { const l = form.querySelector('[data-f="verliehenAn"]'); l.classList.add('err'); bad = bad || l; }
+    if (vals.digital === 'Ja') { delete vals.verliehenAn; delete vals.verliehenAm; }
+    if ($('#lendChk', form)?.checked && !vals.verliehenAn && vals.digital !== 'Ja') { const l = form.querySelector('[data-f="verliehenAn"]'); l.classList.add('err'); bad = bad || l; }
     if (bad) { bad.scrollIntoView({ block: 'center', behavior: 'smooth' }); return toast(linkMsg || 'Bitte Pflichtfelder ausfüllen'); }
     const zurueck = vals._zurueckAm; delete vals._zurueckAm;
     const rec = Object.assign({ typ: data.typ }, vals, { id: item?.id, _coverData: coverData, _removeCover: removeCover, _spineData: spineData, _spineAspect: spineAspect, _removeSpine: removeSpine });
@@ -2491,8 +2509,15 @@ async function wikipediaCovers(it) {
   }
   return out;
 }
+function isbn10(v) {
+  const d = String(v || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+  if (d.length === 10) return d;
+  if (d.length !== 13 || !d.startsWith('978')) return null;
+  const core = d.slice(3, 12); let sum = 0; for (let i = 0; i < 9; i++) sum += (10 - i) * +core[i];
+  const c = (11 - sum % 11) % 11; return core + (c === 10 ? 'X' : String(c));
+}
 async function findCoverCandidates(it) {
-  const out = []; const add = u => { if (u && !out.includes(u) && out.length < 6) out.push(u); };
+  const out = []; const add = u => { if (u && !out.includes(u) && out.length < 7) out.push(u); };
   const rec = Object.assign({}, it);
   try {
     if (it.typ === 'buch') {
@@ -2511,10 +2536,12 @@ async function findCoverCandidates(it) {
     if (it.typ === 'vinyl') add((await mbLookup(rec))?.cover);
     if (!out.length || ['brettspiel', 'game'].includes(it.typ)) add((await wikidataLookup(rec).catch(() => null))?.cover);
     if (out.length < 4) for (const u of await wikipediaCovers(it).catch(() => [])) add(u);
+    // Amazon zuletzt (bei Filmen/Spielen oft mit Altersfreigabe-Logo) – frei abrufbar nur über die ISBN-10 bei Büchern
+    const i10 = isbn10(it.isbn || it.barcode); if (i10) add(`https://images-na.ssl-images-amazon.com/images/P/${i10}.01.L.jpg`);
   } catch { }
   // nur Bilder, die wirklich laden
   const ok = await Promise.all(out.map(u => imgOk(u)));
-  return out.filter((u, i) => ok[i]).slice(0, 4);
+  return out.filter((u, i) => ok[i]).slice(0, 5);
 }
 async function applyCover(id, url) {
   const cur = byId(id); if (!cur || cur.deleted || hasCover(cur)) return false;
@@ -2527,13 +2554,23 @@ async function searchCoverFor(id, btn) {
   if (btn) { btn.disabled = true; btn.textContent = '🔍 Suche Cover …'; }
   const urls = await findCoverCandidates(it);
   if (btn) { btn.disabled = false; btn.textContent = '🔍 Cover im Internet suchen'; }
-  if (!urls.length) return toast('Kein Cover gefunden – du kannst unter „Bearbeiten“ selbst eins hochladen', 4000);
-  let sel = 0;
-  const s = openSheet(`${sheetHead(urls.length > 1 ? 'Cover gefunden – welches passt?' : 'Cover gefunden')}
-    <p class="hint" style="margin-top:0">„${esc(it.titel)}“${it.autor ? ' · ' + esc(it.autor) : ''}. ${urls.length > 1 ? 'Tippe auf das passende Bild.' : 'Passt dieses Bild?'}</p>
-    <div id="csOne">${candHTML(id, urls, sel)}</div>
-    <div class="formfoot"><button class="btn" data-close>Nicht übernehmen</button><button class="btn primary" id="csOk">Übernehmen</button></div>`);
-  $('#csOne', s).onclick = e => { const b = e.target.closest('[data-ci]'); if (!b) return; sel = +b.dataset.ci; $$('[data-ci]', s).forEach(x => x.setAttribute('aria-pressed', +x.dataset.ci === sel)); $('#csOk', s).disabled = sel < 0; };
+  let sel = urls.length ? 0 : -1;
+  const amz = 'https://www.amazon.de/s?k=' + encodeURIComponent([it.titel, it.autor || it.interpret || '', it.typ === 'game' ? it.plattform || '' : it.typ === 'bluray' ? it.format || 'Blu-ray' : ''].filter(Boolean).join(' '));
+  const s = openSheet(`${sheetHead(!urls.length ? 'Kein Cover gefunden' : urls.length > 1 ? 'Cover gefunden – welches passt?' : 'Cover gefunden')}
+    <p class="hint" style="margin-top:0">„${esc(it.titel)}“${it.autor ? ' · ' + esc(it.autor) : ''}. ${!urls.length ? 'In den freien Quellen war nichts dabei.' : urls.length > 1 ? 'Tippe auf das passende Bild.' : 'Passt dieses Bild?'}</p>
+    <div id="csOne">${urls.length ? candHTML(id, urls, sel) : ''}</div>
+    <details class="csman"${urls.length ? '' : ' open'}><summary>Selbst suchen (z. B. bei Amazon)</summary>
+      <p class="hint">Auf Amazon das Produktbild lange drücken → „Bildadresse kopieren“ und hier einfügen. Amazon-Bilder zeigen bei Filmen und Spielen oft das FSK-/USK-Logo.</p>
+      <div class="inrow"><a class="btn" href="${esc(amz)}" target="_blank" rel="noopener">🛒 Bei Amazon suchen</a></div>
+      <div class="inrow" style="margin-top:8px"><input id="csUrl" type="url" placeholder="Bildadresse einfügen (https://…)" style="flex:1"><button class="btn" id="csUrlOk">Prüfen</button></div></details>
+    <div class="formfoot"><button class="btn" data-close>Nicht übernehmen</button><button class="btn primary" id="csOk" ${sel < 0 ? 'disabled' : ''}>Übernehmen</button></div>`);
+  const pick = () => { $$('[data-ci]', s).forEach(x => x.setAttribute('aria-pressed', +x.dataset.ci === sel)); $('#csOk', s).disabled = sel < 0; };
+  $('#csOne', s).onclick = e => { const b = e.target.closest('[data-ci]'); if (!b) return; sel = +b.dataset.ci; pick(); };
+  $('#csUrlOk', s).onclick = async () => {
+    const u = $('#csUrl', s).value.trim(); if (!/^https:\/\//.test(u)) return toast('Bitte eine Bildadresse mit https:// einfügen');
+    if (!await imgOk(u)) return toast('Unter dieser Adresse wurde kein Bild gefunden');
+    if (!urls.includes(u)) urls.push(u); sel = urls.indexOf(u); $('#csOne', s).innerHTML = candHTML(id, urls, sel); pick();
+  };
   $('#csOk', s).onclick = async () => { if (sel < 0) return; if (await applyCover(id, urls[sel])) { await persist(); } await closeSheet(); await closeSheet(); render(); openDetail(id); toast('Cover übernommen'); };
 }
 // Viele Medien auf einmal: suchen, dann alle Vorschläge zur Bestätigung zeigen
@@ -2747,6 +2784,7 @@ function openFilters() {
   for (const f of ff) {
     if (f.f === 'lent') { if (ui.type !== 'verliehen') html += sel('_lent', 'Verliehen', [['ja', 'Nur verliehene'], ['nein', 'Nur vorhandene']]); continue; }
     if (f.t === 'rating') { html += sel('bewertung', 'Bewertung', [1, 2, 3, 4, 5].map(n => [n, 'mindestens ' + '★'.repeat(n)])); continue; }
+    if (f.t === 'bool') { if (pool.some(i => i[f.k] === 'Ja')) html += sel(f.k, f.l, [['Ja', 'Nur digitale'], ['Nein', 'Nur physische']]); continue; }
     let vals = [...new Set(pool.map(i => i[f.k]).filter(v => v != null && v !== '').map(String))];
     if (f.t === 'select') { const o = optsOf(f); vals.sort((a, b) => (o.indexOf(a) + 1 || 999) - (o.indexOf(b) + 1 || 999) || a.localeCompare(b, 'de')); }
     else if (f.t === 'year') vals.sort((a, b) => b - a); else vals.sort((a, b) => a.localeCompare(b, 'de'));
@@ -3039,7 +3077,7 @@ async function sync() {
         if (rx.changed) { extra = rx.list; await idb.set('extra', extra); }
         if (rx.localAhead) res.localAhead = true;
         if (rx.changed && !res.changed) render();
-        if (remote.shared && (remote.shared.updatedAt || 0) > (shared.updatedAt || 0)) { shared = remote.shared; await idb.set('shared', shared); }
+        if (remote.shared && (remote.shared.updatedAt || 0) > (shared.updatedAt || 0)) { const hadMbox = JSON.stringify(shared.mbox || null); shared = remote.shared; await idb.set('shared', shared); if (JSON.stringify(shared.mbox || null) !== hadMbox) mbxSyncSW(); }
         else if ((shared.updatedAt || 0) > (remote.shared?.updatedAt || 0)) res.localAhead = true;
         if (res.changed) { await idb.set('items', items); render(); }
         localAhead = localAhead || res.localAhead;
@@ -3142,6 +3180,9 @@ function openSettings() {
     <h3>Sammlung teilen (nur ansehen)</h3>
     <div class="card" id="shareCard"></div>
 
+    <h3>Anfragen direkt empfangen</h3>
+    <div class="card" id="mboxCard"></div>
+
     <h3>Weiteres Gerät einrichten</h3>
     <div class="card"><p class="hint" style="margin:0">Überträgt KI-Schlüssel, Dropbox-App-Key und Einstellungen auf ein weiteres Gerät. Die Dropbox-Anmeldung wird nur mitgegeben, wenn das Gerät dasselbe Dropbox-Konto nutzt. Den Code nur privat weitergeben (er enthält Zugangsschlüssel).</p>
       <div class="inrow"><button class="btn" id="sCodeOut" style="flex:1">Einrichtungs-Code kopieren</button><button class="btn" id="sCodeIn" style="flex:1">Code einfügen</button></div></div>
@@ -3213,9 +3254,9 @@ function openSettings() {
   $('#sHelp', s).onclick = () => closeSheet().then(openHelp);
   $('#sTabs', s).onclick = () => closeSheet().then(openTabSettings);
   const dg = $('#sDiscogs', s); if (dg) dg.oninput = e => { settings.discogsToken = e.target.value.trim(); saveSettings(); };
-  drawShare($('#shareCard', s));
+  drawShare($('#shareCard', s)); drawMailbox($('#mboxCard', s));
   // Abschnitte aufklappbar machen (übersichtlicher)
-  const ICONS = { 'Wir zwei': '👫', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Automatische Backups': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
+  const ICONS = { 'Anfragen direkt empfangen': '📬', 'Wir zwei': '👫', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Automatische Backups': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
   const openKey = lsGet('mt_setopen', '');
   $$('.set > h3', s).forEach(h => {
     const card = h.nextElementSibling; const d = document.createElement('details'); d.className = 'setsec';
@@ -3472,6 +3513,7 @@ function publicData() {
     app: 'mediathek-ansicht', at: Date.now(),
     title: [shared.person1, shared.person2].filter(Boolean).join(' & '),
     person1: shared.person1, person2: shared.person2,
+    mbox: shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined,
     items: allLive().filter(i => !i.geliehen).map(i => { const o = {}; for (const [k, v] of Object.entries(i)) if (!PRIVATE.includes(k)) o[k] = v; if (i.verliehenAn) o.verliehenAn = true; if (!i.cover) delete o.cover; return o; }),
   };
 }
@@ -3523,7 +3565,7 @@ async function initView(code) {
   let data = null;
   try { if (/^https:\/\/[a-z0-9.-]*dropbox(usercontent)?\.com\//.test(raw)) { const r = await fetch(raw, { cache: 'no-store' }); if (r.ok) data = await r.json(); } } catch { }
   if (!data?.items) { $('#content').innerHTML = '<div class="empty"><div class="big">Link nicht verfügbar</div>Die Freigabe wurde beendet oder der Link ist unvollständig.</div>'; return; }
-  VIEW = { title: data.title };
+  VIEW = { title: data.title, mbox: data.mbox?.k && data.mbox?.r ? data.mbox : null };
   items = data.items; shared = Object.assign(shared, { person1: data.person1 || '', person2: data.person2 || '' });
   $('.brand').firstChild.textContent = data.title ? `Sammlung von ${data.title} ` : 'Mediathek ';
   document.title = data.title ? `Sammlung von ${data.title}` : 'Mediathek';
@@ -3586,10 +3628,10 @@ async function handleIncoming(kind, code) {
     toast(ex ? `Stimme von ${name} aktualisiert` : `Stimme von ${name} eingetragen`);
     if (ab) openAbendDetail(ab.id);
   } else if (kind === 'anfrage' && d?.k === 'a' && Array.isArray(d.i)) {
-    const id = 'r_' + String(d.id || uid()).slice(0, 30);
-    if (extra.some(r => r.id === id)) { ui.type = 'anfragen'; render(); return toast('Diese Anfrage ist schon eingetragen'); }
-    await upsertExtra({ id, kind: 'anfrage', n: String(d.n || 'Gast').slice(0, 40), m: String(d.m || '').slice(0, 500), i: d.i.slice(0, 30).map(x => [String(x[0]), String(x[1] || '').slice(0, 120)]), at: d.at || Date.now(), status: 'offen' });
-    ui.type = 'anfragen'; saveUi(); render(); toast(`Neue Ausleih-Anfrage von ${d.n || 'Gast'}`);
+    const rec = await importRequest(d);
+    ui.type = 'anfragen'; saveUi(); render();
+    if (!rec) return toast('Diese Anfrage ist schon eingetragen');
+    toast(`Neue Ausleih-Anfrage von ${d.n || 'Gast'}`);
   } else toast('Unbekannter Link');
 }
 function pasteIncoming() {
@@ -3778,6 +3820,139 @@ async function initVote(code) {
 }
 
 /* =========================================================
+   Briefkasten: Ausleih-Anfragen kommen direkt in der App an.
+   Eine zweite, kleine Dropbox-App mit nur einem eigenen „App-Ordner“.
+   Gäste bekommen einen Zugang, der dort NUR Dateien ablegen darf (nicht lesen, nicht auflisten).
+   Eure Geräte lesen die Anfragen ab, tragen sie ein und löschen die Datei.
+   ========================================================= */
+const MBX_OWNER = ['files.metadata.read', 'files.content.read', 'files.content.write'];
+const MBX_GUEST = ['files.content.write'];
+const mbxTok = {};
+async function oauthStart(clientId, scopes, store) {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  sessionStorage.setItem(store, verifier);
+  window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&token_access_type=offline&force_reapprove=true&scope=${encodeURIComponent(scopes.join(' '))}`, '_blank');
+}
+async function oauthFinish(clientId, code, store) {
+  const r = await fetch('https://api.dropboxapi.com/oauth2/token', { method: 'POST', body: new URLSearchParams({ code: code.trim(), grant_type: 'authorization_code', client_id: clientId, code_verifier: sessionStorage.getItem(store) || '' }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.refresh_token) throw new Error(j.error_description || j.error || 'Anmeldung fehlgeschlagen');
+  return { refresh: j.refresh_token, scope: j.scope || '' };
+}
+async function mbxToken(clientId, refresh) {
+  const k = clientId + refresh.slice(-8); const c = mbxTok[k]; if (c && c.exp > Date.now()) return c.t;
+  const r = await fetch('https://api.dropboxapi.com/oauth2/token', { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refresh, client_id: clientId }) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error('Briefkasten-Zugang ungültig (' + r.status + ')');
+  mbxTok[k] = { t: j.access_token, exp: Date.now() + (j.expires_in - 60) * 1000 }; return j.access_token;
+}
+// Gast: Anfrage direkt einwerfen
+async function mbxSend(mbox, req) {
+  const t = await mbxToken(mbox.k, mbox.r);
+  const r = await fetch('https://content.dropboxapi.com/2/files/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': JSON.stringify({ path: '/anfragen/' + req.id + '.json', mode: 'add', autorename: true, mute: true }) }, body: JSON.stringify(req) });
+  if (!r.ok) throw new Error('Senden fehlgeschlagen (' + r.status + ')');
+}
+// Eigene Geräte: Briefkasten leeren
+let mbxBusy = false;
+async function pollMailbox({ quiet = false } = {}) {
+  const m = shared.mbox; if (VIEW || mbxBusy || !m?.key || !m?.owner || !navigator.onLine) return 0;
+  mbxBusy = true; let n = 0;
+  try {
+    const t = await mbxToken(m.key, m.owner);
+    const api = (ep, body) => fetch('https://api.dropboxapi.com/2/' + ep, { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const lr = await api('files/list_folder', { path: '/anfragen' });
+    if (!lr.ok) return 0; // Ordner gibt es erst nach der ersten Anfrage
+    const files = ((await lr.json()).entries || []).filter(e => e['.tag'] === 'file' && /\.json$/.test(e.name)).slice(0, 30);
+    const added = [];
+    for (const f of files) {
+      const dr = await fetch('https://content.dropboxapi.com/2/files/download', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Dropbox-API-Arg': JSON.stringify({ path: f.path_lower }) } });
+      if (dr.ok) { try { const d = JSON.parse(await dr.text()); const res = await importRequest(d); if (res) added.push(res); } catch { } }
+      await api('files/delete_v2', { path: f.path_lower });
+    }
+    n = added.length;
+    if (n) {
+      render(); updateAppBadge();
+      if (!quiet) toast(n === 1 ? `📬 Neue Ausleih-Anfrage von ${added[0].n}` : `📬 ${n} neue Ausleih-Anfragen`, 4000);
+      if (document.visibilityState !== 'visible' || ui.type !== 'anfragen') notifyRequests(added);
+    }
+  } catch (e) { console.warn('Briefkasten', e); }
+  finally { mbxBusy = false; }
+  return n;
+}
+async function importRequest(d) {
+  if (!(d?.k === 'a' && Array.isArray(d.i))) return null;
+  const id = 'r_' + String(d.id || uid()).slice(0, 30);
+  if (extra.some(r => r.id === id)) return null;
+  const rec = { id, kind: 'anfrage', n: String(d.n || 'Gast').slice(0, 40), m: String(d.m || '').slice(0, 500), i: d.i.slice(0, 30).map(x => [String(x[0]), String(x[1] || '').slice(0, 120)]), at: d.at || Date.now(), status: 'offen' };
+  await upsertExtra(rec); return rec;
+}
+// App-Symbol: Zahl (Windows/macOS) bzw. Punkt über eine Benachrichtigung (Android)
+function updateAppBadge() {
+  const n = xLive('anfrage').filter(r => r.status === 'offen').length;
+  try { if (navigator.setAppBadge) n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch { }
+  if (!n) clearRequestNotes();
+}
+async function notifyRequests(list) {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker?.ready; if (!reg) return;
+    const open = xLive('anfrage').filter(r => r.status === 'offen');
+    await reg.showNotification(open.length > 1 ? `📬 ${open.length} offene Ausleih-Anfragen` : '📬 Neue Ausleih-Anfrage', { body: list.map(r => `${r.n}: ${r.i.map(x => x[1]).join(', ')}`).join('\n').slice(0, 200), icon: 'icon-192.png', badge: 'icon-192.png', tag: 'mediathek-anfrage', renotify: true, data: { url: './?aktion=anfragen' } });
+  } catch { }
+}
+async function clearRequestNotes() { try { const reg = await navigator.serviceWorker?.getRegistration(); (await reg?.getNotifications({ tag: 'mediathek-anfrage' }) || []).forEach(n => n.close()); } catch { } }
+// Zugangsdaten für den Hintergrund-Check (Service Worker liest IndexedDB, nicht localStorage)
+async function mbxSyncSW() {
+  try {
+    const m = shared.mbox;
+    if (m?.key && m?.owner) await idb.set('mbox', { key: m.key, rt: m.owner }); else await idb.del('mbox');
+    if (!m?.owner || !('Notification' in window) || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker?.ready;
+    if (reg && 'periodicSync' in reg) {
+      const st = await navigator.permissions.query({ name: 'periodic-background-sync' }).catch(() => ({ state: 'denied' }));
+      if (st.state === 'granted') await reg.periodicSync.register('mailbox', { minInterval: 60 * 60 * 1000 });
+    }
+  } catch { }
+}
+function drawMailbox(c) {
+  if (!c) return;
+  const m = shared.mbox || {};
+  const ready = m.key && m.owner && m.guest;
+  const notif = 'Notification' in window ? Notification.permission : 'unsupported';
+  c.innerHTML = ready ? `<p style="margin:0">✓ <b>Briefkasten ist eingerichtet.</b> Anfragen von Freunden kommen direkt hier an – kein WhatsApp nötig.</p>
+      ${notif === 'granted' ? '<p class="hint" style="margin:0">🔔 Benachrichtigungen sind an: Bei neuen Anfragen erscheint ein Punkt am App-Symbol.</p>' : notif === 'unsupported' ? '' : '<button class="btn" id="mbNotif">🔔 Benachrichtigungen erlauben (Punkt am App-Symbol)</button>'}
+      <div class="inrow"><button class="btn" id="mbCheck" style="flex:1">Jetzt nachsehen</button><button class="btn danger" id="mbOff" style="flex:1">Briefkasten entfernen</button></div>`
+    : `<p class="hint" style="margin:0">Damit Freunde Ausleih-Anfragen <b>direkt in die App</b> schicken können statt per WhatsApp-Link. Einmalig, ca. 5 Minuten:</p>
+      <ol class="hint" style="margin:0;padding-left:20px">
+        <li>Auf <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener">dropbox.com/developers/apps</a> → <b>Create app</b> → Scoped access → <b>App folder</b> (nicht Full Dropbox!) → Name z. B. „Mediathek-Briefkasten-Mueller“.</li>
+        <li>Reiter <b>Permissions</b>: files.metadata.read, files.content.read, files.content.write anhaken → <b>Submit</b>.</li>
+        <li>Reiter Settings: <b>App key</b> kopieren und hier einfügen.</li></ol>
+      <label class="fld"><span>App key des Briefkastens</span><input id="mbKey" value="${esc(m.key || '')}" autocomplete="off"></label>
+      <div class="inrow"><button class="btn ${m.owner ? '' : 'primary'}" id="mbA1" style="flex:1">${m.owner ? '✓ ' : ''}1. Für euch verbinden</button><button class="btn ${m.owner && !m.guest ? 'primary' : ''}" id="mbA2" style="flex:1" ${m.owner ? '' : 'disabled'}>2. Gäste-Zugang erzeugen</button></div>
+      <p class="hint" style="margin:0">Bei jedem Schritt öffnet sich Dropbox: <b>Zulassen</b>, Code kopieren, hier einfügen. Der Gäste-Zugang darf nur Dateien in diesen Briefkasten-Ordner legen – nichts lesen und nichts anderes in eurer Dropbox sehen.</p>`;
+  const key = () => ($('#mbKey', c)?.value || m.key || '').trim();
+  const step = async (which) => {
+    const k = key(); if (!k) return toast('Bitte zuerst den App key einfügen');
+    const store = 'mbx_' + which; await oauthStart(k, which === 'owner' ? MBX_OWNER : MBX_GUEST, store);
+    const code = prompt('Code von Dropbox hier einfügen:'); if (!code) return;
+    try {
+      const r = await oauthFinish(k, code, store);
+      shared.mbox = Object.assign({}, shared.mbox, { key: k, [which]: r.refresh, at: Date.now() });
+      if (which === 'owner' && !MBX_OWNER.every(x => r.scope.split(' ').includes(x))) toast('Achtung: Dem Briefkasten fehlen Berechtigungen – Schritt 2 der Anleitung prüfen', 5000);
+      await saveShared(); await mbxSyncSW();
+      if (which === 'guest' && shared.share?.enabled) await updateShareFile(true).catch(() => { });
+      toast(which === 'owner' ? 'Verbunden – jetzt Schritt 2' : 'Briefkasten fertig eingerichtet');
+    } catch (e) { alert('Hat nicht geklappt: ' + e.message); }
+    drawMailbox(c);
+  };
+  const a1 = $('#mbA1', c); if (a1) a1.onclick = () => step('owner');
+  const a2 = $('#mbA2', c); if (a2) a2.onclick = () => step('guest');
+  const nb = $('#mbNotif', c); if (nb) nb.onclick = async () => { const p = await Notification.requestPermission(); if (p === 'granted') { await mbxSyncSW(); toast('Benachrichtigungen an'); } else toast('Benachrichtigungen wurden nicht erlaubt'); drawMailbox(c); };
+  const ck = $('#mbCheck', c); if (ck) ck.onclick = async () => { const n = await pollMailbox({ quiet: true }); toast(n ? `${n} neue Anfrage(n)` : 'Keine neuen Anfragen'); };
+  const off = $('#mbOff', c); if (off) off.onclick = async () => { if (!confirm('Briefkasten entfernen? Freunde schicken Anfragen dann wieder per WhatsApp-Link.')) return; delete shared.mbox; await saveShared(); await mbxSyncSW(); if (shared.share?.enabled) await updateShareFile(true).catch(() => { }); drawMailbox(c); };
+}
+
+/* =========================================================
    Ausleih-Anfragen: Gäste (Leseansicht) → Posteingang
    ========================================================= */
 let basket = [];
@@ -3804,7 +3979,13 @@ function openBasket() {
   $('#bkSend', s).onclick = async () => {
     const name = $('#bkName', s).value.trim(); if (!name) return toast('Bitte deinen Namen eingeben'); if (!basket.length) return;
     lsSet('mt_myname', name); const msg = $('#bkMsg', s).value.trim();
-    const url = baseURL() + '#anfrage=' + await packObj({ k: 'a', id: uid(), n: name, m: msg, i: basket, at: Date.now() });
+    const req = { k: 'a', id: uid(), n: name, m: msg, i: basket, at: Date.now() };
+    if (VIEW?.mbox) { // direkt in die App der beiden
+      const b = $('#bkSend', s); b.disabled = true; b.textContent = 'Sende …';
+      try { await mbxSend(VIEW.mbox, req); await closeSheet(); basket = []; lsSet('mt_basket', basket); updateBasketBar(); openSheet(`${sheetHead('Anfrage gesendet')}<p style="font-size:40px;text-align:center;margin:8px 0">📬</p><p style="text-align:center">Deine Anfrage ist bei ${esc(VIEW.title || 'den beiden')} angekommen. Sie melden sich bei dir.</p><div class="formfoot"><button class="btn primary" data-close>Fertig</button></div>`); return; }
+      catch (e) { b.disabled = false; b.textContent = 'Anfrage senden'; toast('Direkt senden hat nicht geklappt – du kannst sie stattdessen per Nachricht schicken', 4500); }
+    }
+    const url = baseURL() + '#anfrage=' + await packObj(req);
     const list = basket.map(b => '• ' + b[1]).join('\n');
     await closeSheet();
     shareOut({ title: 'Anfrage senden', intro: `Schick die Nachricht an ${esc(VIEW?.title || 'die beiden')}.`, text: `🙋 Hallo! Ich würde mir gern ausleihen:\n${list}${msg ? '\n\n' + msg : ''}\n\nGruß, ${name}\n\nZum Eintragen in eure Mediathek antippen:`, url,
@@ -3812,15 +3993,16 @@ function openBasket() {
   };
 }
 function renderInbox(el) {
+  clearRequestNotes();
   const all = xLive('anfrage').sort((a, b) => b.at - a.at);
   const open = all.filter(r => r.status === 'offen'), done = all.filter(r => r.status !== 'offen');
   const card = r => {
-    const lines = r.i.map(([id, t]) => { const it = byId(id); return `<li>${esc(it?.titel || t)} – ${!it || it.deleted ? '<span class="bad">nicht mehr in der Sammlung</span>' : it.verliehenAn ? `<span class="bad">${esc(lentText(it))}</span>` : '<span class="ok">verfügbar</span>'}</li>`; }).join('');
-    const avail = r.i.filter(([id]) => { const it = byId(id); return it && !it.deleted && !it.verliehenAn; }).length;
+    const lines = r.i.map(([id, t]) => { const it = byId(id); return `<li>${esc(it?.titel || t)} – ${!it || it.deleted ? '<span class="bad">nicht mehr in der Sammlung</span>' : it.verliehenAn ? `<span class="bad">${esc(lentText(it))}</span>` : it.digital === 'Ja' ? '<span class="bad">nur digital – nicht verleihbar</span>' : '<span class="ok">verfügbar</span>'}</li>`; }).join('');
+    const avail = r.i.filter(([id]) => { const it = byId(id); return it && !it.deleted && !it.verliehenAn && it.digital !== 'Ja'; }).length;
     return `<div class="req${r.status !== 'offen' ? ' done' : ''}"><b>${esc(r.n)}</b> <span class="hint">· ${new Date(r.at).toLocaleDateString('de-DE')}${r.status !== 'offen' ? ' · ' + esc(r.status) : ''}</span><ul>${lines}</ul>${r.m ? `<div class="note" style="margin-bottom:8px">„${esc(r.m)}“</div>` : ''}
       <div class="chkacts">${r.status === 'offen' ? `${avail ? `<button class="btn ok" data-rq="lend" data-id="${r.id}">✓ An ${esc(r.n)} verleihen (${avail})</button>` : ''}<button class="btn" data-rq="reply" data-id="${r.id}">💬 Antworten</button><button class="btn" data-rq="no" data-id="${r.id}">Ablehnen</button>` : ''}<button class="btn ghost" data-rq="del" data-id="${r.id}" aria-label="Löschen">🗑</button></div></div>`;
   };
-  el.innerHTML = `<div class="planhead"><div><h2>Ausleih-Anfragen</h2><p class="hint" style="margin:4px 0 0">Kommen über euren Teilen-Link. Ein Tipp auf den Link in der Nachricht trägt die Anfrage hier ein.</p></div><button class="btn" id="ibPaste">🔗 Link einfügen</button></div>
+  el.innerHTML = `<div class="planhead"><div><h2>Ausleih-Anfragen</h2><p class="hint" style="margin:4px 0 0">${shared.mbox?.guest ? 'Kommen über euren Teilen-Link direkt hier an (📬 Briefkasten).' : 'Kommen über euren Teilen-Link. Ein Tipp auf den Link in der Nachricht trägt die Anfrage hier ein. Tipp: Unter Einstellungen → „Anfragen direkt empfangen“ kommen sie ohne WhatsApp an.'}</p></div><button class="btn" id="ibPaste">🔗 Link einfügen</button></div>
     ${open.length ? open.map(card).join('') : '<div class="empty" style="padding:30px"><div class="big">Keine offenen Anfragen</div></div>'}
     ${done.length ? `<details><summary class="hint" style="margin:12px 0">Erledigt (${done.length})</summary>${done.map(card).join('')}</details>` : ''}`;
   $('#ibPaste', el).onclick = pasteIncoming;
@@ -4159,7 +4341,8 @@ let rzT; let lastW = innerWidth;
 addEventListener('resize', () => { if (Math.abs(innerWidth - lastW) < 30) return; lastW = innerWidth; clearTimeout(rzT); rzT = setTimeout(() => { if (TYPES[ui.type] && ui.special[ui.type]) render(); }, 200); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleSync(300); });
 addEventListener('online', () => scheduleSync(300));
-setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 60000);
+setInterval(() => { if (document.visibilityState === 'visible') { sync(); pollMailbox(); } }, 60000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pollMailbox(); });
 setTimeout(() => fetchMissingFronts(), 6000); setInterval(() => { if (document.visibilityState === 'visible') fetchMissingFronts(); }, 15 * 60000);
 window.addEventListener('error', e => console.error(e.message));
 // Link angetippt, während die App schon offen ist (nur der Teil nach # ändert sich)
@@ -4181,13 +4364,17 @@ addEventListener('hashchange', () => {
   shared = Object.assign(shared, (await idb.get('shared')) || {});
   extra = (await idb.get('extra')) || [];
   if (new URLSearchParams(location.search).has('demo') && !items.length) await loadDemo();
+  // 1.12: „Download-Code“ im Lieferumfang wird zum Haken „Digital“
+  { let mig = 0; for (const i of items) if (i.lieferumfang === 'Download-Code') { delete i.lieferumfang; i.digital = 'Ja'; i.updatedAt = Date.now(); mig++; } if (mig) await persist(); }
   const aktion = new URLSearchParams(location.search).get('aktion');
   history.replaceState({ sheet: 0 }, '', incoming || aktion ? location.pathname : undefined);
   if (aktion === 'wunsch') { ui.type = 'wunsch'; ui.sort = 'prio'; }
+  if (aktion === 'anfragen') { ui.type = 'anfragen'; clearRequestNotes(); }
   render(); syncLabel();
   scheduleSync(500);
   if (aktion === 'check') openCheck(); else if (aktion === 'scan') openScanner(); else if (aktion === 'neu') openAddMenu();
   if (incoming) handleIncoming(incoming[1], incoming[2]);
+  mbxSyncSW(); setTimeout(() => pollMailbox(), 2500);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => { });
 })();
 
