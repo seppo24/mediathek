@@ -514,7 +514,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.13.3';
+const APP_VERSION = '1.14';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2041,6 +2041,14 @@ Regeln:
 - "titel" so, wie er auf dem Medium steht (bei deutschen Ausgaben der deutsche Titel).
 - Fülle Felder, die auf dem Foto lesbar sind. Allgemein bekannte Fakten (Autor, Erscheinungsjahr, Regie, Verlag, Plattform, Spieleranzahl usw.) darfst du ergänzen, aber NUR wenn du dir sicher bist. Sonst Feld weglassen.
 - Zahlenfelder (jahr, seiten, laufzeit, spielerMin, spielerMax, dauer, alterAb) als Zahlen.
+- FORMAT bei Filmen (Feld "format") NUR nach dem, was auf dem Foto zu sehen ist – NIE aus Allgemeinwissen raten, denn derselbe Film erscheint in allen Formaten. Merkmale:
+  • "4K UHD Blu-ray": schwarzes Band oben mit „4K ULTRA HD“ / „Ultra HD Blu-ray“, meist schwarze Hülle; auf dem Rücken schwarzer Streifen mit 4K-Logo.
+  • "Blu-ray": blaues Band oben mit „Blu-ray Disc“-Logo, blaue (seltener transparente) flache Hülle; auf dem Rücken blauer Streifen.
+  • "3D Blu-ray": wie Blu-ray, zusätzlich „3D“-Logo/Schriftzug; oft Lentikular-Cover.
+  • "DVD": deutlich höhere und breitere Hülle als Blu-ray, „DVD“- bzw. „DVD VIDEO“-Logo, meist schwarze oder transparente Hülle ohne farbiges Band.
+  • "VHS": große, dicke Kassettenhülle.
+  • Steelbooks/Mediabooks: Format am Logo auf Rückseite oder Rücken erkennen. Combo-Pack „4K UHD + Blu-ray“ → "4K UHD Blu-ray".
+  Ist das Format nicht eindeutig erkennbar, lass "format" weg und schreibe in "hinweis": "Format (4K/Blu-ray/DVD) bitte prüfen".
 - Ist ein Titel nur teilweise lesbar, nimm ihn trotzdem auf, mit "sicherheit":"niedrig" und kurzem "hinweis", was zu sehen ist.
 - "hinweis" nur ausfüllen, wenn es etwas zu beachten gibt (auf Deutsch, kurz).`;
 }
@@ -2133,7 +2141,7 @@ function productToRecord(p, code) {
   else if (/board game|brettspiel|toys|games & puzzles/i.test(cat)) typ = 'brettspiel';
   else if (/book/i.test(cat)) typ = 'buch';
   const rec = { typ, titel: t.replace(/\s*[\(\[][^\)\]]*(blu-?ray|dvd|4k|uhd|steelbook)[^\)\]]*[\)\]]/ig, '').replace(/\s*-\s*(blu-?ray|dvd)$/i, '').trim(), barcode: code };
-  if (typ === 'bluray') { rec.format = /4k|uhd/i.test(t) ? '4K UHD Blu-ray' : /dvd/i.test(t) ? 'DVD' : 'Blu-ray'; if (/steelbook/i.test(t)) rec.edition = 'Steelbook'; if (p.brand) rec.studio = p.brand; }
+  if (typ === 'bluray') { rec.format = /4k|uhd|ultra ?hd/i.test(t) ? '4K UHD Blu-ray' : /\b3d\b/i.test(t) && /blu/i.test(t) ? '3D Blu-ray' : /dvd/i.test(t) ? 'DVD' : /blu-?ray|\bbd\b/i.test(t) ? 'Blu-ray' : /vhs/i.test(t) ? 'VHS' : undefined; if (!rec.format) rec._hint = 'Format (4K/Blu-ray/DVD) bitte prüfen'; if (/steelbook/i.test(t)) rec.edition = 'Steelbook'; if (p.brand) rec.studio = p.brand; }
   if (typ === 'game') { const m = t.match(/PS5|PS4|PS3|Xbox Series X|Xbox One|Xbox 360|Switch 2|Switch|Wii U|Wii|3DS|PC/i); if (m) rec.plattform = { 'xbox series x': 'Xbox Series X|S' }[m[0].toLowerCase()] || m[0].replace(/^ps/i, 'PS'); if (p.brand) rec.publisher = p.brand; }
   if (typ === 'brettspiel' && p.brand) rec.verlag = p.brand;
   if (p.images?.[0]) rec.cover = p.images[0].replace('http://', 'https://');
@@ -3413,7 +3421,7 @@ function openStats() {
   const priced = own.filter(i => +i.kaufpreis > 0); const total = priced.reduce((a, i) => a + +i.kaufpreis, 0);
   const lentNow = own.filter(i => i.verliehenAn).length;
   const tile = (v, l) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`;
-  const est = own.filter(i => i.wert?.ca); const estSum = est.reduce((a, i) => a + +i.wert.ca, 0);
+  const est = own.filter(i => i.wert?.ca); const estSum = est.reduce((a, i) => a + +i.wert.ca, 0); const estDig = est.filter(i => i.digital === 'Ja').reduce((a, i) => a + +i.wert.ca, 0);
   const bars = (rows, { color, click } = {}) => { const mx = Math.max(1, ...rows.map(r => r[1])); return `<div class="bars">${rows.map(([l, v, c, key, txt]) => `${click && key ? `<button class="lb" data-go="${key}">${esc(l)}</button>` : `<span class="lb" title="${esc(l)}">${esc(l)}</span>`}<div class="tr" title="${esc(l)}: ${esc(txt || v)}"><div class="fl" style="width:${(v / mx * 100).toFixed(1)}%;background:${c || color || 'var(--accent)'}"></div></div><span class="vl">${esc(txt || v)}</span>`).join('')}</div>`; };
   const top = (arr, k, cnt = 5, split = false) => { const m = new Map(); arr.forEach(i => { const vals = split ? String(i[k] || '').split(',').map(x => x.trim()).filter(Boolean) : [i[k]]; vals.forEach(v => { if (!isEmpty(v)) m.set(v, (m.get(v) || 0) + 1); }); }); return [...m.entries()].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), 'de')).slice(0, cnt); };
   const ofType = t => own.filter(i => i.typ === t);
@@ -3449,7 +3457,7 @@ function openStats() {
     ['Brettspiel-Kategorien', top(ofType('brettspiel'), 'kategorie')], ['Brettspiel-Verlage', top(ofType('brettspiel'), 'verlag')],
   ].filter(([, r]) => r.length);
   const s = openSheet(`${sheetHead('Statistik')}
-    <div class="tiles">${tile(n, 'Medien in der Sammlung')}${VIEW ? '' : tile(priced.length ? euro(total) : '–', priced.length ? `Sammlungswert (${priced.length} von ${n} mit Preis)` : 'Sammlungswert (noch keine Preise)')}${!VIEW ? `<button class="tile" id="stWert" style="text-align:left;cursor:pointer"><div class="v">${est.length ? euro(estSum) : '?'}</div><div class="l">${est.length ? `geschätzter Wert heute (${est.length} von ${n}) ›` : 'Was ist die Sammlung wert? ›'}</div></button>` : ''}${tile(lentNow, 'gerade verliehen')}${tile(wishes().length, 'auf der Wunschliste')}${!VIEW && xLive('abgang').some(a => a.preis) ? tile(euro(xLive('abgang').reduce((a, x) => a + (+x.preis || 0), 0)), `Erlös aus ${xLive('abgang').filter(a => a.preis).length} Verkäufen`) : ''}</div>
+    <div class="tiles">${tile(n, 'Medien in der Sammlung')}${VIEW ? '' : tile(priced.length ? euro(total) : '–', priced.length ? `Sammlungswert (${priced.length} von ${n} mit Preis)` : 'Sammlungswert (noch keine Preise)')}${!VIEW ? `<button class="tile" id="stWert" style="text-align:left;cursor:pointer"><div class="v">${est.length ? euro(estSum) : '?'}</div><div class="l">${est.length ? `geschätzter Wert heute (${est.length} von ${n})${estDig ? `, davon ${euro(estDig)} digital` : ''} ›` : 'Was ist die Sammlung wert? ›'}</div></button>` : ''}${tile(lentNow, 'gerade verliehen')}${tile(wishes().length, 'auf der Wunschliste')}${!VIEW && xLive('abgang').some(a => a.preis) ? tile(euro(xLive('abgang').reduce((a, x) => a + (+x.preis || 0), 0)), `Erlös aus ${xLive('abgang').filter(a => a.preis).length} Verkäufen`) : ''}</div>
     ${sec('Nach Medienart', bars(typeRows, { click: true }), 'Antippen öffnet die Medienart')}
     ${!VIEW && valueRows.length ? sec('Wert nach Medienart', bars(valueRows), 'Summe der eingetragenen Kaufpreise') : ''}
     ${sec('Neu hinzugefügt – letzte 12 Monate', cols)}
@@ -4319,8 +4327,9 @@ async function discogsValue(it) {
   return { ca: Math.round(low * 1.15 * 2) / 2, min: Math.round(low * 100) / 100, max: Math.round(low * 1.8), q: 'Discogs', hinweis: `${st.num_for_sale || 0} Angebote, ab ${euroS(low)}` };
 }
 async function aiValues(batch) {
-  const list = batch.map(it => ({ id: it.id, art: TYPES[it.typ].single, titel: it.titel, details: subtitle(it), format: it.format || it.ausgabe || it.plattform || it.edition || '', zustand: it.zustandPlatte || it.zustand || '', vollstaendig: it.vollstaendig || it.lieferumfang || '', kaufpreis: it.kaufpreis || '' }));
+  const list = batch.map(it => ({ id: it.id, art: TYPES[it.typ].single, titel: it.titel, details: subtitle(it), format: it.format || it.ausgabe || it.plattform || it.edition || '', zustand: it.zustandPlatte || it.zustand || '', vollstaendig: it.vollstaendig || it.lieferumfang || '', kaufpreis: it.kaufpreis || '', ...(it.digital === 'Ja' ? { digital: 'ja – digitale Lizenz/Download, kein physisches Medium' } : {}) }));
   const prompt = `Schätze den heutigen GEBRAUCHTWERT in Euro (realistischer Verkaufspreis privat in Deutschland, z. B. Kleinanzeigen/eBay/Medimops), Stand ${new Date().getFullYear()}, für diese Medien einer privaten Sammlung. Berücksichtige Format, Edition und Zustand. Seltene oder gesuchte Ausgaben höher, Massenware niedrig (z. B. Standard-DVDs oft 1–3 €). Bist du dir bei einem Titel unsicher, gib eine breitere Spanne an.
+Bei "digital": ja gibt es keinen Gebrauchtmarkt – schätze dort den heutigen regulären Kaufpreis im Store (Wiederbeschaffungswert) und schreibe als hinweis "digital – Store-Preis".
 Medien: ${JSON.stringify(list)}
 Antworte NUR mit JSON: {"werte":[{"id":"…","ca":Zahl,"min":Zahl,"max":Zahl,"hinweis":"max. 8 Wörter, z. B. gesuchte Erstauflage"}]}`;
   const text = await aiCall(prompt, null, 3000);
@@ -4351,6 +4360,7 @@ async function estimateValues(list, s) {
 }
 function openValue() {
   const own = live(); const est = own.filter(i => i.wert?.ca); const miss = own.filter(i => !i.wert?.ca);
+  const digSum = est.filter(i => i.digital === 'Ja').reduce((a, i) => a + +i.wert.ca, 0);
   const sum = est.reduce((a, i) => a + +i.wert.ca, 0), sMin = est.reduce((a, i) => a + (+i.wert.min || +i.wert.ca), 0), sMax = est.reduce((a, i) => a + (+i.wert.max || +i.wert.ca), 0);
   const paid = est.filter(i => +i.kaufpreis > 0); const paidSum = paid.reduce((a, i) => a + +i.kaufpreis, 0), paidVal = paid.reduce((a, i) => a + +i.wert.ca, 0);
   const byType = TYPE_KEYS.map(t => [TYPES[t].label, est.filter(i => i.typ === t).reduce((a, i) => a + +i.wert.ca, 0), `var(--c-${t})`]).filter(r => r[1] > 0);
@@ -4360,7 +4370,7 @@ function openValue() {
   const ai = settings.provider !== 'barcode' && aiKey();
   const cost = settings.provider === 'claude' && /sonnet/.test(settings.claudeModel) ? 'ca. 1 Cent je 20 Medien' : 'unter 0,2 Cent je 20 Medien';
   const s = openSheet(`${sheetHead('Was ist die Sammlung wert?')}
-    <div class="tiles"><div class="tile"><div class="v">${est.length ? euroS(sum) : '–'}</div><div class="l">geschätzter Gebrauchtwert${est.length ? ` (Spanne ${euroS(sMin)}–${euroS(sMax)})` : ''}</div></div>
+    <div class="tiles"><div class="tile"><div class="v">${est.length ? euroS(sum) : '–'}</div><div class="l">geschätzter Gebrauchtwert${est.length ? ` (Spanne ${euroS(sMin)}–${euroS(sMax)})` : ''}${digSum ? `<br><b>davon ${euroS(digSum)} digital</b>` : ''}</div></div>
       <div class="tile"><div class="v">${est.length} / ${own.length}</div><div class="l">Medien geschätzt</div></div>
       ${paid.length ? `<div class="tile"><div class="v">${Math.round(paidVal / paidSum * 100)} %</div><div class="l">vom Kaufpreis noch wert (${paid.length} Medien mit Preis)</div></div>` : ''}</div>
     <div class="stsec"><p style="margin:0 0 10px;font-size:14px">Die KI schätzt realistische Privat-Verkaufspreise in Deutschland, bei Vinyl mit Discogs-Token echte Marktpreise. <b>Nur Richtwerte</b> – für Versicherung oder Verkauf im Zweifel nachprüfen.</p>
