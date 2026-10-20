@@ -518,7 +518,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.15.1';
+const APP_VERSION = '1.16';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1665,6 +1665,7 @@ function openDetail(id) {
     ${(it.auto || []).length ? '<p class="hint" style="margin:0 0 8px">🌐 = online ergänzt</p>' : ''}
     ${(it.verleihHistorie || []).length ? `<details class="hist"><summary>Verleih-Verlauf (${it.verleihHistorie.length})</summary><ul>${it.verleihHistorie.map(h => `<li><b>${esc(h.an)}</b> · ${h.am ? esc(deDate(h.am)) : '?'} – ${esc(deDate(h.zurueck))}</li>`).join('')}</ul></details>` : ''}
     ${it.inhalt ? `<div class="inhalt"><h4>Inhalt${(it.auto || []).includes('inhalt') ? ' <span class="autotag" title="Online ergänzt">🌐</span>' : ''}</h4><p class="clamp" id="dInh">${esc(it.inhalt)}</p>${it.inhalt.length > 260 ? '<button class="btn ghost" id="dInhMore" style="height:30px;padding:0 8px">mehr anzeigen</button>' : ''}${!VIEW && inhaltWrongLang(it) ? `<button class="btn" id="dInhLang" style="width:100%;margin-top:6px">🌐 Inhaltsangabe auf ${esc(LANG_NAME[bookLang(it)] || bookLang(it))} holen</button>` : ''}</div>` : ''}
+    ${!VIEW && TYPES[it.typ] && (isEmpty(it.barcode) || (it.typ === 'buch' && isEmpty(it.isbn))) ? `<button class="btn" id="dScan" style="width:100%;margin-bottom:8px">▥ ${it.typ === 'buch' ? 'ISBN' : 'Barcode'} scannen und speichern</button>` : ''}
     ${!VIEW && !hasCover(it) ? `<button class="btn" id="dCover" style="width:100%;margin-bottom:8px">🔍 Cover im Internet suchen</button>` : ''}
     ${canFill ? `<button class="btn" id="dFill" style="width:100%">🌐 Fehlende Angaben online ergänzen (${missingFields(it).length} leer)</button>` : ''}
     ${it.geliehen ? `<div class="note${isOverdue(it) ? ' warn' : ''}" style="margin-bottom:10px">↙ Geliehen von <b>${esc(it.geliehenVon || '?')}</b>${it.geliehenAm ? ' am ' + esc(deDate(it.geliehenAm)) : ''}${it.rueckgabeBis ? ` · zurückgeben bis <b>${esc(deDate(it.rueckgabeBis))}</b>${isOverdue(it) ? ' – überfällig!' : ''}` : ''}</div>` : ''}
@@ -1677,6 +1678,13 @@ function openDetail(id) {
   $$('[data-author]', s).forEach(b => b.onclick = () => openAuthor(b.dataset.author));
   const il = $('#dInhLang', s); if (il) il.onclick = async () => { il.disabled = true; il.textContent = 'Suche …'; const ok = await fixInhaltLang(it); if (ok) { await closeSheet(); render(); openDetail(it.id); toast('Inhaltsangabe ersetzt'); } else { il.disabled = false; il.textContent = '🌐 Erneut versuchen'; } };
   const im = $('#dInhMore', s); if (im) im.onclick = () => { $('#dInh', s).classList.toggle('clamp'); im.textContent = $('#dInh', s).classList.contains('clamp') ? 'mehr anzeigen' : 'weniger'; };
+  const dsc = $('#dScan', s); if (dsc) dsc.onclick = async () => {
+    const code = await scanOnce(it.typ === 'buch' ? 'ISBN scannen' : 'Barcode scannen'); if (!code) return;
+    const cur = byId(it.id); if (!cur) return;
+    if (isEmpty(cur.barcode)) cur.barcode = code;
+    if (cur.typ === 'buch' && isEmpty(cur.isbn) && isISBN(code)) cur.isbn = code;
+    cur.updatedAt = Date.now(); await persist(); await closeSheet(); render(); openDetail(it.id); toast('Nummer gespeichert: ' + code);
+  };
   const dc = $('#dCover', s); if (dc) dc.onclick = () => searchCoverFor(it.id, dc);
   const dr = $('#dRules', s); if (dr) dr.onclick = () => openRules(it.id);
   if (VIEW) {
@@ -1768,7 +1776,7 @@ function inputHTML(typ, f, val) {
       const dl = ['titel', 'notizen', 'barcode', 'isbn'].includes(f.k) ? '' : `list="dl_${f.k}"`;
       inp = `<input type="text" name="${f.k}" value="${esc(v)}" ${f.im ? `inputmode="${f.im}"` : ''} ${f.ph ? `placeholder="${esc(f.ph)}"` : ''} ${dl} autocomplete="off">`;
       if (dl) inp += `<datalist id="dl_${f.k}">${distinctValues(f.k).slice(0, 200).map(x => `<option value="${esc(x)}">`).join('')}</datalist>`;
-      if (f.lookup) inp = `<div class="inrow">${inp}<button type="button" class="btn" data-lookup="${f.k}" title="Online nachschlagen">🔍</button></div>`;
+      if (f.lookup) inp = `<div class="inrow">${inp}<button type="button" class="btn" data-scanfld="${f.k}" title="Nummer mit der Kamera scannen" aria-label="Scannen">▥</button><button type="button" class="btn" data-lookup="${f.k}" title="Online nachschlagen">🔍</button></div>`;
     }
   }
   return `<label class="fld${f.wide || f.t === 'textarea' ? ' wide' : ''}" data-f="${f.k}"><span>${esc(f.l)}${req ? ' *' : ''}</span>${inp}</label>`;
@@ -1835,6 +1843,17 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     if (e.target.closest('[data-ytsearch]')) { const t = form.elements.titel?.value.trim(); if (!t) return toast('Bitte zuerst den Titel eingeben'); const extra = { bluray: 'Trailer deutsch', game: 'Trailer', brettspiel: 'Regeln erklärt', buch: 'Rezension' }[data.typ] || ''; window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(t + ' ' + extra), '_blank', 'noopener'); toast('Video öffnen, „Teilen“ → Link kopieren und hier einfügen', 3500); return; }
     const st = e.target.closest('[data-star]');
     if (st) { const wrap = st.parentElement; const inp = wrap.querySelector('input'); const n = +st.dataset.star; inp.value = +inp.value === n ? '' : n; $$('[data-star]', wrap).forEach(b => b.classList.toggle('on', +inp.value >= +b.dataset.star)); }
+    const sf = e.target.closest('[data-scanfld]');
+    if (sf) {
+      const code = await scanOnce(sf.dataset.scanfld === 'isbn' ? 'ISBN scannen' : 'Barcode scannen'); if (!code) return;
+      const k = sf.dataset.scanfld; form.elements[k].value = code;
+      if (k === 'barcode' && data.typ === 'buch' && isISBN(code) && form.elements.isbn && !form.elements.isbn.value) form.elements.isbn.value = code;
+      if (k === 'isbn' && form.elements.barcode && !form.elements.barcode.value) form.elements.barcode.value = code;
+      form.elements[k].dispatchEvent(new Event('change', { bubbles: true }));
+      if (!form.elements.titel?.value) form.querySelector(`[data-lookup="${k}"]`)?.click(); // neues Medium: gleich nachschlagen
+      else toast('Nummer übernommen – 🔍 schlägt die Daten dazu nach');
+      return;
+    }
     const lk = e.target.closest('[data-lookup]');
     if (lk) {
       const code = String(form.elements[lk.dataset.lookup].value).replace(/[^0-9Xx]/g, '');
@@ -2754,6 +2773,33 @@ async function detectInImage(dataURL) {
   }
   const ZX = await loadZXing();
   try { const r = await new ZX.BrowserMultiFormatReader().decodeFromImageUrl(dataURL); return [r.getText()]; } catch { return []; }
+}
+// Einzelnen Barcode scannen (für ISBN-/EAN-Felder): liefert die Nummer oder null
+function scanOnce(title = 'Nummer scannen') {
+  return new Promise(resolve => {
+    let stream = null, timer = null, stopped = false, last = '', cnt = 0, done = false;
+    const finish = v => { if (done) return; done = true; stop(); resolve(v); };
+    const liveScan = !!(hasDetector() && navigator.mediaDevices?.getUserMedia);
+    const s = openSheet(`${sheetHead(title)}
+      ${liveScan ? `<div class="scanbox"><video playsinline muted autoplay></video><div class="aim"></div><div class="flash"></div></div><p class="hint">Barcode bzw. ISBN-Strichcode ins Feld halten.</p>`
+        : `<div class="note">Live-Scan wird von diesem Browser nicht unterstützt. Fotografiere den Barcode.</div>`}
+      <div class="formfoot"><button class="btn" data-close>Abbrechen</button><label class="btn">📷 Foto vom Barcode<input type="file" accept="image/*" capture="environment" hidden id="soPhoto"></label></div>`, { onClose: () => finish(null) });
+    function stop() { stopped = true; clearInterval(timer); stream?.getTracks().forEach(t => t.stop()); }
+    const got = async code => { navigator.vibrate?.(80); const fl = $('.flash', s); if (fl) fl.style.opacity = .35; finish(String(code).trim()); await closeSheet(); };
+    $('#soPhoto', s).onchange = async e => { const f = e.target.files[0]; if (!f) return; const codes = await detectInImage(await resizeImage(f, 1600, .9)); codes.length ? got(codes[0]) : toast('Kein Barcode erkannt – bitte näher heran und scharf fotografieren'); };
+    if (liveScan) {
+      const video = $('video', s);
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(st => {
+        if (stopped) { st.getTracks().forEach(t => t.stop()); return; }
+        stream = st; video.srcObject = st; addCamTools(s, st);
+        const det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+        timer = setInterval(async () => {
+          if (video.readyState < 2 || done) return;
+          try { for (const c of await det.detect(video)) { if (c.rawValue === last) cnt++; else { last = c.rawValue; cnt = 1; } if (cnt >= 2) return got(c.rawValue); } } catch { }
+        }, 250);
+      }).catch(err => { $('.scanbox', s).outerHTML = `<div class="note warn">Kamera nicht verfügbar (${esc(err.message)}). Fotografiere den Barcode oder tippe die Nummer ein.</div>`; });
+    }
+  });
 }
 function openScanner() {
   const scanned = new Map(); // code -> {frame}
