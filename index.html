@@ -514,7 +514,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.13.2';
+const APP_VERSION = '1.13.3';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1000,7 +1000,7 @@ function renderChips() {
   if (!VIEW) { defs.push(['abend', '🎲 Abendplaner']); if (xLive('anfrage').length) defs.push(['anfragen', '📬 Anfragen']); }
   // eigene Reihenfolge / ausgeblendete Tabs (pro Gerät)
   const tc = tabCfg(); const ord = k => { const i = tc.order.indexOf(k); return i < 0 ? 999 : i; };
-  let shown = defs.filter(([k]) => VIEW || k === ui.type || (!tc.hidden.includes(k) && !(tc.hideEmpty && TYPES[k] && !counts[k])));
+  let shown = defs.filter(([k]) => VIEW || k === ui.type || (k === 'anfragen' && counts.anfragen) || (!tc.hidden.includes(k) && !(tc.hideEmpty && TYPES[k] && !counts[k]))); // offene Anfragen immer zeigen
   if (!VIEW) shown = shown.map((d, i) => [d, i]).sort((a, b) => ord(a[0][0]) - ord(b[0][0]) || a[1] - b[1]).map(x => x[0]);
   $('#typeChips').innerHTML = shown.map(([k, l]) => `<button class="chip" data-type="${k}" aria-pressed="${ui.type === k}">${l}<span class="n">${counts[k]}</span></button>`).join('');
   $('#checkBtn').hidden = !VIEW && !!tc.hideCheck; $('#statsBtn').hidden = !VIEW && !!tc.hideStats;
@@ -3867,7 +3867,30 @@ async function mbxSend(mbox, req) {
   if (!r.ok) throw new Error('Senden fehlgeschlagen (' + r.status + ')');
 }
 // Eigene Geräte: Briefkasten leeren
-let mbxBusy = false;
+let mbxBusy = false, mbxStatus = null;
+// Kompletter Test: als „Gast“ eine Testdatei einwerfen und mit eurem Zugang wiederfinden
+async function mbxDiagnose() {
+  const m = shared.mbox || {}; const L = [];
+  L.push('Mediathek ' + APP_VERSION + ' · App key ' + (m.key ? m.key.slice(0, 4) + '…' : 'fehlt') + ' · Eurer Zugang: ' + (m.owner ? 'ja' : 'NEIN') + ' · Gäste-Zugang: ' + (m.guest ? 'ja' : 'NEIN'));
+  if (!m.key || !m.owner || !m.guest) return L.concat('✗ Briefkasten nicht vollständig eingerichtet');
+  let ot, gt;
+  try { ot = await mbxToken(m.key, m.owner); L.push('✓ Eurer Zugang funktioniert'); } catch (e) { return L.concat('✗ Eurer Zugang: ' + e.message + ' → Schritt 1 wiederholen'); }
+  try { gt = await mbxToken(m.key, m.guest); L.push('✓ Gäste-Zugang funktioniert'); } catch (e) { return L.concat('✗ Gäste-Zugang: ' + e.message + ' → Schritt 2 wiederholen'); }
+  const name = 'test_' + Date.now() + '.txt';
+  const ur = await fetch('https://content.dropboxapi.com/2/files/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + gt, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': JSON.stringify({ path: '/anfragen/' + name, mode: 'add', autorename: true, mute: true }) }, body: 'Test' });
+  if (!ur.ok) return L.concat('✗ Gast kann nicht einwerfen: ' + ur.status + ' ' + (await ur.text()).slice(0, 200));
+  L.push('✓ Testdatei als Gast eingeworfen');
+  const api = (ep, body) => fetch('https://api.dropboxapi.com/2/' + ep, { method: 'POST', headers: { Authorization: 'Bearer ' + ot, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const lr = await api('files/list_folder', { path: '/anfragen' });
+  if (!lr.ok) return L.concat('✗ Euer Zugang kann den Briefkasten nicht lesen: ' + lr.status + ' ' + (await lr.text()).slice(0, 200) + (lr.status === 409 ? ' → Gäste-Zugang und euer Zugang gehören zu VERSCHIEDENEN Dropbox-Konten. Beide Schritte im selben Dropbox-Konto (in Chrome angemeldet) wiederholen.' : ''));
+  const ents = (await lr.json()).entries || [];
+  const hit = ents.find(e => e.name === name);
+  L.push(hit ? '✓ Testdatei mit eurem Zugang gefunden – der Briefkasten funktioniert' : '✗ Testdatei NICHT gefunden (' + ents.length + ' andere Dateien) → Gäste-Zugang und euer Zugang gehören zu verschiedenen Dropbox-Konten. Schritt 1 und 2 im selben Dropbox-Konto wiederholen.');
+  if (hit) await api('files/delete_v2', { path: hit.path_lower });
+  const reqs = ents.filter(e => /\.json$/.test(e.name)).length; if (reqs) L.push('• ' + reqs + ' Anfrage(n) liegen gerade im Briefkasten');
+  if (mbxStatus) L.push('• Letztes Abholen: ' + new Date(mbxStatus.at).toLocaleTimeString('de-DE') + (mbxStatus.err ? ' – Fehler: ' + mbxStatus.err : ' – ' + (mbxStatus.n || 0) + ' neu'));
+  return L;
+}
 async function pollMailbox({ quiet = false } = {}) {
   const m = shared.mbox; if (VIEW || mbxBusy || !m?.key || !m?.owner || !navigator.onLine) return 0;
   mbxBusy = true; let n = 0;
@@ -3875,21 +3898,24 @@ async function pollMailbox({ quiet = false } = {}) {
     const t = await mbxToken(m.key, m.owner);
     const api = (ep, body) => fetch('https://api.dropboxapi.com/2/' + ep, { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const lr = await api('files/list_folder', { path: '/anfragen' });
-    if (!lr.ok) return 0; // Ordner gibt es erst nach der ersten Anfrage
-    const files = ((await lr.json()).entries || []).filter(e => e['.tag'] === 'file' && /\.json$/.test(e.name)).slice(0, 30);
+    if (!lr.ok) { const tx = await lr.text().catch(() => ''); mbxStatus = { at: Date.now(), n: 0, files: 0, err: /not_found/.test(tx) ? '' : 'files/list_folder (' + lr.status + '): ' + tx.slice(0, 200) }; return 0; } // Ordner gibt es erst nach der ersten Anfrage
+    const all = (await lr.json()).entries || [];
+    const files = all.filter(e => e['.tag'] === 'file' && /\.json$/.test(e.name)).slice(0, 30);
     const added = [];
     for (const f of files) {
       const dr = await fetch('https://content.dropboxapi.com/2/files/download', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Dropbox-API-Arg': JSON.stringify({ path: f.path_lower }) } });
-      if (dr.ok) { try { const d = JSON.parse(await dr.text()); const res = await importRequest(d); if (res) added.push(res); } catch { } }
+      if (!dr.ok) { mbxStatus = { at: Date.now(), err: 'files/download (' + dr.status + '): ' + (await dr.text().catch(() => '')).slice(0, 200) }; continue; } // nicht löschen, später erneut
+      try { const d = JSON.parse(await dr.text()); const res = await importRequest(d); if (res) added.push(res); } catch { }
       await api('files/delete_v2', { path: f.path_lower });
     }
     n = added.length;
+    if (!mbxStatus?.err || mbxStatus.at < Date.now() - 5000) mbxStatus = { at: Date.now(), n, files: files.length, err: '' };
     if (n) {
       render(); updateAppBadge();
       if (!quiet) toast(n === 1 ? `📬 Neue Ausleih-Anfrage von ${added[0].n}` : `📬 ${n} neue Ausleih-Anfragen`, 4000);
       if (document.visibilityState !== 'visible' || ui.type !== 'anfragen') notifyRequests(added);
     }
-  } catch (e) { console.warn('Briefkasten', e); }
+  } catch (e) { console.warn('Briefkasten', e); mbxStatus = { at: Date.now(), err: String(e.message || e) }; }
   finally { mbxBusy = false; }
   return n;
 }
@@ -3935,7 +3961,9 @@ function drawMailbox(c) {
   const notif = 'Notification' in window ? Notification.permission : 'unsupported';
   c.innerHTML = ready ? `<p style="margin:0">✓ <b>Briefkasten ist eingerichtet.</b> Anfragen von Freunden kommen direkt hier an – kein WhatsApp nötig.</p>
       ${notif === 'granted' ? '<p class="hint" style="margin:0">🔔 Benachrichtigungen sind an: Bei neuen Anfragen erscheint ein Punkt am App-Symbol.</p>' : notif === 'unsupported' ? '' : '<button class="btn" id="mbNotif">🔔 Benachrichtigungen erlauben (Punkt am App-Symbol)</button>'}
-      <div class="inrow"><button class="btn" id="mbCheck" style="flex:1">Jetzt nachsehen</button><button class="btn danger" id="mbOff" style="flex:1">Briefkasten entfernen</button></div>`
+      <div class="inrow"><button class="btn" id="mbCheck" style="flex:1">Jetzt nachsehen</button><button class="btn" id="mbDiag" style="flex:1">🩺 Briefkasten prüfen</button></div>
+      <pre id="mbOut" hidden style="white-space:pre-wrap;font-size:12px;margin:0;background:var(--surface2);border-radius:8px;padding:8px"></pre>
+      <button class="btn danger" id="mbOff">Briefkasten entfernen</button>`
     : `<p class="hint" style="margin:0">Damit Freunde Ausleih-Anfragen <b>direkt in die App</b> schicken können statt per WhatsApp-Link. Einmalig, ca. 5 Minuten:</p>
       <ol class="hint" style="margin:0;padding-left:20px">
         <li>Auf <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener">dropbox.com/developers/apps</a> → <b>Create app</b> → Scoped access → <b>App folder</b> (nicht Full Dropbox!) → Name z. B. „Mediathek-Briefkasten-Mueller“.</li>
@@ -3972,7 +4000,8 @@ function drawMailbox(c) {
   const a1 = $('#mbA1', c); if (a1) a1.onclick = () => step('owner');
   const a2 = $('#mbA2', c); if (a2) a2.onclick = () => step('guest');
   const nb = $('#mbNotif', c); if (nb) nb.onclick = async () => { const p = await Notification.requestPermission(); if (p === 'granted') { await mbxSyncSW(); toast('Benachrichtigungen an'); } else toast('Benachrichtigungen wurden nicht erlaubt'); drawMailbox(c); };
-  const ck = $('#mbCheck', c); if (ck) ck.onclick = async () => { const n = await pollMailbox({ quiet: true }); toast(n ? `${n} neue Anfrage(n)` : 'Keine neuen Anfragen'); };
+  const ck = $('#mbCheck', c); if (ck) ck.onclick = async () => { const n = await pollMailbox({ quiet: true }); toast(n ? `${n} neue Anfrage(n)` : mbxStatus?.err ? 'Fehler: ' + mbxStatus.err : 'Keine neuen Anfragen', 5000); };
+  const dg = $('#mbDiag', c); if (dg) dg.onclick = async () => { dg.disabled = true; dg.textContent = 'Prüfe …'; const out = $('#mbOut', c); out.hidden = false; out.textContent = '…'; const L = await mbxDiagnose().catch(e => ['✗ ' + e.message]); out.textContent = L.join('\n'); dg.disabled = false; dg.textContent = '🩺 Erneut prüfen'; try { await navigator.clipboard.writeText(L.join('\n')); toast('Ergebnis kopiert – bei Problemen an Claude schicken'); } catch { } };
   const off = $('#mbOff', c); if (off) off.onclick = async () => { if (!confirm('Briefkasten entfernen? Freunde schicken Anfragen dann wieder per WhatsApp-Link.')) return; delete shared.mbox; await saveShared(); await mbxSyncSW(); if (shared.share?.enabled) await updateShareFile(true).catch(() => { }); drawMailbox(c); };
 }
 
