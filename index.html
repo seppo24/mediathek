@@ -514,7 +514,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.13';
+const APP_VERSION = '1.13.1';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -3929,12 +3929,20 @@ function drawMailbox(c) {
         <li>Reiter Settings: <b>App key</b> kopieren und hier einfügen.</li></ol>
       <label class="fld"><span>App key des Briefkastens</span><input id="mbKey" value="${esc(m.key || '')}" autocomplete="off"></label>
       <div class="inrow"><button class="btn ${m.owner ? '' : 'primary'}" id="mbA1" style="flex:1">${m.owner ? '✓ ' : ''}1. Für euch verbinden</button><button class="btn ${m.owner && !m.guest ? 'primary' : ''}" id="mbA2" style="flex:1" ${m.owner ? '' : 'disabled'}>2. Gäste-Zugang erzeugen</button></div>
-      <p class="hint" style="margin:0">Bei jedem Schritt öffnet sich Dropbox: <b>Zulassen</b>, Code kopieren, hier einfügen. Der Gäste-Zugang darf nur Dateien in diesen Briefkasten-Ordner legen – nichts lesen und nichts anderes in eurer Dropbox sehen.</p>`;
+      ${drawMailbox.pending ? `<div class="note" style="margin:0"><b>${drawMailbox.pending === 'owner' ? 'Schritt 1' : 'Schritt 2'}:</b> In Dropbox auf <b>Zulassen</b> tippen, den angezeigten Code kopieren, hierher zurückwechseln und einfügen:</div>
+        <div class="inrow"><input id="mbCode" placeholder="Code von Dropbox einfügen" autocomplete="off" style="flex:1"><button class="btn primary" id="mbCodeOk">Verbinden</button></div>` : ''}
+      <p class="hint" style="margin:0">Bei jedem Schritt öffnet sich Dropbox: <b>Zulassen</b>, Code kopieren, hierher zurück und in das Feld einfügen, das dann hier erscheint. Der Gäste-Zugang darf nur Dateien in diesen Briefkasten-Ordner legen – nichts lesen und nichts anderes in eurer Dropbox sehen.</p>`;
   const key = () => ($('#mbKey', c)?.value || m.key || '').trim();
   const step = async (which) => {
     const k = key(); if (!k) return toast('Bitte zuerst den App key einfügen');
-    const store = 'mbx_' + which; await oauthStart(k, which === 'owner' ? MBX_OWNER : MBX_GUEST, store);
-    const code = prompt('Code von Dropbox hier einfügen:'); if (!code) return;
+    shared.mbox = Object.assign({}, shared.mbox, { key: k }); // App key merken, bevor Dropbox sich öffnet
+    drawMailbox.pending = which; drawMailbox(c);
+    await oauthStart(k, which === 'owner' ? MBX_OWNER : MBX_GUEST, 'mbx_' + which);
+  };
+  const finish = async () => {
+    const which = drawMailbox.pending, k = key(); const code = ($('#mbCode', c)?.value || '').trim();
+    if (!code) return toast('Bitte den Code von Dropbox einfügen');
+    const store = 'mbx_' + which;
     try {
       const r = await oauthFinish(k, code, store);
       shared.mbox = Object.assign({}, shared.mbox, { key: k, [which]: r.refresh, at: Date.now() });
@@ -3942,9 +3950,11 @@ function drawMailbox(c) {
       await saveShared(); await mbxSyncSW();
       if (which === 'guest' && shared.share?.enabled) await updateShareFile(true).catch(() => { });
       toast(which === 'owner' ? 'Verbunden – jetzt Schritt 2' : 'Briefkasten fertig eingerichtet');
-    } catch (e) { alert('Hat nicht geklappt: ' + e.message); }
+      drawMailbox.pending = null;
+    } catch (e) { alert('Hat nicht geklappt: ' + e.message + '\n\nTipp: Den Schritt noch einmal starten und den neuen Code verwenden – jeder Code gilt nur einmal und nur kurz.'); }
     drawMailbox(c);
   };
+  const co = $('#mbCodeOk', c); if (co) co.onclick = finish;
   const a1 = $('#mbA1', c); if (a1) a1.onclick = () => step('owner');
   const a2 = $('#mbA2', c); if (a2) a2.onclick = () => step('guest');
   const nb = $('#mbNotif', c); if (nb) nb.onclick = async () => { const p = await Notification.requestPermission(); if (p === 'granted') { await mbxSyncSW(); toast('Benachrichtigungen an'); } else toast('Benachrichtigungen wurden nicht erlaubt'); drawMailbox(c); };
