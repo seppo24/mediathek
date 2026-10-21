@@ -538,7 +538,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.19';
+const APP_VERSION = '1.19.1';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2025,6 +2025,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.19.1', '21.10.2026', ['Versionsverlauf um die frühen Versionen 1.0–1.6 ergänzt']],
   ['1.19', '21.10.2026', ['Info-Bereich in den Einstellungen: Versionsverlauf, Gerät & Speicher, Datenschutz, Quellen', 'Nach einem Update erscheint einmal kurz „Neu in dieser Version“', 'Knopf „Nach Update suchen“']],
   ['1.18', '21.10.2026', ['Bessere Cover-Quellen: Deutsche Nationalbibliothek (Bücher), TVmaze (Serien mit Staffel-Cover), iTunes (Filme, Serien, Alben), MusicBrainz-Alben, Discogs', 'Strengere Treffer: Titel und Autor bzw. Interpret müssen passen, keine „ungefähren“ Wikipedia-Treffer mehr']],
   ['1.17', '21.10.2026', ['Nachträglich eingetragene ISBN/Barcode: Abgleich der Online-Angaben mit Auswahl alt → neu je Feld oder für alle']],
@@ -2038,7 +2039,13 @@ const CHANGELOG = [
   ['1.9', '19.10.2026', ['Reihen und Filmreihen in richtiger Reihenfolge', 'Autorenseite mit fehlenden Büchern', 'Bücherregal „Wie zuhause“ mit Fächern, Drag & Drop und Sicherungen']],
   ['1.8', '19.10.2026', ['Regeln in 2 Minuten (Brettspiele)', 'Was ist die Sammlung wert?', 'Tabs & Ansicht, Einfach-Modus, Hilfe', '1.8.1–1.8.2: Sync-Fehler verständlich erklärt, Verbindungsprüfung']],
   ['1.7', '19.10.2026', ['Von anderen geliehen', 'Aussortieren (Verkaufen, Verschenken, Spenden)', 'Aufräum-Assistent (Doppelungen, fehlende Angaben)', 'App-Verknüpfungen am App-Symbol', 'Neue Medienart Vinyl mit Plattenladen']],
-  ['bis 1.6', 'Okt. 2026', ['Grundversion: Blu-rays, Bücher, Games, Brettspiele – manuell, per Foto (Claude/Gemini) oder Barcode', 'Gemeinsamer Dropbox-Ordner für zwei Konten, Excel-Export, Videothek / Bücherregal / Spieleladen', 'Fehlende Angaben online ergänzen, Verleihen mit Verlauf, Wunschliste, Schnellcheck, Statistik', 'Monatliche Backups, Leseansicht für Freunde, Ausleih-Anfragen, Abendplaner, BGG- und YouTube-Links']],
+  ['1.6', 'Okt. 2026', ['BoardGameGeek-Link bei Brettspielen, automatisch ergänzt (sofern Wikidata das Spiel kennt) oder per „🔍 BGG“-Suche', 'YouTube-Link (Trailer, Rezension, Regelerklärung) für alle Medien, mit Vorschaubild', 'Beide Links in Detailansicht, Leseansicht und auf der Abstimmungsseite']],
+  ['1.5', 'Okt. 2026', ['Abendplaner: eigene Vorschläge per ☆, stehen bei den Gästen ganz oben', 'Titel vorschlagen, die nicht in der Sammlung sind („bringt Max mit“), plus Nachricht an die Gäste', 'Auswahl „Nur ⭐“']],
+  ['1.4', 'Okt. 2026', ['Ausleih-Anfragen über den Teilen-Link, Tab „📬 Anfragen“ mit Verleihen/Antworten/Ablehnen', 'Abendplaner: Auswahl filtern, Gäste wählen per Link ihre Top 3, Rangliste mit Punkten', 'Schnellerer Start bei großen Sammlungen (Liste lädt beim Scrollen nach)', 'Großes Scanfeld mit Taschenlampe und 2×-Zoom']],
+  ['1.3', 'Okt. 2026', ['Schnellcheck „Haben wir das schon?“ per Barcode oder Titel', 'Wunschliste mit Priorität und „✓ Gekauft“', 'Statistik-Seite', 'Buchrücken aus Regal-Fotos per KI ausgeschnitten und im Bücherregal gezeigt', 'Spiele-Cover über RAWG', 'Monatliche automatische Backups im Dropbox-Ordner', 'Teilbare Leseansicht für Freunde']],
+  ['1.2', 'Okt. 2026', ['Verleihen mit Haken, Name und Datum, „Zurückbekommen“ mit Rückgabedatum', 'Verleih-Verlauf je Medium', 'Filter „Verliehen“ und eigener Tab „↗ Verliehen“ mit Filter nach Person']],
+  ['1.1', 'Okt. 2026', ['Gemeinsamer, geteilter Dropbox-Ordner für zwei eigene Dropbox-Konten (Ordnerauswahl)', 'Fehlende Angaben online ergänzen: Google Books, Open Library, Wikidata, optional TMDb – danach die KI für den Rest, eigene Eingaben bleiben unangetastet']],
+  ['1.0', 'Okt. 2026', ['Blu-rays, Bücher, Games und Brettspiele katalogisieren – als App auf Handy und Laptop installierbar', 'Hinzufügen per Hand (passende Felder je Medienart, Pflichtfelder einstellbar), per Foto (einzeln oder viele Buchrücken, jeder Treffer wird bestätigt) oder per Barcode', 'Foto-Erkennung wahlweise mit Claude, Gemini oder nur Barcode, mit Kostenangabe', 'Abgleich der Geräte über Dropbox, unabhängig von Claude', 'Liste mit Suche und Filtern, Spezialansichten Videothek, Bücherregal und Spieleladen', 'Excel-Export mit einem Tabellenblatt je Medienart']],
 ];
 function infoHTML() {
   const list = CHANGELOG.map(([v, d, pts], i) => `<details class="clv"${i === 0 ? ' open' : ''}><summary><b>Version ${esc(v)}</b> <span class="hint">${esc(d)}</span></summary><ul>${pts.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>`).join('');
@@ -2047,7 +2054,7 @@ function infoHTML() {
     ['TVmaze', 'https://www.tvmaze.com', 'Serien-Cover'], ['Apple iTunes', 'https://www.apple.com/itunes/', 'Film-, Serien- und Album-Cover'], ['RAWG', 'https://rawg.io', 'Games (mit Schlüssel)'], ['BoardGameGeek', 'https://boardgamegeek.com', 'Brettspiele (mit Token) – Powered by BGG'],
     ['MusicBrainz / Cover Art Archive', 'https://musicbrainz.org', 'Schallplatten'], ['Discogs', 'https://www.discogs.com', 'Vinyl-Cover und Marktpreise (mit Token)'], ['UPCitemdb', 'https://www.upcitemdb.com', 'Produktnamen zu Barcodes']];
   return `<div class="infohead"><b>Mediathek ${esc(APP_VERSION)}</b><span class="hint">Stand ${APP_DATE}</span><button class="btn" id="inUpd" style="margin-left:auto">Nach Update suchen</button></div>
-    <h4 class="inh">Versionsverlauf</h4>${list}
+    <h4 class="inh">Versionsverlauf</h4>${list}<p class="hint" style="margin:6px 0 0">Die Versionen 1.0 bis 1.6 sind nachträglich aus dem Entwicklungsverlauf rekonstruiert: Inhalt und Reihenfolge stimmen, die genaue Nummerierung und die Daten sind nicht mehr belegt.</p>
     <h4 class="inh">Dieses Gerät</h4><div id="inDev" class="infokv"><p class="hint">Wird ermittelt …</p></div>
     <h4 class="inh">Wo liegen eure Daten?</h4>
     <ul class="infol"><li><b>Auf euren Geräten</b> (im Browser-Speicher der App) und als Datei <code>mediathek.json</code> in eurem Dropbox-Ordner, eigene Fotos im Unterordner <code>covers</code>. Kein Server von Claude oder sonst jemandem.</li>
