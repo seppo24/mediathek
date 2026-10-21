@@ -477,6 +477,12 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .ccopt small{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
 .ccopt span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .ccopt[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 30%,transparent)}
+.infohead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.inh{margin:14px 0 6px;font:600 15px Fraunces,Georgia,serif}
+.clv{border-top:1px solid var(--line);padding:6px 0}.clv summary{cursor:pointer;display:flex;gap:8px;align-items:baseline}
+.clv ul,.infol{margin:6px 0 0;padding-left:20px;font-size:14px;display:grid;gap:4px}
+.infol.src li{font-size:13px}
+.infokv{display:grid;gap:4px;font-size:14px}.infokv div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding:3px 0}.infokv span{color:var(--ink2)}.infokv b{text-align:right;font-weight:600}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -532,7 +538,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.18';
+const APP_VERSION = '1.19';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2014,6 +2020,76 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
     s.parentElement._onClose = () => { ro.disconnect(); finish(null); };
     layout();
   });
+}
+
+/* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
+const APP_DATE = '21.10.2026';
+const CHANGELOG = [
+  ['1.19', '21.10.2026', ['Info-Bereich in den Einstellungen: Versionsverlauf, Gerät & Speicher, Datenschutz, Quellen', 'Nach einem Update erscheint einmal kurz „Neu in dieser Version“', 'Knopf „Nach Update suchen“']],
+  ['1.18', '21.10.2026', ['Bessere Cover-Quellen: Deutsche Nationalbibliothek (Bücher), TVmaze (Serien mit Staffel-Cover), iTunes (Filme, Serien, Alben), MusicBrainz-Alben, Discogs', 'Strengere Treffer: Titel und Autor bzw. Interpret müssen passen, keine „ungefähren“ Wikipedia-Treffer mehr']],
+  ['1.17', '21.10.2026', ['Nachträglich eingetragene ISBN/Barcode: Abgleich der Online-Angaben mit Auswahl alt → neu je Feld oder für alle']],
+  ['1.16', '21.10.2026', ['ISBN und Barcode per Kamera scannen – im Formular und direkt aus der Detailansicht', '1.16.1: Cover-Suche für alle in Etappen, ohne Vorauswahl, mit eigenem Hochladen', '1.16.2: „Bei allen ergänzen“ nur Angaben (keine Cover), wahlweise direkt oder einzeln geprüft']],
+  ['1.15', '20.10.2026', ['Inhaltsangabe in der Detailansicht (nicht bei Vinyl)', '1.15.1: Inhaltsangabe in der Sprache des Buches, vorhandene lassen sich umstellen']],
+  ['1.14', '20.10.2026', ['Format-Erkennung 4K / Blu-ray / DVD per Foto verbessert, kein Raten mehr', 'Sammlungswert mit „davon … € digital“', '1.14.1: Verbindungstest für TMDb, RAWG und Discogs']],
+  ['1.13', '20.10.2026', ['Haken „Digital“ (ersetzt „Download-Code“), digitale Medien nicht verleihbar', 'Amazon als Cover-Quelle (Bücher) bzw. zum Selbst-Suchen', 'Anfragen-Briefkasten: Ausleih-Anfragen direkt in die App, Benachrichtigung mit Punkt am App-Symbol', '1.13.1–1.13.3: Code-Feld beim Briefkasten, Briefkasten-Prüfung, eigene Cover auch für Freunde sichtbar']],
+  ['1.12', '19.10.2026', ['BoardGameGeek: Brettspiel-Cover und -Daten mit eigenem Token']],
+  ['1.11', '19.10.2026', ['Cover-Suche per Knopf mit Rückfrage – einzeln und für alle', '1.11.1: Dropbox-Berechtigungen werden beim Verbinden geprüft', '1.11.2: Cover auch aus Wikipedia', '1.11.3: Teilen-Link funktioniert beim ersten Erstellen']],
+  ['1.10', '19.10.2026', ['Cover und Buchrücken getrennt, Liste zeigt immer die Vorderseite', 'Bilder hochladen, zuschneiden und stufenlos drehen', 'Ähnliche Autorennamen werden erkannt', 'Autorenseite mit englischen Titeln bei englischen Büchern']],
+  ['1.9', '19.10.2026', ['Reihen und Filmreihen in richtiger Reihenfolge', 'Autorenseite mit fehlenden Büchern', 'Bücherregal „Wie zuhause“ mit Fächern, Drag & Drop und Sicherungen']],
+  ['1.8', '19.10.2026', ['Regeln in 2 Minuten (Brettspiele)', 'Was ist die Sammlung wert?', 'Tabs & Ansicht, Einfach-Modus, Hilfe', '1.8.1–1.8.2: Sync-Fehler verständlich erklärt, Verbindungsprüfung']],
+  ['1.7', '19.10.2026', ['Von anderen geliehen', 'Aussortieren (Verkaufen, Verschenken, Spenden)', 'Aufräum-Assistent (Doppelungen, fehlende Angaben)', 'App-Verknüpfungen am App-Symbol', 'Neue Medienart Vinyl mit Plattenladen']],
+  ['bis 1.6', 'Okt. 2026', ['Grundversion: Blu-rays, Bücher, Games, Brettspiele – manuell, per Foto (Claude/Gemini) oder Barcode', 'Gemeinsamer Dropbox-Ordner für zwei Konten, Excel-Export, Videothek / Bücherregal / Spieleladen', 'Fehlende Angaben online ergänzen, Verleihen mit Verlauf, Wunschliste, Schnellcheck, Statistik', 'Monatliche Backups, Leseansicht für Freunde, Ausleih-Anfragen, Abendplaner, BGG- und YouTube-Links']],
+];
+function infoHTML() {
+  const list = CHANGELOG.map(([v, d, pts], i) => `<details class="clv"${i === 0 ? ' open' : ''}><summary><b>Version ${esc(v)}</b> <span class="hint">${esc(d)}</span></summary><ul>${pts.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>`).join('');
+  const src = [['Google Books', 'https://books.google.com', 'Buchdaten, Cover'], ['Open Library', 'https://openlibrary.org', 'Buchdaten, Cover'], ['Deutsche Nationalbibliothek', 'https://www.dnb.de', 'Buch-Cover zur ISBN'],
+    ['Wikidata / Wikipedia / Wikimedia Commons', 'https://www.wikidata.org', 'Daten, Inhaltsangaben, Bilder'], ['TMDB', 'https://www.themoviedb.org', 'Filme & Serien (mit Schlüssel) – This product uses the TMDB API but is not endorsed or certified by TMDB.'],
+    ['TVmaze', 'https://www.tvmaze.com', 'Serien-Cover'], ['Apple iTunes', 'https://www.apple.com/itunes/', 'Film-, Serien- und Album-Cover'], ['RAWG', 'https://rawg.io', 'Games (mit Schlüssel)'], ['BoardGameGeek', 'https://boardgamegeek.com', 'Brettspiele (mit Token) – Powered by BGG'],
+    ['MusicBrainz / Cover Art Archive', 'https://musicbrainz.org', 'Schallplatten'], ['Discogs', 'https://www.discogs.com', 'Vinyl-Cover und Marktpreise (mit Token)'], ['UPCitemdb', 'https://www.upcitemdb.com', 'Produktnamen zu Barcodes']];
+  return `<div class="infohead"><b>Mediathek ${esc(APP_VERSION)}</b><span class="hint">Stand ${APP_DATE}</span><button class="btn" id="inUpd" style="margin-left:auto">Nach Update suchen</button></div>
+    <h4 class="inh">Versionsverlauf</h4>${list}
+    <h4 class="inh">Dieses Gerät</h4><div id="inDev" class="infokv"><p class="hint">Wird ermittelt …</p></div>
+    <h4 class="inh">Wo liegen eure Daten?</h4>
+    <ul class="infol"><li><b>Auf euren Geräten</b> (im Browser-Speicher der App) und als Datei <code>mediathek.json</code> in eurem Dropbox-Ordner, eigene Fotos im Unterordner <code>covers</code>. Kein Server von Claude oder sonst jemandem.</li>
+      <li><b>Schlüssel und Tokens</b> (KI, TMDb, RAWG, BGG, Discogs) bleiben auf dem Gerät und gehen nur per Einrichtungs-Code an ein weiteres Gerät.</li>
+      <li><b>An die KI</b> gehen nur Fotos zur Erkennung und Titel/Angaben zum Ergänzen oder Schätzen – keine Namen, Preise oder Notizen.</li>
+      <li><b>An Online-Datenbanken</b> gehen nur Titel, ISBN oder Barcode.</li>
+      <li><b>Teilen-Link:</b> Freunde sehen keine Preise, Notizen, Standorte und nicht, an wen etwas verliehen ist.</li></ul>
+    <h4 class="inh">Kosten im Überblick</h4>
+    <ul class="infol"><li>App, Dropbox-Abgleich, Barcode-Scan und alle Datenbanken: <b>kostenlos</b>.</li><li>KI (nur wenn eingerichtet): Foto-Erkennung ca. 0,5–3 Cent pro Foto, Ergänzen ca. 0,05–0,3 Cent pro Medium, Werte schätzen unter 1 Cent je 20 Medien. Abgerechnet direkt bei Anthropic bzw. Google.</li></ul>
+    <h4 class="inh">Datenquellen</h4><ul class="infol src">${src.map(([n, u, d]) => `<li><a href="${u}" target="_blank" rel="noopener">${esc(n)}</a> – ${esc(d)}</li>`).join('')}</ul>
+    <h4 class="inh">Hilfe bei Problemen</h4>
+    <ul class="infol"><li><b>Sync-Fehler:</b> oben auf „Sync-Fehler“ tippen → 🩺 Prüfung.</li><li><b>App sieht nach Update alt aus:</b> „Nach Update suchen“ oder App ganz schließen und neu öffnen.</li><li><b>Etwas klappt nicht:</b> Meldung bzw. Prüfergebnis kopieren und an Claude schicken.</li></ul>`;
+}
+async function fillDeviceInfo(el) {
+  if (!el) return;
+  const kv = (k, v) => `<div><span>${esc(k)}</span><b>${v}</b></div>`;
+  const all = allLive(); const own = all.filter(i => i.coverLocal && !i.coverSpine).length, spines = all.filter(i => hasSpine(i)).length;
+  let mem = '–'; try { const e = await navigator.storage?.estimate?.(); if (e?.usage != null) mem = (e.usage / 1048576).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' MB' + (e.quota ? ` von ${e.quota >= 1073741824 ? Math.round(e.quota / 1073741824) + ' GB' : Math.round(e.quota / 1048576) + ' MB'}` : ''); } catch { }
+  const installed = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  el.innerHTML = kv('Als App installiert', installed ? 'ja' : 'nein (im Browser)') + kv('Medien', `${all.length} (davon ${live().length} in der Sammlung)`) + kv('Eigene Fotos', `${own} Cover · ${spines} Buchrücken`)
+    + kv('Speicher belegt', mem) + kv('Dropbox', dbxReady() ? esc(settings.dbxFolder || '/') : dbxConnected() ? 'verbunden, kein Ordner gewählt' : 'nicht verbunden')
+    + kv('Letzte Synchronisierung', meta.lastSync ? new Date(meta.lastSync).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '–')
+    + kv('Foto-Erkennung', settings.provider === 'claude' ? 'Claude (' + esc(settings.claudeModel.replace('claude-', '')) + ')' : settings.provider === 'gemini' ? 'Gemini' : 'nur Barcode')
+    + kv('Briefkasten', shared.mbox?.guest ? 'aktiv' : 'aus') + kv('Benachrichtigungen', 'Notification' in window ? { granted: 'erlaubt', denied: 'blockiert', default: 'nicht gefragt' }[Notification.permission] : 'nicht verfügbar');
+}
+async function checkForUpdate(btn) {
+  btn.disabled = true; btn.textContent = 'Suche …';
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update();
+    const r = await fetch('index.html?v=' + Date.now(), { cache: 'no-store' }); const t = await r.text();
+    const v = (t.match(/APP_VERSION = '([^']+)'/) || [])[1];
+    if (v && v !== APP_VERSION) { if (confirm(`Version ${v} ist verfügbar (installiert: ${APP_VERSION}). Jetzt neu laden?`)) { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); location.reload(); return; } }
+    else toast('✓ Du hast die neueste Version (' + APP_VERSION + ')');
+  } catch { toast('Update-Prüfung nicht möglich – bist du online?'); }
+  btn.disabled = false; btn.textContent = 'Nach Update suchen';
+}
+// Nach einem Update einmal zeigen, was neu ist
+function showWhatsNew() {
+  const seen = lsGet('mt_seenVersion', ''); if (VIEW || seen === APP_VERSION) return;
+  lsSet('mt_seenVersion', APP_VERSION); if (!seen) return; // Erstinstallation: nichts zeigen
+  const e = CHANGELOG.find(c => c[0] === APP_VERSION) || CHANGELOG[0];
+  openSheet(`${sheetHead('Neu in Version ' + APP_VERSION)}<ul class="infol">${e[2].map(p => `<li>${esc(p)}</li>`).join('')}</ul><p class="hint">Den ganzen Verlauf findest du unter Einstellungen → Info.</p><div class="formfoot"><button class="btn primary" data-close>Alles klar</button></div>`);
 }
 
 /* ---------- Hinzufügen-Menü ---------- */
@@ -3603,6 +3679,8 @@ function openSettings() {
     <h3>Weiteres Gerät einrichten</h3>
     <div class="card"><p class="hint" style="margin:0">Überträgt KI-Schlüssel, Dropbox-App-Key und Einstellungen auf ein weiteres Gerät. Die Dropbox-Anmeldung wird nur mitgegeben, wenn das Gerät dasselbe Dropbox-Konto nutzt. Den Code nur privat weitergeben (er enthält Zugangsschlüssel).</p>
       <div class="inrow"><button class="btn" id="sCodeOut" style="flex:1">Einrichtungs-Code kopieren</button><button class="btn" id="sCodeIn" style="flex:1">Code einfügen</button></div></div>
+    <h3>Info</h3>
+    <div class="card" id="infoCard">${infoHTML()}</div>
     <p class="hint" style="text-align:center;margin:20px 0 0">Mediathek ${APP_VERSION} · Daten liegen auf diesem Gerät${dbxReady() ? ' und in eurer Dropbox (' + esc(settings.dbxFolder || '/') + ')' : ''}.</p>
   </div>`);
 
@@ -3685,8 +3763,9 @@ function openSettings() {
   $('#sTabs', s).onclick = () => closeSheet().then(openTabSettings);
   const dg = $('#sDiscogs', s); if (dg) dg.oninput = e => { settings.discogsToken = e.target.value.trim(); saveSettings(); };
   drawShare($('#shareCard', s)); drawMailbox($('#mboxCard', s));
+  fillDeviceInfo($('#inDev', s)); $('#inUpd', s).onclick = e => checkForUpdate(e.currentTarget);
   // Abschnitte aufklappbar machen (übersichtlicher)
-  const ICONS = { 'Anfragen direkt empfangen': '📬', 'Wir zwei': '👫', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Automatische Backups': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
+  const ICONS = { 'Info': 'ℹ️', 'Anfragen direkt empfangen': '📬', 'Wir zwei': '👫', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Automatische Backups': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
   const openKey = lsGet('mt_setopen', '');
   $$('.set > h3', s).forEach(h => {
     const card = h.nextElementSibling; const d = document.createElement('details'); d.className = 'setsec';
@@ -4862,6 +4941,7 @@ addEventListener('hashchange', () => {
   if (aktion === 'check') openCheck(); else if (aktion === 'scan') openScanner(); else if (aktion === 'neu') openAddMenu();
   if (incoming) handleIncoming(incoming[1], incoming[2]);
   mbxSyncSW(); setTimeout(() => pollMailbox(), 2500);
+  setTimeout(showWhatsNew, 1200);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => { });
 })();
 
