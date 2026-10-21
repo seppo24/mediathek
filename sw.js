@@ -1,5 +1,5 @@
 // Offline-Cache für die App selbst. Daten liegen in IndexedDB + Dropbox, nicht hier.
-const CACHE = 'mediathek-v33';
+const CACHE = 'mediathek-v34';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -11,6 +11,15 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  // „Teilen“ an die Mediathek (Web Share Target): Bild/Link merken, dann App öffnen
+  if (e.request.method === 'POST' && url.searchParams.has('share-target')) {
+    e.respondWith((async () => {
+      try { const fd = await e.request.formData(); const f = fd.get('image'); const text = ['title', 'text', 'url'].map(k => fd.get(k)).filter(Boolean).join(' ');
+        await kv('readwrite', s => s.put({ file: f && typeof f !== 'string' && f.size ? f : null, text, at: Date.now() }, 'shareIn')); } catch { }
+      return Response.redirect('./?aktion=geteilt', 303);
+    })());
+    return;
+  }
   if (e.request.method !== 'GET') return;
   const sameOrigin = url.origin === self.location.origin;
   const cdn = /cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|fonts\.(googleapis|gstatic)\.com/.test(url.host);

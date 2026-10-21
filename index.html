@@ -483,6 +483,8 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .clv ul,.infol{margin:6px 0 0;padding-left:20px;font-size:14px;display:grid;gap:4px}
 .infol.src li{font-size:13px}
 .infokv{display:grid;gap:4px;font-size:14px}.infokv div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding:3px 0}.infokv span{color:var(--ink2)}.infokv b{text-align:right;font-weight:600}
+.owntools{display:flex;flex-wrap:wrap;gap:6px}.owntools a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}.owntools .btn{height:34px;padding:0 10px;font-size:13px}
+.csown{display:grid;gap:6px}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -538,7 +540,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.19.1';
+const APP_VERSION = '1.20';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2025,6 +2027,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.20', '21.10.2026', ['Eigenes Cover: „🔎 Google Bilder“ und „🛒 Amazon“ öffnen die Suche, „📋 Einfügen“ übernimmt ein kopiertes Bild, „🖼 Bild/Screenshot“ lädt z. B. einen Screenshot aus der Amazon-App – jeweils mit Zuschneiden', 'Bilder lassen sich per „Teilen“ direkt an die Mediathek schicken (nach Neuinstallation der App)', 'Die gleichen Knöpfe gibt es bei „Cover für Medien ohne Bild suchen“']],
   ['1.19.1', '21.10.2026', ['Versionsverlauf um die frühen Versionen 1.0–1.6 ergänzt']],
   ['1.19', '21.10.2026', ['Info-Bereich in den Einstellungen: Versionsverlauf, Gerät & Speicher, Datenschutz, Quellen', 'Nach einem Update erscheint einmal kurz „Neu in dieser Version“', 'Knopf „Nach Update suchen“']],
   ['1.18', '21.10.2026', ['Bessere Cover-Quellen: Deutsche Nationalbibliothek (Bücher), TVmaze (Serien mit Staffel-Cover), iTunes (Filme, Serien, Alben), MusicBrainz-Alben, Discogs', 'Strengere Treffer: Titel und Autor bzw. Interpret müssen passen, keine „ungefähren“ Wikipedia-Treffer mehr']],
@@ -2906,6 +2909,56 @@ async function applyCover(id, url) {
   cur.cover = url; delete cur.coverSkip; cur.updatedAt = Date.now(); return true;
 }
 const candHTML = (id, urls, sel) => `<div class="cands">${urls.map((u, i) => `<button class="cand" data-cid="${id}" data-ci="${i}" aria-pressed="${sel === i}"><img src="${esc(u)}" referrerpolicy="no-referrer" alt="Vorschlag ${i + 1}"></button>`).join('')}<button class="cand none" data-cid="${id}" data-ci="-1" aria-pressed="${sel === -1}">✕<small>keins</small></button></div>`;
+// ---- Eigenes Cover aus Google Bilder / Amazon / Zwischenablage / Teilen ----
+const coverQuery = it => [it.titel, it.autor || it.interpret || '', it.typ === 'game' ? it.plattform || '' : it.typ === 'bluray' ? it.format || 'Blu-ray' : it.typ === 'brettspiel' ? 'Brettspiel' : it.typ === 'vinyl' ? 'Vinyl' : ''].filter(Boolean).join(' ');
+const amazonURL = it => 'https://www.amazon.de/s?k=' + encodeURIComponent(coverQuery(it));
+const googleImgURL = it => 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(coverQuery(it) + ' cover');
+const setCoverTarget = id => idb.set('coverTarget', { id, at: Date.now() });
+function ownToolsHTML(it, compact) {
+  return `<div class="owntools"><a class="btn" data-ext="${it.id}" href="${esc(googleImgURL(it))}" target="_blank" rel="noopener">🔎 Google Bilder</a><a class="btn" data-ext="${it.id}" href="${esc(amazonURL(it))}" target="_blank" rel="noopener">🛒 Amazon</a>
+    <button type="button" class="btn" data-clip="${it.id}">📋 Einfügen</button><label class="btn">🖼 Bild/Screenshot<input type="file" accept="image/*" hidden data-own="${it.id}"></label>${compact ? '' : `<label class="btn">📷 Foto<input type="file" accept="image/*" capture="environment" hidden data-own="${it.id}"></label>`}</div>
+    ${compact ? '' : `<p class="hint" style="margin:6px 0 0"><b>Google Bilder:</b> Bild lange drücken → „Bild kopieren“, zurück zur Mediathek und <b>📋 Einfügen</b> – oder „Teilen“ → Mediathek.<br><b>Amazon-App:</b> Screenshot vom Cover machen, dann <b>🖼 Bild/Screenshot</b> und zuschneiden. (Amazon-Bilder zeigen bei Filmen und Spielen oft das FSK-/USK-Logo.)</p>`}`;
+}
+async function clipboardImage() {
+  if (!navigator.clipboard?.read) { const t = await navigator.clipboard?.readText?.().catch(() => ''); return /^https?:\/\/\S+$/.test((t || '').trim()) ? t.trim() : null; }
+  const list = await navigator.clipboard.read();
+  for (const ci of list) {
+    const t = ci.types.find(x => x.startsWith('image/')); if (t) return blobToDataURL(await ci.getType(t));
+    if (ci.types.includes('text/plain')) { const tx = (await (await ci.getType('text/plain')).text()).trim(); if (/^https?:\/\/\S+$/.test(tx)) return tx; }
+  }
+  return null;
+}
+// Bild (Daten oder Adresse) zuschneiden lassen und als Cover speichern
+async function saveOwnCover(id, src) {
+  const it = byId(id); if (!it || !src) return false;
+  let data = src;
+  if (!String(src).startsWith('data:')) {
+    data = await imageForEditing(src);
+    if (!data) { // Server erlaubt kein Bearbeiten → Adresse direkt übernehmen
+      if (!await imgOk(src)) { toast('Unter dieser Adresse wurde kein Bild gefunden'); return false; }
+      if (!confirm('Dieses Bild lässt sich nicht zuschneiden, aber direkt als Cover übernehmen. Übernehmen?')) return false;
+      await upsertItem(Object.assign({}, it, { cover: src, _removeCover: false, _noAuthorCheck: true })); const c = byId(id); if (c) { c.cover = src; delete c.coverSkip; } await persist(); idb.del('coverTarget'); return true;
+    }
+  } else data = await resizeImage(await dataURLToBlob(data), 2000, .9);
+  const r = await openImageEditor(data, { kind: 'cover' }); if (!r) return false;
+  await upsertItem(Object.assign({}, byId(id), { _coverData: r.data, _noAuthorCheck: true })); const c = byId(id); if (c) delete c.coverSkip;
+  idb.del('coverTarget'); return true;
+}
+async function pasteCoverFor(id) {
+  try { const src = await clipboardImage(); if (!src) { toast('In der Zwischenablage ist kein Bild. In Google Bilder: Bild lange drücken → „Bild kopieren“.', 4500); return false; } return await saveOwnCover(id, src); }
+  catch { toast('Kein Zugriff auf die Zwischenablage – bitte erlauben oder Screenshot verwenden', 4500); return false; }
+}
+// Mit „Teilen“ an die Mediathek geschicktes Bild (Web Share Target, über den Service Worker)
+async function handleSharedIn() {
+  const sh = await idb.get('shareIn'); await idb.del('shareIn'); if (!sh) return;
+  const tg = await idb.get('coverTarget');
+  if (!tg || Date.now() - tg.at > 3 * 3600e3 || !byId(tg.id)) return toast('Für welches Medium? Öffne zuerst beim Medium „🔍 Cover im Internet suchen“ → Google Bilder, dann teilen.', 6000);
+  let src = null;
+  if (sh.file) src = await blobToDataURL(sh.file);
+  else { const m = String(sh.text || '').match(/https?:\/\/\S+\.(?:jpe?g|png|webp)(?:\?\S*)?|https?:\/\/\S*(?:media-amazon|images-amazon|googleusercontent|gstatic)\S*/i); if (m) src = m[0]; }
+  if (!src) return toast('Geteilt wurde nur ein Link zur Seite, daraus lässt sich kein Bild holen. Teile das Bild selbst (lange drücken → Bild teilen) oder mach einen Screenshot.', 6500);
+  if (await saveOwnCover(tg.id, src)) { render(); openDetail(tg.id); toast('Cover übernommen'); }
+}
 // Ein Medium (aus der Detailansicht)
 async function searchCoverFor(id, btn) {
   const it = byId(id); if (!it) return;
@@ -2913,17 +2966,22 @@ async function searchCoverFor(id, btn) {
   const urls = await findCoverCandidates(it);
   if (btn) { btn.disabled = false; btn.textContent = '🔍 Cover im Internet suchen'; }
   let sel = urls.length ? 0 : -1;
-  const amz = 'https://www.amazon.de/s?k=' + encodeURIComponent([it.titel, it.autor || it.interpret || '', it.typ === 'game' ? it.plattform || '' : it.typ === 'bluray' ? it.format || 'Blu-ray' : ''].filter(Boolean).join(' '));
   const s = openSheet(`${sheetHead(!urls.length ? 'Kein Cover gefunden' : urls.length > 1 ? 'Cover gefunden – welches passt?' : 'Cover gefunden')}
     <p class="hint" style="margin-top:0">„${esc(it.titel)}“${it.autor ? ' · ' + esc(it.autor) : ''}. ${!urls.length ? 'In den freien Quellen war nichts dabei.' : urls.length > 1 ? 'Tippe auf das passende Bild.' : 'Passt dieses Bild?'}</p>
     <div id="csOne">${urls.length ? candHTML(id, urls, sel) : ''}</div>
-    <details class="csman"${urls.length ? '' : ' open'}><summary>Selbst suchen (z. B. bei Amazon)</summary>
-      <p class="hint">Auf Amazon das Produktbild lange drücken → „Bildadresse kopieren“ und hier einfügen. Amazon-Bilder zeigen bei Filmen und Spielen oft das FSK-/USK-Logo.</p>
-      <div class="inrow"><a class="btn" href="${esc(amz)}" target="_blank" rel="noopener">🛒 Bei Amazon suchen</a></div>
-      <div class="inrow" style="margin-top:8px"><input id="csUrl" type="url" placeholder="Bildadresse einfügen (https://…)" style="flex:1"><button class="btn" id="csUrlOk">Prüfen</button></div></details>
+    <details class="csman"${urls.length ? '' : ' open'}><summary>Selbst suchen (Google Bilder, Amazon, eigenes Bild)</summary>
+      ${ownToolsHTML(it)}
+      <div class="inrow" style="margin-top:8px"><input id="csUrl" type="url" placeholder="oder Bildadresse einfügen (https://…)" style="flex:1"><button class="btn" id="csUrlOk">Prüfen</button></div></details>
     <div class="formfoot"><button class="btn" data-close>Nicht übernehmen</button><button class="btn primary" id="csOk" ${sel < 0 ? 'disabled' : ''}>Übernehmen</button></div>`);
   const pick = () => { $$('[data-ci]', s).forEach(x => x.setAttribute('aria-pressed', +x.dataset.ci === sel)); $('#csOk', s).disabled = sel < 0; };
   $('#csOne', s).onclick = e => { const b = e.target.closest('[data-ci]'); if (!b) return; sel = +b.dataset.ci; pick(); };
+  const done = async () => { await closeSheet(); await closeSheet(); render(); openDetail(id); toast('Cover übernommen'); };
+  const man = $('.csman', s);
+  man.addEventListener('click', async e => {
+    if (e.target.closest('[data-ext]')) { setCoverTarget(id); return; }
+    if (e.target.closest('[data-clip]')) { if (await pasteCoverFor(id)) done(); }
+  });
+  man.addEventListener('change', async e => { const inp = e.target.closest('[data-own]'); if (!inp) return; const f = inp.files[0]; inp.value = ''; if (!f) return; if (await saveOwnCover(id, await resizeImage(f, 2000, .9))) done(); });
   $('#csUrlOk', s).onclick = async () => {
     const u = $('#csUrl', s).value.trim(); if (!/^https:\/\//.test(u)) return toast('Bitte eine Bildadresse mit https:// einfügen');
     if (!await imgOk(u)) return toast('Unter dieser Adresse wurde kein Bild gefunden');
@@ -2960,12 +3018,15 @@ async function searchCoversBulk(list) {
     const sel = d == null ? null : d.u === '-' ? -1 : urls ? urls.indexOf(d.u) : null;
     return `<div class="csrow" data-row="${it.id}"><div class="cst"><b>${esc(it.titel)}</b><small>${esc(subtitle(it))}</small></div>
       ${urls === null ? '<p class="hint" style="margin:0">Suche …</p>' : urls.length ? candHTML(it.id, urls, sel) : `<div class="cands"><button class="cand none" data-cid="${it.id}" data-ci="-1" aria-pressed="${sel === -1}">✕<small>keins</small></button></div><p class="hint" style="margin:0">Nichts gefunden – eigenes Bild hochladen oder „keins“.</p>`}
-      <div class="csown"><label class="btn ghost">📷 Foto<input type="file" accept="image/*" capture="environment" hidden data-own="${it.id}"></label><label class="btn ghost">🖼 Galerie<input type="file" accept="image/*" hidden data-own="${it.id}"></label>${sel != null ? '<span class="hint">✓ gemerkt</span>' : ''}</div></div>`;
+      <div class="csown">${ownToolsHTML(it, true)}${sel != null ? '<span class="hint">✓ gemerkt</span>' : ''}</div></div>`;
   };
   const visible = it => showAll || !fresh(it.id) || cache[it.id].urls.length || draft[it.id];
   const draw = () => { body.innerHTML = todo.filter(visible).map(rowHTML2).join('') || '<p class="hint" style="text-align:center;padding:20px">Keine offenen Medien mit Vorschlägen. „auch ohne Vorschläge zeigen“ zeigt die übrigen – dort kannst du eigene Bilder hochladen.</p>'; upd(); };
   const redrawRow = id => { const r = body.querySelector(`[data-row="${id}"]`); const it = todo.find(i => i.id === id); if (r && it) { if (visible(it)) r.outerHTML = rowHTML2(it); else r.remove(); } else if (it && visible(it)) draw(); upd(); };
-  body.onclick = e => {
+  const ownDone = id => { delete draft[id]; saveDraft(); todo = todo.filter(x => x.id !== id); body.querySelector(`[data-row="${id}"]`)?.remove(); upd(); toast('Eigenes Cover gespeichert'); };
+  body.onclick = async e => {
+    const ex = e.target.closest('[data-ext]'); if (ex) { setCoverTarget(ex.dataset.ext); return; }
+    const cl = e.target.closest('[data-clip]'); if (cl) { if (await pasteCoverFor(cl.dataset.clip)) ownDone(cl.dataset.clip); return; }
     const b = e.target.closest('[data-ci]'); if (!b) return; const id = b.dataset.cid, i = +b.dataset.ci;
     const urls = cache[id]?.urls || []; const cur = draft[id];
     const v = i < 0 ? '-' : urls[i];
@@ -2974,10 +3035,7 @@ async function searchCoversBulk(list) {
   };
   body.onchange = async e => {
     const inp = e.target.closest('[data-own]'); if (!inp) return; const f = inp.files[0]; inp.value = ''; if (!f) return;
-    const id = inp.dataset.own; const it = byId(id); if (!it) return;
-    const r = await openImageEditor(await resizeImage(f, 2000, .9), { kind: 'cover' }); if (!r) return;
-    await upsertItem(Object.assign({}, it, { _coverData: r.data, _noAuthorCheck: true }));
-    delete draft[id]; saveDraft(); todo = todo.filter(x => x.id !== id); body.querySelector(`[data-row="${id}"]`)?.remove(); upd(); toast('Eigenes Cover gespeichert');
+    const id = inp.dataset.own; if (await saveOwnCover(id, await resizeImage(f, 2000, .9))) ownDone(id);
   };
   $('#csShowAll', s).onchange = e => { showAll = e.target.checked; draw(); };
   $('#csFirst', s).onclick = () => {
@@ -4943,6 +5001,7 @@ addEventListener('hashchange', () => {
   history.replaceState({ sheet: 0 }, '', incoming || aktion ? location.pathname : undefined);
   if (aktion === 'wunsch') { ui.type = 'wunsch'; ui.sort = 'prio'; }
   if (aktion === 'anfragen') { ui.type = 'anfragen'; clearRequestNotes(); }
+  if (aktion === 'geteilt') setTimeout(handleSharedIn, 300);
   render(); syncLabel();
   scheduleSync(500);
   if (aktion === 'check') openCheck(); else if (aktion === 'scan') openScanner(); else if (aktion === 'neu') openAddMenu();
