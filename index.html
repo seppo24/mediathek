@@ -532,7 +532,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.17';
+const APP_VERSION = '1.18';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2698,13 +2698,17 @@ async function wikipediaCovers(it) {
     const pages = Object.values(j?.query?.pages || {}).filter(p => p.thumbnail?.source).sort((a, b) => (a.index || 0) - (b.index || 0));
     const match = pages.filter(p => { const k = clean(p.title); return k && nt && (k === nt || (nt.length >= 4 && (k.includes(nt) || nt.includes(k)))); });
     for (const p of match) out.push(p.thumbnail.source);
-    if (!match.length && pages[0]) out.push(pages[0].thumbnail.source); // bester Suchtreffer als Vorschlag
   }
   if (it.typ === 'brettspiel' && out.length < 2) { // Fotos von Spielschachteln auf Wikimedia Commons
     const j = await fetchJSON(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=4&gsrsearch=${encodeURIComponent(it.titel + ' board game')}&prop=imageinfo&iiprop=url&iiurlwidth=500`, 7000);
     for (const p of Object.values(j?.query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0))) { const u = p.imageinfo?.[0]?.thumburl; if (u && /\.(jpe?g|png|webp)/i.test(u)) out.push(u); }
   }
   return out;
+}
+function isbn13(v) {
+  const d = String(v || '').replace(/[^0-9Xx]/g, '').toUpperCase(); if (d.length === 13) return d; if (d.length !== 10) return d;
+  const core = '978' + d.slice(0, 9); let sum = 0; for (let i = 0; i < 12; i++) sum += (+core[i]) * (i % 2 ? 3 : 1);
+  return core + ((10 - sum % 10) % 10);
 }
 function isbn10(v) {
   const d = String(v || '').replace(/[^0-9Xx]/g, '').toUpperCase();
@@ -2713,32 +2717,106 @@ function isbn10(v) {
   const core = d.slice(3, 12); let sum = 0; for (let i = 0; i < 9; i++) sum += (10 - i) * +core[i];
   const c = (11 - sum % 11) % 11; return core + (c === 10 ? 'X' : String(c));
 }
+// ---- Zusätzliche Cover-Quellen (ohne Schlüssel, mit CORS) ----
+const tnorm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\(.*?\)|\[.*?\]/g, ' ').replace(/^(der|die|das|the|ein|eine|a|an|le|la|les)\s+/, '').replace(/[^a-z0-9äöüß]/g, '');
+const titleMatch = (a, b) => { const x = tnorm(a), y = tnorm(b); return !!x && !!y && (x === y || (Math.min(x.length, y.length) >= 6 && (x.startsWith(y) || y.startsWith(x)))); };
+const nameMatch = (a, b) => { if (!a || !b) return true; const s = n => nameParts(n).last; return authorNames(a).some(x => authorNames(b).some(y => s(x) === s(y))) || tnorm(a).includes(tnorm(b)) || tnorm(b).includes(tnorm(a)); };
+const seriesInfo = it => { const t = String(it.titel || ''); const m = t.match(/^(.*?)\s*[-–:,]?\s*(?:staffel|season|series|s)\s*(\d+)/i); const n = +(String(it.staffel || '').match(/\d+/) || [])[0] || (m ? +m[2] : 0); return { show: (m ? m[1] : t).trim(), season: n || null }; };
+const isSeries = it => it.typ === 'bluray' && (it.art === 'Serie' || /staffel|season|die komplette serie|complete series/i.test(it.titel || '') || !!seriesInfo(it).season && it.art !== 'Film');
+// Deutsche Nationalbibliothek / VLB: Verlagscover zur ISBN (sehr zuverlässig für deutsche Bücher)
+const dnbCover = isbn => `https://portal.dnb.de/opac/mvb/cover?isbn=${isbn}`;
+// TVmaze: Serien-Poster, bei Staffelangabe das Staffel-Cover
+async function tvmazeCovers(it) {
+  const { show, season } = seriesInfo(it); const out = [];
+  const j = await fetchJSON('https://api.tvmaze.com/search/shows?q=' + encodeURIComponent(show), 7000);
+  const all = (Array.isArray(j) ? j : []).map(x => x.show).filter(Boolean); const exact = all.filter(s => tnorm(s.name) === tnorm(show));
+  const hits = (exact.length ? exact : all.filter(s => titleMatch(s.name, show))).slice(0, 1);
+  for (const s of hits) {
+    if (season) { const ss = await fetchJSON(`https://api.tvmaze.com/shows/${s.id}/seasons`, 7000); const se = (Array.isArray(ss) ? ss : []).find(x => x.number === season); if (se?.image) out.push(se.image.original || se.image.medium); }
+    if (s.image) out.push(s.image.original || s.image.medium);
+  }
+  return out;
+}
+// TMDb (mit Schlüssel): mehrere Poster, bei Serien auch das Staffel-Poster
+async function tmdbCovers(it) {
+  const key = settings.tmdbKey; if (!key) return [];
+  const bearer = key.length > 40;
+  const get = path => { const url = 'https://api.themoviedb.org/3/' + path + (path.includes('?') ? '&' : '?') + (bearer ? '' : 'api_key=' + encodeURIComponent(key)); return bearer ? fetch(url, { headers: { Authorization: 'Bearer ' + key } }).then(r => r.ok ? r.json() : null).catch(() => null) : fetchJSON(url); };
+  const ser = isSeries(it); const { show, season } = seriesInfo(it);
+  const q = ser ? show : String(it.titel).replace(/\s*[-–:]\s*(staffel|season)\s*\d+.*$/i, '');
+  const kind = ser ? 'tv' : 'movie';
+  const sr = await get(`search/${kind}?language=de-DE&query=${encodeURIComponent(q)}${!ser && it.jahr ? '&year=' + it.jahr : ''}`);
+  const hit = (sr?.results || []).find(r => titleMatch(r.title || r.name, q) || titleMatch(r.original_title || r.original_name, q)) || null; if (!hit) return [];
+  const out = []; const P = p => 'https://image.tmdb.org/t/p/w500' + p;
+  if (ser && season) { const s = await get(`tv/${hit.id}/season/${season}?language=de-DE`); if (s?.poster_path) out.push(P(s.poster_path)); }
+  if (hit.poster_path) out.push(P(hit.poster_path));
+  const im = await get(`${kind}/${hit.id}/images?include_image_language=de,null,en`);
+  for (const p of (im?.posters || []).sort((a, b) => (b.iso_639_1 === 'de') - (a.iso_639_1 === 'de') || b.vote_average - a.vote_average).slice(0, 3)) out.push(P(p.file_path));
+  return out;
+}
+// iTunes/Apple (kostenlos, ohne Schlüssel): Film-Poster (deutscher Store) und Album-Cover in hoher Auflösung
+async function itunesCovers(it) {
+  const film = it.typ === 'bluray', q = film ? String(it.titel).replace(/\s*[-–:]\s*(staffel|season)\s*\d+.*$/i, '') : [it.interpret, it.titel].filter(Boolean).join(' ');
+  const ent = film ? (isSeries(it) ? 'tvSeason' : 'movie') : 'album';
+  const j = await fetchJSON(`https://itunes.apple.com/search?country=de&limit=10&entity=${ent}&term=${encodeURIComponent(q)}`, 7000);
+  return (j?.results || []).filter(r => {
+    if (film) return titleMatch(r.trackName || r.collectionName, ent === 'tvSeason' ? seriesInfo(it).show : q) || titleMatch(r.collectionName, it.titel);
+    return titleMatch(r.collectionName, it.titel) && nameMatch(r.artistName, it.interpret);
+  }).slice(0, 3).map(r => String(r.artworkUrl100 || '').replace(/\/\d+x\d+bb\./, '/600x600bb.')).filter(Boolean);
+}
+// MusicBrainz: Album (Release-Group) suchen → Vorderseite aus dem Cover Art Archive
+async function mbCovers(it) {
+  const out = []; const qq = s => '"' + String(s).replace(/["\\]/g, ' ') + '"';
+  if (it.barcode) { const j = await fetchJSON('https://musicbrainz.org/ws/2/release?fmt=json&limit=3&query=' + encodeURIComponent('barcode:' + it.barcode), 7000); for (const r of j?.releases || []) if (r.barcode === String(it.barcode)) out.push(`https://coverartarchive.org/release/${r.id}/front-500`); }
+  const q = `releasegroup:${qq(it.titel)}` + (it.interpret ? ` AND artist:${qq(it.interpret)}` : '');
+  const j = await fetchJSON('https://musicbrainz.org/ws/2/release-group?fmt=json&limit=5&query=' + encodeURIComponent(q), 7000);
+  for (const g of (j?.['release-groups'] || []).filter(g => g.score >= 85 && titleMatch(g.title, it.titel) && nameMatch((g['artist-credit'] || []).map(a => a.name).join(' '), it.interpret)).slice(0, 2)) out.push(`https://coverartarchive.org/release-group/${g.id}/front-500`);
+  return out;
+}
+// Discogs (mit Token): Cover der passenden Veröffentlichung
+async function discogsCovers(it) {
+  const tok = settings.discogsToken; if (!tok) return [];
+  const q = it.barcode ? `barcode=${encodeURIComponent(it.barcode)}` : `release_title=${encodeURIComponent(it.titel)}${it.interpret ? '&artist=' + encodeURIComponent(it.interpret) : ''}`;
+  try { const r = await fetch(`https://api.discogs.com/database/search?type=release&per_page=5&${q}`, { headers: { Authorization: 'Discogs token=' + tok } }); if (!r.ok) return []; const j = await r.json();
+    return (j.results || []).map(x => x.cover_image).filter(u => u && !/spacer\.gif/.test(u)).slice(0, 2); } catch { return []; }
+}
+// Mehrere Vorschläge; Reihenfolge: exakte Treffer (ISBN/Barcode) zuerst, unsichere Titelsuche zuletzt
 async function findCoverCandidates(it) {
-  const out = []; const add = u => { if (u && !out.includes(u) && out.length < 7) out.push(u); };
+  const out = []; const add = u => { if (u && !out.includes(u) && out.length < 8) out.push(u); };
+  const addAll = arr => (arr || []).forEach(add);
   const rec = Object.assign({}, it);
+  const safe = p => p.catch(() => null);
   try {
     if (it.typ === 'buch') {
-      const isbn = String(it.isbn || it.barcode || '').replace(/[^0-9Xx]/g, '');
-      if (isbn.length >= 10) { const b = await lookupISBN(isbn).catch(() => null); add(b?.cover); const ol = `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`; if (await imgOk(ol)) add(ol); }
-      const q = `intitle:${it.titel}` + (it.autor ? `+inauthor:${authorNames(it.autor)[0] || ''}` : '');
-      const g = await fetchJSON('https://www.googleapis.com/books/v1/volumes?maxResults=10&q=' + encodeURIComponent(q), 7000);
-      const nt = normDup(it.titel);
-      for (const x of g?.items || []) { const v = x.volumeInfo || {}; const k = normDup(v.title); if (!k || !(k === nt || k.includes(nt) || nt.includes(k))) continue; const img = v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail; if (img) add(img.replace('http://', 'https://').replace('&edge=curl', '')); }
-      const ol = await fetchJSON(`https://openlibrary.org/search.json?title=${encodeURIComponent(it.titel)}${it.autor ? '&author=' + encodeURIComponent(authorNames(it.autor)[0] || '') : ''}&fields=cover_i&limit=5`, 7000);
-      for (const d of ol?.docs || []) if (d.cover_i) add(`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`);
+      const isbn = String(it.isbn || (isISBN(String(it.barcode || '')) ? it.barcode : '') || '').replace(/[^0-9Xx]/g, '');
+      if (isbn.length >= 10) {
+        add(dnbCover(isbn13(isbn))); // Verlagscover über DNB/VLB
+        const b = await safe(lookupISBN(isbn)); add(b?.cover);
+        add(`https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`);
+        const i10 = isbn10(isbn); if (i10) add(`https://images-na.ssl-images-amazon.com/images/P/${i10}.01.L.jpg`);
+      }
+      if (out.length < 3) { // ohne (passende) ISBN: Titel UND Autor müssen passen
+        const q = `intitle:${it.titel}` + (it.autor ? `+inauthor:${authorNames(it.autor)[0] || ''}` : '');
+        const lang = bookLang(it);
+        const g = await fetchJSON(`https://www.googleapis.com/books/v1/volumes?maxResults=15&langRestrict=${lang}&q=` + encodeURIComponent(q), 7000);
+        for (const x of g?.items || []) { const v = x.volumeInfo || {}; if (!titleMatch(v.title, it.titel) || !nameMatch((v.authors || []).join(', '), it.autor)) continue; const img = v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail; if (img) add(img.replace('http://', 'https://').replace('&edge=curl', '').replace('zoom=1', 'zoom=2')); }
+        const ol = await fetchJSON(`https://openlibrary.org/search.json?title=${encodeURIComponent(it.titel)}${it.autor ? '&author=' + encodeURIComponent(authorNames(it.autor)[0] || '') : ''}&fields=cover_i,title,author_name,language&limit=8`, 7000);
+        for (const d of ol?.docs || []) if (d.cover_i && titleMatch(d.title, it.titel)) add(`https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg`);
+      }
     }
-    if (it.typ === 'bluray' && settings.tmdbKey) add((await tmdbLookup(rec))?.cover);
-    if (it.typ === 'game' && settings.rawgKey) add((await rawgLookup(rec))?.cover);
-    if (it.typ === 'brettspiel' && settings.bggToken) for (const u of await bggCoverCands(it).catch(() => [])) add(u);
-    if (it.typ === 'vinyl') add((await mbLookup(rec))?.cover);
-    if (!out.length || ['brettspiel', 'game'].includes(it.typ)) add((await wikidataLookup(rec).catch(() => null))?.cover);
-    if (out.length < 4) for (const u of await wikipediaCovers(it).catch(() => [])) add(u);
-    // Amazon zuletzt (bei Filmen/Spielen oft mit Altersfreigabe-Logo) – frei abrufbar nur über die ISBN-10 bei Büchern
-    const i10 = isbn10(it.isbn || it.barcode); if (i10) add(`https://images-na.ssl-images-amazon.com/images/P/${i10}.01.L.jpg`);
+    if (it.typ === 'bluray') {
+      if (isSeries(it)) { addAll(await safe(tmdbCovers(it))); addAll(await safe(tvmazeCovers(it))); addAll(await safe(itunesCovers(it))); }
+      else { addAll(await safe(tmdbCovers(it))); addAll(await safe(itunesCovers(it))); }
+    }
+    if (it.typ === 'vinyl') { addAll(await safe(discogsCovers(it))); addAll(await safe(mbCovers(it))); addAll(await safe(itunesCovers(it))); }
+    if (it.typ === 'game' && settings.rawgKey) add((await safe(rawgLookup(rec)))?.cover);
+    if (it.typ === 'brettspiel' && settings.bggToken) addAll(await safe(bggCoverCands(it)));
+    if (!out.length || ['brettspiel', 'game'].includes(it.typ)) add((await safe(wikidataLookup(rec)))?.cover);
+    if (out.length < 3) addAll(await safe(wikipediaCovers(it)));
   } catch { }
-  // nur Bilder, die wirklich laden
+  // nur Bilder, die wirklich laden (leere Platzhalter fallen raus)
   const ok = await Promise.all(out.map(u => imgOk(u)));
-  return out.filter((u, i) => ok[i]).slice(0, 5);
+  return out.filter((u, i) => ok[i]).slice(0, 6);
 }
 async function applyCover(id, url) {
   const cur = byId(id); if (!cur || cur.deleted || hasCover(cur)) return false;
@@ -2778,9 +2856,9 @@ async function searchCoversBulk(list) {
   const pool = () => (list || allLive()).filter(i => !i.deleted && TYPES[i.typ] && i.titel && !hasCover(i) && !i.coverSkip);
   let todo = pool();
   if (!todo.length) return toast('Alle Medien haben schon ein Cover');
-  const cache = (await idb.get('coverCands')) || {}; const draft = (await idb.get('coverDraft')) || {};
+  const cache = (await idb.get('coverCands2')) || {}; const draft = (await idb.get('coverDraft')) || {};
   const fresh = id => cache[id] && Date.now() - cache[id].at < 30 * 864e5;
-  const saveDraft = () => idb.set('coverDraft', draft); const saveCache = () => idb.set('coverCands', cache);
+  const saveDraft = () => idb.set('coverDraft', draft); const saveCache = () => idb.set('coverCands2', cache);
   let stop = false, searching = true, showAll = false;
   const s = openSheet(`${sheetHead('Cover suchen')}
     <p class="hint" style="margin-top:0">Tippe bei jedem Medium das passende Bild an, „✕ keins“ oder lade ein eigenes hoch (📷/🖼). <b>Nichts ist vorausgewählt.</b> Deine Auswahl wird sofort gemerkt – du kannst jederzeit schließen und später weitermachen.</p>
