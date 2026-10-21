@@ -463,6 +463,20 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .inhalt h4{margin:0 0 4px;font:600 14px Fraunces,Georgia,serif}
 .inhalt p{margin:0 0 4px;font-size:14px;line-height:1.5;white-space:pre-line}
 .inhalt p.clamp{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.csbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:2}
+.csown{display:flex;gap:6px;align-items:center}.csown .btn{height:32px;padding:0 10px;font-size:13px}
+.fplist{display:grid;gap:4px}
+.fpf{display:flex;gap:8px;align-items:flex-start;font-size:14px}.fpf input{margin-top:3px;accent-color:var(--accent)}
+.fpinh{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.cclist{display:grid;gap:10px}
+.ccrow{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--surface)}
+.cck{font-weight:700;font-size:13px;margin-bottom:6px}
+.ccv{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:stretch}
+.ccarr{align-self:center;color:var(--ink2)}
+.ccopt{text-align:left;border:2px solid var(--line);border-radius:10px;background:var(--bg);padding:6px 8px;font-size:13px;display:grid;gap:2px;cursor:pointer;color:var(--ink)}
+.ccopt small{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
+.ccopt span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.ccopt[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 30%,transparent)}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -518,7 +532,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.16';
+const APP_VERSION = '1.17';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1684,6 +1698,7 @@ function openDetail(id) {
     if (isEmpty(cur.barcode)) cur.barcode = code;
     if (cur.typ === 'buch' && isEmpty(cur.isbn) && isISBN(code)) cur.isbn = code;
     cur.updatedAt = Date.now(); await persist(); await closeSheet(); render(); openDetail(it.id); toast('Nummer gespeichert: ' + code);
+    checkAfterCode(it.id, code);
   };
   const dc = $('#dCover', s); if (dc) dc.onclick = () => searchCoverFor(it.id, dc);
   const dr = $('#dRules', s); if (dr) dr.onclick = () => openRules(it.id);
@@ -1911,13 +1926,16 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     if (item?.autoAt) rec.autoAt = item.autoAt;
     if (!coverData && !removeCover && data.cover) rec.cover = data.cover;
     if (item?.cover && !coverData && !removeCover) rec.cover = item.cover;
+    const oldIsbn = item ? String(item.isbn || '') : '', oldBc = item ? String(item.barcode || '') : ''; // vor dem Speichern merken (item wird überschrieben)
     const saved = await upsertItem(rec);
+    const newCode = !item ? null : saved.isbn && String(saved.isbn) !== oldIsbn ? saved.isbn : saved.barcode && String(saved.barcode) !== oldBc ? saved.barcode : null;
     if (item?.cover && !rec.cover) delete saved.cover;
     await closeSheet(); render();
     toast(item ? 'Gespeichert' : saved.geliehen ? `„${saved.titel}“ als geliehen eingetragen` : saved.wunsch ? `„${saved.titel}“ auf die Wunschliste gesetzt` : `„${saved.titel}“ hinzugefügt`);
     // Neues Medium: leere Felder automatisch im Hintergrund ergänzen
     if (!item && !prefill?._checked && settings.autoFill && (missingFields(saved).length || !hasCover(saved))) autoCompleteItem(saved.id);
     onSaved?.(saved);
+    if (newCode) setTimeout(() => checkAfterCode(saved.id, newCode), 400); // nachträglich eingetragene Nummer: Angaben abgleichen
   };
 }
 
@@ -2206,6 +2224,49 @@ async function lookupCode(code) {
   return null;
 }
 
+
+/* ---------- Nachträglich eingetragene Nummer: passen die Online-Angaben noch? ---------- */
+const sameVal = (a, b) => String(a ?? '').toLowerCase().replace(/\s+/g, ' ').trim() === String(b ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+async function checkAfterCode(id, code) {
+  const it = byId(id); if (!it || !code) return;
+  toast('Prüfe die Angaben zur Nummer …', 2000);
+  let r = await lookupCode(code).catch(() => null);
+  if (!r) return toast('Zur Nummer wurden online keine Daten gefunden – die Angaben bleiben, wie sie sind', 3500);
+  const rec = Object.assign({}, r, { typ: it.typ }); delete rec.cover;
+  if (rec.titel) await completeRecord(rec, { useAI: false }).catch(() => []);
+  const cur = byId(id); if (!cur) return;
+  const rows = [];
+  for (const f of fieldsOf(cur.typ)) {
+    const k = f.k; if (['barcode', 'isbn', 'notizen', 'youtube'].includes(k) || f.own || f.wish || f.borrow || f.t === 'lend' || f.t === 'bool') continue;
+    const nv = rec[k]; if (isEmpty(nv)) continue;
+    if (f.t === 'select' && !optsOf(f).includes(String(nv))) continue;
+    const ov = cur[k];
+    if (isEmpty(ov)) rows.push({ k, f, ov, nv, def: 'neu' });
+    else if (k === 'titel' ? normDup(ov) !== normDup(nv) : ((cur.auto || []).includes(k) && !sameVal(ov, nv))) rows.push({ k, f, ov, nv, def: 'alt' });
+  }
+  if (!rows.length) return toast('✓ Die Angaben passen zur Nummer', 3000);
+  const choice = Object.fromEntries(rows.map(x => [x.k, x.def]));
+  const show = (f, v) => isEmpty(v) ? '<i class="hint">leer</i>' : esc(fmt(f, v)).slice(0, 300);
+  const s = openSheet(`${sheetHead('Neue Angaben zur Nummer')}
+    <p class="hint" style="margin-top:0">Zur Nummer <b>${esc(code)}</b> wurden Angaben gefunden, die von den bisherigen abweichen. Wähle je Feld, was gelten soll. Vorausgewählt: Leere Felder werden gefüllt, Vorhandenes bleibt.</p>
+    <div class="inrow" style="margin-bottom:10px"><button class="btn" id="ccAllNew" style="flex:1">Alle neu</button><button class="btn" id="ccAllOld" style="flex:1">Alle alt</button></div>
+    <div class="cclist">${rows.map(x => `<div class="ccrow" data-k="${x.k}"><div class="cck">${esc(x.f.l)}</div>
+      <div class="ccv"><button class="ccopt" data-pick="alt"><small>alt</small><span>${show(x.f, x.ov)}</span></button><span class="ccarr">→</span><button class="ccopt" data-pick="neu"><small>neu</small><span>${show(x.f, x.nv)}</span></button></div></div>`).join('')}</div>
+    <div class="formfoot"><button class="btn" data-close>Alles lassen</button><button class="btn primary" id="ccOk">Auswahl übernehmen</button></div>`);
+  const paint = () => $$('.ccrow', s).forEach(row => $$('.ccopt', row).forEach(b => b.setAttribute('aria-pressed', choice[row.dataset.k] === b.dataset.pick)));
+  paint();
+  $('.cclist', s).onclick = e => { const b = e.target.closest('[data-pick]'); if (!b) return; choice[b.closest('.ccrow').dataset.k] = b.dataset.pick; paint(); };
+  $('#ccAllNew', s).onclick = () => { rows.forEach(x => choice[x.k] = 'neu'); paint(); };
+  $('#ccAllOld', s).onclick = () => { rows.forEach(x => choice[x.k] = 'alt'); paint(); };
+  $('#ccOk', s).onclick = async () => {
+    const c = byId(id); if (!c) return closeSheet();
+    const take = rows.filter(x => choice[x.k] === 'neu');
+    for (const x of take) c[x.k] = ['number', 'year'].includes(x.f.t) ? +x.nv : x.nv;
+    if (take.length) { c.auto = [...new Set([...(c.auto || []), ...take.map(x => x.k).filter(k => k !== 'titel')])]; c.updatedAt = Date.now(); await persist(); }
+    await closeSheet(); render(); if (sheets.length === 0) openDetail(id);
+    toast(take.length ? `${take.length} Angabe(n) aktualisiert` : 'Alles bleibt, wie es war');
+  };
+}
 
 /* ---------- Fehlende Angaben online ergänzen ----------
    Reihenfolge: kostenlose Datenbanken (Google Books / Open Library, Wikidata, optional TMDb)
@@ -2681,7 +2742,7 @@ async function findCoverCandidates(it) {
 }
 async function applyCover(id, url) {
   const cur = byId(id); if (!cur || cur.deleted || hasCover(cur)) return false;
-  cur.cover = url; cur.updatedAt = Date.now(); return true;
+  cur.cover = url; delete cur.coverSkip; cur.updatedAt = Date.now(); return true;
 }
 const candHTML = (id, urls, sel) => `<div class="cands">${urls.map((u, i) => `<button class="cand" data-cid="${id}" data-ci="${i}" aria-pressed="${sel === i}"><img src="${esc(u)}" referrerpolicy="no-referrer" alt="Vorschlag ${i + 1}"></button>`).join('')}<button class="cand none" data-cid="${id}" data-ci="-1" aria-pressed="${sel === -1}">✕<small>keins</small></button></div>`;
 // Ein Medium (aus der Detailansicht)
@@ -2710,52 +2771,163 @@ async function searchCoverFor(id, btn) {
   $('#csOk', s).onclick = async () => { if (sel < 0) return; if (await applyCover(id, urls[sel])) { await persist(); } await closeSheet(); await closeSheet(); render(); openDetail(id); toast('Cover übernommen'); };
 }
 // Viele Medien auf einmal: suchen, dann alle Vorschläge zur Bestätigung zeigen
+// Viele Medien: Vorschläge suchen (läuft im Hintergrund weiter), ihr wählt in Ruhe aus.
+// Nichts ist vorausgewählt. Jede Auswahl wird sofort als Entwurf gespeichert (auch über mehrere Sitzungen),
+// „Auswahl übernehmen“ setzt die gewählten Cover. Gefundene Vorschläge werden 30 Tage zwischengespeichert.
 async function searchCoversBulk(list) {
-  const todo = (list || allLive()).filter(i => !i.deleted && TYPES[i.typ] && i.titel && !hasCover(i));
+  const pool = () => (list || allLive()).filter(i => !i.deleted && TYPES[i.typ] && i.titel && !hasCover(i) && !i.coverSkip);
+  let todo = pool();
   if (!todo.length) return toast('Alle Medien haben schon ein Cover');
-  if (!confirm(`${todo.length} Medien haben noch kein Cover. Jetzt im Internet suchen? Danach entscheidest du bei jedem, ob das gefundene Bild übernommen wird.`)) return;
-  const s = openSheet(`${sheetHead('Cover suchen')}<div id="csBody"><div class="spinner"></div><p class="hint" style="text-align:center" id="csProg"></p></div>
-    <div class="formfoot" id="csFoot"><button class="btn" id="csStop">Suche beenden</button></div>`, { full: true });
-  let stop = false; const found = [];
-  $('#csStop', s).onclick = () => { stop = true; };
-  s.parentElement._onClose = () => { stop = true; };
-  for (let i = 0; i < todo.length && !stop; i++) {
-    const p = $('#csProg', s); if (p) p.textContent = `${i + 1} von ${todo.length} · ${found.length} gefunden · „${todo[i].titel}“`;
-    const urls = await findCoverCandidates(todo[i]);
-    if (urls.length) found.push({ it: todo[i], urls, sel: 0 });
-  }
-  if (!s.isConnected) return;
-  const body = $('#csBody', s), foot = $('#csFoot', s);
-  if (!found.length) { body.innerHTML = '<p class="hint" style="text-align:center;padding:20px">Leider keine Cover gefunden. Unter „Bearbeiten“ kannst du selbst eins hochladen.</p>'; foot.innerHTML = '<button class="btn primary" data-close>Schließen</button>'; return; }
-  const count = () => found.filter(f => f.sel >= 0).length;
-  body.innerHTML = `<p class="hint" style="margin-top:0">Für ${found.length} von ${todo.length} Medien gefunden. Vorausgewählt ist jeweils das erste Bild – tippe ein anderes an oder „✕ keins“, wenn keins passt.</p>
-    <div class="inrow" style="margin-bottom:10px"><button class="btn ghost" id="csAll">Alle auswählen</button><button class="btn ghost" id="csNone">Keins auswählen</button></div>
-    <div class="cslist">${found.map(f => `<div class="csrow"><div class="cst"><b>${esc(f.it.titel)}</b><small>${esc(subtitle(f.it))}</small></div>${candHTML(f.it.id, f.urls, f.sel)}</div>`).join('')}</div>`;
-  const upd = () => { foot.innerHTML = `<button class="btn" data-close>Abbrechen</button><button class="btn primary" id="csApply" ${count() ? '' : 'disabled'}>${count()} Cover übernehmen</button>`; $('#csApply', s).onclick = apply; };
-  const setSel = (f, v) => { f.sel = v; $$(`[data-cid="${f.it.id}"]`, body).forEach(x => x.setAttribute('aria-pressed', +x.dataset.ci === v)); };
-  body.onclick = e => {
-    if (e.target.closest('#csAll')) { found.forEach(f => setSel(f, f.sel >= 0 ? f.sel : 0)); return upd(); }
-    if (e.target.closest('#csNone')) { found.forEach(f => setSel(f, -1)); return upd(); }
-    const b = e.target.closest('[data-ci]'); if (!b) return; const f = found.find(x => x.it.id === b.dataset.cid); if (!f) return; setSel(f, +b.dataset.ci); upd();
+  const cache = (await idb.get('coverCands')) || {}; const draft = (await idb.get('coverDraft')) || {};
+  const fresh = id => cache[id] && Date.now() - cache[id].at < 30 * 864e5;
+  const saveDraft = () => idb.set('coverDraft', draft); const saveCache = () => idb.set('coverCands', cache);
+  let stop = false, searching = true, showAll = false;
+  const s = openSheet(`${sheetHead('Cover suchen')}
+    <p class="hint" style="margin-top:0">Tippe bei jedem Medium das passende Bild an, „✕ keins“ oder lade ein eigenes hoch (📷/🖼). <b>Nichts ist vorausgewählt.</b> Deine Auswahl wird sofort gemerkt – du kannst jederzeit schließen und später weitermachen.</p>
+    <div class="csbar"><span id="csProg" class="hint"></span><label class="chk" style="margin:0"><input type="checkbox" id="csShowAll"> auch ohne Vorschläge zeigen</label></div>
+    <div class="cslist" id="csBody"></div>
+    <div class="formfoot"><button class="btn" id="csFirst" title="Bei allen ohne Auswahl das erste Bild nehmen">Alle: 1. Bild</button><button class="btn primary" id="csApply" disabled>Auswahl übernehmen</button></div>`, { full: true, onClose: () => { stop = true; } });
+  const body = $('#csBody', s);
+  const decided = () => Object.keys(draft).filter(id => todo.some(i => i.id === id)).length;
+  const upd = () => {
+    const withC = todo.filter(i => fresh(i.id) && cache[i.id].urls.length).length, searched = todo.filter(i => fresh(i.id)).length;
+    $('#csProg', s).textContent = `${searched < todo.length && searching ? `Suche … ${searched}/${todo.length} · ` : ''}${withC} mit Vorschlägen · ${decided()} ausgewählt · ${todo.length - decided()} offen`;
+    const b = $('#csApply', s); b.disabled = !decided(); b.textContent = decided() ? `Auswahl übernehmen (${decided()})` : 'Auswahl übernehmen';
   };
-  const apply = async () => { let n = 0; for (const f of found) if (f.sel >= 0 && await applyCover(f.it.id, f.urls[f.sel])) n++; if (n) await persist(); await closeSheet(); render(); toast(`${n} Cover übernommen`); };
-  upd();
+  const rowHTML2 = it => {
+    const urls = fresh(it.id) ? cache[it.id].urls : null; const d = draft[it.id];
+    const sel = d == null ? null : d.u === '-' ? -1 : urls ? urls.indexOf(d.u) : null;
+    return `<div class="csrow" data-row="${it.id}"><div class="cst"><b>${esc(it.titel)}</b><small>${esc(subtitle(it))}</small></div>
+      ${urls === null ? '<p class="hint" style="margin:0">Suche …</p>' : urls.length ? candHTML(it.id, urls, sel) : `<div class="cands"><button class="cand none" data-cid="${it.id}" data-ci="-1" aria-pressed="${sel === -1}">✕<small>keins</small></button></div><p class="hint" style="margin:0">Nichts gefunden – eigenes Bild hochladen oder „keins“.</p>`}
+      <div class="csown"><label class="btn ghost">📷 Foto<input type="file" accept="image/*" capture="environment" hidden data-own="${it.id}"></label><label class="btn ghost">🖼 Galerie<input type="file" accept="image/*" hidden data-own="${it.id}"></label>${sel != null ? '<span class="hint">✓ gemerkt</span>' : ''}</div></div>`;
+  };
+  const visible = it => showAll || !fresh(it.id) || cache[it.id].urls.length || draft[it.id];
+  const draw = () => { body.innerHTML = todo.filter(visible).map(rowHTML2).join('') || '<p class="hint" style="text-align:center;padding:20px">Keine offenen Medien mit Vorschlägen. „auch ohne Vorschläge zeigen“ zeigt die übrigen – dort kannst du eigene Bilder hochladen.</p>'; upd(); };
+  const redrawRow = id => { const r = body.querySelector(`[data-row="${id}"]`); const it = todo.find(i => i.id === id); if (r && it) { if (visible(it)) r.outerHTML = rowHTML2(it); else r.remove(); } else if (it && visible(it)) draw(); upd(); };
+  body.onclick = e => {
+    const b = e.target.closest('[data-ci]'); if (!b) return; const id = b.dataset.cid, i = +b.dataset.ci;
+    const urls = cache[id]?.urls || []; const cur = draft[id];
+    const v = i < 0 ? '-' : urls[i];
+    if (cur && cur.u === v) delete draft[id]; else draft[id] = { u: v }; // nochmal tippen = Auswahl aufheben
+    saveDraft(); redrawRow(id);
+  };
+  body.onchange = async e => {
+    const inp = e.target.closest('[data-own]'); if (!inp) return; const f = inp.files[0]; inp.value = ''; if (!f) return;
+    const id = inp.dataset.own; const it = byId(id); if (!it) return;
+    const r = await openImageEditor(await resizeImage(f, 2000, .9), { kind: 'cover' }); if (!r) return;
+    await upsertItem(Object.assign({}, it, { _coverData: r.data, _noAuthorCheck: true }));
+    delete draft[id]; saveDraft(); todo = todo.filter(x => x.id !== id); body.querySelector(`[data-row="${id}"]`)?.remove(); upd(); toast('Eigenes Cover gespeichert');
+  };
+  $('#csShowAll', s).onchange = e => { showAll = e.target.checked; draw(); };
+  $('#csFirst', s).onclick = () => {
+    const n = todo.filter(i => !draft[i.id] && fresh(i.id) && cache[i.id].urls.length);
+    if (!n.length) return toast('Bei allen mit Vorschlägen ist schon etwas ausgewählt');
+    if (!confirm(`Bei ${n.length} Medien ohne Auswahl jeweils das erste Bild auswählen? Du kannst danach noch einzelne ändern.`)) return;
+    n.forEach(i => draft[i.id] = { u: cache[i.id].urls[0] }); saveDraft(); draw();
+  };
+  $('#csApply', s).onclick = async () => {
+    let n = 0, k = 0;
+    for (const [id, d] of Object.entries(draft)) {
+      const it = byId(id); if (!it || it.deleted) { delete draft[id]; continue; }
+      if (d.u === '-') { it.coverSkip = true; it.updatedAt = Date.now(); k++; }
+      else if (await applyCover(id, d.u)) n++;
+      delete draft[id];
+    }
+    await saveDraft(); if (n || k) await persist();
+    todo = pool(); draw(); render();
+    toast(`${n} Cover übernommen${k ? `, ${k}× „keins“` : ''}${todo.length ? ` – ${todo.length} noch offen` : ''}`, 4000);
+    if (!todo.length) closeSheet();
+  };
+  draw();
+  // Suche im Hintergrund, zwei gleichzeitig; Ergebnisse erscheinen sofort
+  const queue = todo.filter(i => !fresh(i.id));
+  const worker = async () => {
+    while (queue.length && !stop) {
+      const it = queue.shift(); const urls = await findCoverCandidates(it).catch(() => []);
+      cache[it.id] = { at: Date.now(), urls }; saveCache();
+      if (s.isConnected) redrawRow(it.id);
+    }
+  };
+  await Promise.all([worker(), worker()]); searching = false; if (s.isConnected) upd();
 }
 
+// Vorschläge für leere Felder eines Mediums holen (ohne Cover, ohne etwas zu ändern)
+async function fillProposal(id) {
+  const it = byId(id); if (!it || it.deleted) return null;
+  const rec = Object.assign({}, it);
+  const keys = await completeRecord(rec);
+  const cur = byId(id); if (!cur || cur.deleted) return null;
+  cur.autoAt = Date.now(); if (cur.typ === 'brettspiel' && !cur.bgg && !keys.includes('bgg')) cur.bggTried = true;
+  const ch = {}; for (const k of keys) if (k !== 'cover' && isEmpty(cur[k]) && !isEmpty(rec[k])) ch[k] = rec[k];
+  return Object.keys(ch).length ? { id, ch } : null;
+}
+function applyProposal(p, only) {
+  const cur = byId(p.id); if (!cur || cur.deleted) return 0;
+  const ks = Object.keys(p.ch).filter(k => (!only || only.includes(k)) && isEmpty(cur[k]));
+  ks.forEach(k => cur[k] = p.ch[k]);
+  if (ks.length) { cur.auto = [...new Set([...(cur.auto || []), ...ks])]; cur.updatedAt = Date.now(); }
+  return ks.length;
+}
+// „Bei allen vorhandenen Medien ergänzen“: nur Angaben (keine Cover), wahlweise direkt oder einzeln geprüft
 async function completeAll(list) {
-  const todo = list ? list.filter(i => !i.deleted) : allLive().filter(i => ((missingFields(i).length || !hasCover(i)) && (!i.autoAt || i.autoAt < (settings.sourcesAt || 0))) || (i.typ === 'brettspiel' && !i.bgg && !i.bggTried));
-  if (!todo.length) return toast('Bei allen Medien wurde schon ergänzt');
+  const todo = list ? list.filter(i => !i.deleted) : allLive().filter(i => (missingFields(i).length && (!i.autoAt || i.autoAt < (settings.sourcesAt || 0))) || (i.typ === 'brettspiel' && !i.bgg && !i.bggTried));
+  const saved = (await idb.get('fillProps')) || [];
+  const pending = saved.filter(p => byId(p.id) && !byId(p.id).deleted);
+  if (!todo.length && !pending.length) return toast('Bei allen Medien wurde schon ergänzt');
   if (list) todo.forEach(i => delete i.autoAt);
-  const aiNote = settings.provider !== 'barcode' && aiKey() ? `\n\nDie KI wird für Lücken mitgenutzt (ca. ${settings.provider === 'claude' && settings.claudeModel.includes('sonnet') ? '0,3' : '0,05'} Cent pro Medium).` : '';
-  if (!confirm(`${todo.length} Medien haben noch leere Felder oder kein Cover. Jetzt online ergänzen? Eigene Angaben bleiben unverändert.${aiNote}`)) return;
-  const s = openSheet(`${sheetHead('Ergänze Angaben')}<div class="spinner"></div><p class="hint" style="text-align:center" id="caProg"></p><div class="formfoot"><button class="btn" data-close>Abbrechen</button></div>`);
-  let n = 0, stop = false; s.parentElement._onClose = () => stop = true;
-  for (let i = 0; i < todo.length && !stop; i++) {
-    $('#caProg', s).textContent = `${i + 1} / ${todo.length}: ${todo[i].titel}`;
-    if (await autoCompleteItem(todo[i].id, { quiet: true })) n++;
+  const ai = settings.provider !== 'barcode' && aiKey();
+  const aiNote = ai ? ` Die KI füllt verbleibende Lücken (ca. ${settings.provider === 'claude' && settings.claudeModel.includes('sonnet') ? '0,3' : '0,05'} Cent pro Medium).` : '';
+  const mode = await new Promise(res => {
+    const s = openSheet(`${sheetHead('Angaben ergänzen')}
+      <p style="margin-top:0">${todo.length ? `<b>${todo.length} Medien</b> haben noch leere Felder.` : ''}${pending.length ? ` ${pending.length} Vorschläge vom letzten Mal warten noch auf deine Prüfung.` : ''} Es werden nur <b>Angaben</b> ergänzt, keine Cover (dafür gibt es „🖼 Cover suchen“). Eigene Einträge bleiben unverändert.${aiNote}</p>
+      <div class="menu"><button data-m="check"><span class="mi">🔍</span><span><b>Einzeln prüfen</b><small>Du siehst je Medium, was gefunden wurde, und entscheidest selbst. Jederzeit unterbrechbar.</small></span></button>
+      <button data-m="direct" ${todo.length ? '' : 'disabled'}><span class="mi">⚡</span><span><b>Direkt übernehmen</b><small>Alles Gefundene wird ohne Rückfrage eingetragen (mit 🌐 markiert).</small></span></button></div>`, { onClose: () => res(chosen) });
+    let chosen = null;
+    s.onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; chosen = b.dataset.m; closeSheet(); }; // erst schließen, dann geht es weiter
+  });
+  if (!mode) return;
+  if (mode === 'direct') {
+    const s = openSheet(`${sheetHead('Ergänze Angaben')}<div class="spinner"></div><p class="hint" style="text-align:center" id="caProg"></p><div class="formfoot"><button class="btn" data-close>Abbrechen</button></div>`);
+    let n = 0, stop = false; s.parentElement._onClose = () => stop = true;
+    for (let i = 0; i < todo.length && !stop; i++) {
+      $('#caProg', s).textContent = `${i + 1} / ${todo.length}: ${todo[i].titel}`;
+      const p = await fillProposal(todo[i].id); if (p && applyProposal(p)) n++;
+      if (i % 10 === 9) await persist();
+    }
+    await persist(); render(); if (!stop) await closeSheet();
+    return toast(`${n} Medien ergänzt`);
   }
-  if (!stop) await closeSheet();
-  toast(`${n} Medien ergänzt`);
+  // Einzeln prüfen: Vorschläge erscheinen nach und nach, werden gemerkt (auch nach dem Schließen)
+  let props = pending.slice(), stop = false;
+  const saveProps = () => idb.set('fillProps', props);
+  const queue = todo.filter(i => !props.some(p => p.id === i.id));
+  const s = openSheet(`${sheetHead('Angaben prüfen')}
+    <p class="hint" style="margin-top:0">Haken bei einzelnen Feldern entfernen, wenn etwas nicht stimmt. Dann „Übernehmen“ oder „Verwerfen“. Gefundenes wird gemerkt – du kannst jederzeit schließen und später weitermachen.</p>
+    <div class="csbar"><span id="fpProg" class="hint"></span></div>
+    <div class="cslist" id="fpBody"></div>
+    <div class="formfoot"><button class="btn" data-close>Später weiter</button><button class="btn primary" id="fpAll" disabled>Alle übernehmen</button></div>`, { full: true, onClose: () => { stop = true; } });
+  const body = $('#fpBody', s);
+  const card = p => { const it = byId(p.id); if (!it) return ''; return `<div class="csrow" data-fp="${p.id}"><div class="cst"><b>${esc(it.titel)}</b><small>${esc(TYPES[it.typ]?.single || '')}${subtitle(it) ? ' · ' + esc(subtitle(it)) : ''}</small></div>
+    <div class="fplist">${Object.entries(p.ch).map(([k, v]) => { const f = fieldDef(it.typ, k); return `<label class="fpf"><input type="checkbox" data-k="${k}" checked><span><b>${esc(f?.l || k)}:</b> <span class="${k === 'inhalt' ? 'fpinh' : ''}">${esc(f ? fmt(f, v) : String(v))}</span></span></label>`; }).join('')}</div>
+    <div class="chkacts"><button class="btn ok" data-fpa="ok">✓ Übernehmen</button><button class="btn" data-fpa="no">✕ Verwerfen</button></div></div>`; };
+  const upd = () => { $('#fpProg', s).textContent = `${queue.length && !stop ? `Suche … noch ${queue.length} · ` : ''}${props.length} Vorschläge zu prüfen`; const a = $('#fpAll', s); a.disabled = !props.length; a.textContent = props.length ? `Alle übernehmen (${props.length})` : 'Alle übernehmen'; if (!props.length && !queue.length) body.innerHTML = '<p class="hint" style="text-align:center;padding:20px">Alles geprüft ✓</p>'; };
+  body.innerHTML = props.map(card).join(''); upd();
+  body.onclick = async e => {
+    const b = e.target.closest('[data-fpa]'); if (!b) return; const row = b.closest('[data-fp]'); const id = row.dataset.fp; const p = props.find(x => x.id === id); if (!p) return;
+    if (b.dataset.fpa === 'ok') { const only = $$('input[data-k]:checked', row).map(x => x.dataset.k); if (applyProposal(p, only)) await persist(); }
+    props = props.filter(x => x.id !== id); await saveProps(); row.remove(); upd(); render();
+  };
+  $('#fpAll', s).onclick = async () => {
+    if (!confirm(`Alle ${props.length} Vorschläge so übernehmen, wie sie gerade angehakt sind?`)) return;
+    for (const p of props) { const row = body.querySelector(`[data-fp="${p.id}"]`); applyProposal(p, row ? $$('input[data-k]:checked', row).map(x => x.dataset.k) : null); }
+    props = []; await saveProps(); await persist(); render(); body.innerHTML = ''; upd(); toast('Übernommen');
+  };
+  while (queue.length && !stop) {
+    const it = queue.shift(); const p = await fillProposal(it.id);
+    if (p) { props.push(p); await saveProps(); if (s.isConnected) body.insertAdjacentHTML('beforeend', card(p)); }
+    if (s.isConnected) upd();
+  }
+  await idb.set('items', items); if (s.isConnected) upd();
 }
 
 /* ---------- Barcode-Scanner ---------- */
@@ -3334,7 +3506,7 @@ function openSettings() {
     <div class="card">
       <button class="btn primary" id="sExcel">Excel-Liste herunterladen</button>
       <button class="btn" id="sValue">💶 Was ist die Sammlung wert?</button>
-      <button class="btn" id="sCovers">🖼 Cover für Medien ohne Bild suchen (${allLive().filter(i => TYPES[i.typ] && !hasCover(i)).length})</button>
+      <button class="btn" id="sCovers">🖼 Cover für Medien ohne Bild suchen (${allLive().filter(i => TYPES[i.typ] && !hasCover(i) && !i.coverSkip).length})</button>
       <button class="btn" id="sClean">🧹 Aufräum-Assistent</button>
       <div class="inrow"><button class="btn" id="sBackup" style="flex:1">Sicherung (.json) speichern</button><label class="btn" style="flex:1">Sicherung laden<input type="file" accept=".json,application/json" hidden id="sRestore"></label></div>
     </div>
@@ -3700,7 +3872,7 @@ async function shareThumb(it) {
   } catch { return null; }
 }
 function publicData() {
-  const PRIVATE = ['wert', 'weg', 'bggTried', 'kaufpreis', 'kaufdatum', 'notizen', 'verliehenAm', 'verleihHistorie', 'auto', 'autoAt', 'standort', 'barcode', 'updatedAt', 'coverLocal', 'coverSpine', 'coverAspect', 'spineLocal', 'imgAt', 'spineAt', 'preisCa'];
+  const PRIVATE = ['coverSkip', 'wert', 'weg', 'bggTried', 'kaufpreis', 'kaufdatum', 'notizen', 'verliehenAm', 'verleihHistorie', 'auto', 'autoAt', 'standort', 'barcode', 'updatedAt', 'coverLocal', 'coverSpine', 'coverAspect', 'spineLocal', 'imgAt', 'spineAt', 'preisCa'];
   return {
     app: 'mediathek-ansicht', at: Date.now(),
     title: [shared.person1, shared.person2].filter(Boolean).join(' & '),
