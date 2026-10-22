@@ -485,6 +485,12 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .infokv{display:grid;gap:4px;font-size:14px}.infokv div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding:3px 0}.infokv span{color:var(--ink2)}.infokv b{text-align:right;font-weight:600}
 .owntools{display:flex;flex-wrap:wrap;gap:6px}.owntools a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}.owntools .btn{height:34px;padding:0 10px;font-size:13px}
 .csown{display:grid;gap:6px}
+.viewtools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end;margin-bottom:10px;font-size:13px;color:var(--ink2)}
+.viewtools .seg button{min-width:34px;padding:0 8px}
+.gshelf .bs-row{height:200px}
+.spine.box{border-radius:3px;background:linear-gradient(90deg,rgba(0,0,0,.25),rgba(255,255,255,.16) 12%,rgba(255,255,255,0) 30%,rgba(0,0,0,.06) 75%,rgba(0,0,0,.28)),var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.25),inset 0 6px 0 rgba(255,255,255,.1)}
+.spine.box .st{font:800 12px/1.05 system-ui;letter-spacing:.02em;text-transform:uppercase;max-height:calc(var(--h) - 48px)}
+.spine.box .sa{max-height:40px}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -540,7 +546,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.20';
+const APP_VERSION = '1.21';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -703,7 +709,7 @@ const isRequired = (typ, k) => k === 'titel' || (shared.required?.[typ] || []).i
 let items = [];
 let meta = { remoteRev: null, seq: 0, syncedSeq: 0, lastSync: 0, pendingCovers: [], pendingCoverDeletes: [] };
 let ui = Object.assign({ type: 'alle', q: '', filters: {}, sort: 'titel', special: {}, shelfSort: 'autor' }, lsGet('mt_ui', {}));
-const saveUi = () => VIEW ? null : lsSet('mt_ui', { type: ui.type, sort: ui.sort, special: ui.special, shelfSort: ui.shelfSort });
+const saveUi = () => VIEW ? null : lsSet('mt_ui', { type: ui.type, sort: ui.sort, special: ui.special, shelfSort: ui.shelfSort, perRow: ui.perRow, bgView: ui.bgView, bgSort: ui.bgSort });
 const allLive = () => items.filter(i => !i.deleted);
 const live = () => allLive().filter(i => !i.wunsch && !i.geliehen); // eure Sammlung (ohne Wunschliste und Geliehenes)
 const borrowed = () => allLive().filter(i => i.geliehen);
@@ -1116,7 +1122,7 @@ function render() {
   const special = TYPES[ui.type] && ui.special[ui.type];
   if (special) {
     if (ui.type === 'buch') { el.innerHTML = renderBookshelf(list); if (ui.shelfSort === 'zuhause' && !VIEW) bindHome(el); }
-    else if (ui.type === 'brettspiel') el.innerHTML = renderGameStore(list);
+    else if (ui.type === 'brettspiel') el.innerHTML = bgViewSwitch() + (ui.bgView === 'regal' ? renderGameShelf(list) : renderGameStore(list));
     else if (ui.type === 'vinyl') el.innerHTML = renderRecordStore(list);
     else el.innerHTML = renderVideothek(list, ui.type);
   } else {
@@ -1190,6 +1196,63 @@ function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n)
 function groupBy(list, keyFn) { const m = new Map(); list.forEach(it => { const k = keyFn(it); if (!m.has(k)) m.set(k, []); m.get(k).push(it); }); return [...m.entries()]; }
 const isNew = it => Date.now() - (it.createdAt || 0) < 14 * 864e5;
 
+/* ----- Einstellbare Ansichten: Medien pro Reihe, Reihenfolge der Gruppen, Brettspiel-Regal ----- */
+const orient = () => innerWidth > innerHeight ? 'l' : 'p';
+const perRowKey = typ => typ === 'vinyl' ? 'rs' : 'vt_' + typ;
+const perRowGet = typ => (ui.perRow?.[perRowKey(typ)] || {})[orient()] || 0; // 0 = automatisch
+// Gruppen (Plattformen, Genres) in eigener Reihenfolge – für beide Geräte gleich (shared)
+function orderGroups(typ, groups) {
+  const ord = shared.groupOrder?.[typ] || []; const ix = k => { const i = ord.indexOf(k); return i < 0 ? 1e6 : i; };
+  return groups.sort((a, b) => ix(a[0]) - ix(b[0]) || a[0].localeCompare(b[0], 'de'));
+}
+function viewTools(typ, groupNames) {
+  const n = perRowGet(typ); const canOrder = ['game', 'vinyl'].includes(typ) && !VIEW;
+  return `<div class="viewtools"><span>Pro Reihe <small>(${orient() === 'l' ? 'quer' : 'hochkant'})</small></span><div class="seg" style="width:auto">${[0, 1, 2, 3, 4, 5, 6].map(k => `<button data-perrow="${k}" aria-pressed="${n === k}">${k || 'Auto'}</button>`).join('')}</div>
+    ${canOrder && groupNames.length > 1 ? `<button class="btn" data-grouporder="${typ}" style="height:32px;padding:0 10px">↕ ${typ === 'game' ? 'Plattformen' : 'Genres'} sortieren</button>` : ''}</div>`;
+}
+function openGroupOrder(typ) {
+  const key = typ === 'game' ? (it => it.plattform || 'Sonstige') : (it => it.genre || 'Diverses');
+  const names = orderGroups(typ, groupBy(live().filter(i => i.typ === typ), key)).map(g => g[0]);
+  let ord = names.slice();
+  const s = openSheet(`${sheetHead(typ === 'game' ? 'Reihenfolge der Plattformen' : 'Reihenfolge der Genres')}
+    <p class="hint" style="margin-top:0">Gilt auf allen Geräten. Neue ${typ === 'game' ? 'Plattformen' : 'Genres'} erscheinen alphabetisch am Ende.</p>
+    <div class="tabcfg" id="goList"></div>
+    <div class="formfoot"><button class="btn" id="goReset">Alphabetisch</button><button class="btn primary" data-close>Fertig</button></div>`);
+  const draw = () => { $('#goList', s).innerHTML = ord.map((n, i) => `<div class="tabrow"><label>${esc(n)}</label><span><button class="btn ghost" data-up="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben">▲</button><button class="btn ghost" data-down="${i}" ${i === ord.length - 1 ? 'disabled' : ''} aria-label="Nach unten">▼</button></span></div>`).join(''); };
+  const save = async () => { shared.groupOrder = Object.assign({}, shared.groupOrder, { [typ]: ord.slice() }); await saveShared(); render(); };
+  draw();
+  $('#goList', s).onclick = e => { const u = e.target.closest('[data-up]'), d = e.target.closest('[data-down]'); if (!u && !d) return; const i = +(u || d).dataset[u ? 'up' : 'down'], j = u ? i - 1 : i + 1; [ord[i], ord[j]] = [ord[j], ord[i]]; draw(); save(); };
+  $('#goReset', s).onclick = () => { ord.sort((a, b) => a.localeCompare(b, 'de')); draw(); shared.groupOrder = Object.assign({}, shared.groupOrder, { [typ]: [] }); saveShared().then(render); };
+}
+// Brettspiel-Regal: Schachteln stehen hochkant, man sieht die Seite
+function boxSpineDims(it) {
+  if (hasSpine(it) && it.coverAspect) { const h = 168; return { w: Math.round(Math.min(90, Math.max(14, h * it.coverAspect))), h, img: true }; }
+  const k = it.kategorie || '', x = it.komplexitaet || '';
+  if (k === 'Kartenspiel') return { w: 24, h: 112 };
+  if (it.erweiterungVon) return { w: 20, h: 150 + hash(it.id) % 14 };
+  const w = x === 'Schwer' ? 50 : x === 'Leicht' ? 30 : k === 'Kinderspiel' ? 34 : 40;
+  return { w: w + hash(it.id) % 6, h: k === 'Kinderspiel' ? 140 : 160 + hash(it.id) % 20 };
+}
+function renderGameShelf(list) {
+  const s = ui.bgSort || 'titel';
+  const cmpT = (a, b) => (a.erweiterungVon || a.titel || '').localeCompare(b.erweiterungVon || b.titel || '', 'de') || (a.erweiterungVon ? 1 : -1);
+  if (s === 'kategorie') list.sort((a, b) => (a.kategorie || '~').localeCompare(b.kategorie || '~', 'de') || cmpT(a, b));
+  else if (s === 'verlag') list.sort((a, b) => (a.verlag || '~').localeCompare(b.verlag || '~', 'de') || cmpT(a, b));
+  else if (s === 'groesse') list.sort((a, b) => boxSpineDims(b).h - boxSpineDims(a).h || cmpT(a, b));
+  else list.sort(cmpT);
+  const avail = contentWidth() - 48; const rows = []; let cur = [], used = 0;
+  for (const it of list) { const d = boxSpineDims(it); if (used + d.w + 2 > avail && cur.length) { rows.push(cur); cur = []; used = 0; } cur.push([it, d]); used += d.w + 2; }
+  if (cur.length) rows.push(cur);
+  let html = `<div class="bs-tools">Sortiert nach <div class="seg" style="width:auto">${[['titel', 'Titel'], ['kategorie', 'Kategorie'], ['verlag', 'Verlag'], ['groesse', 'Größe']].map(([k, l]) => `<button data-bgsort="${k}" aria-pressed="${s === k}">${l}</button>`).join('')}</div></div><div class="bookcase gshelf">`;
+  rows.forEach(row => {
+    html += `<div class="bs-row">${row.map(([it, d]) => { const c = colorFor(it.titel); const thin = d.w < 26;
+      return `<button class="spine box${thin ? ' thin' : ''}" ${d.img ? `data-spine="${it.id}"` : ''} data-open="${it.id}" title="${esc(it.titel)}" style="--w:${d.w}px;--h:${d.h}px;--c:${c};--t:${textOn(c)}">
+        ${it.verliehenAn ? '<span class="lentmark"></span>' : ''}<span class="st">${esc(it.titel)}</span><span class="sa">${esc(it.verlag || '')}</span></button>`; }).join('')}</div><div class="bs-board"></div>`;
+  });
+  return html + '</div>';
+}
+function bgViewSwitch() { return `<div class="bs-tools" style="justify-content:flex-start">Ansicht <div class="seg" style="width:auto"><button data-bgview="laden" aria-pressed="${(ui.bgView || 'laden') === 'laden'}">🎲 Spieleladen</button><button data-bgview="regal" aria-pressed="${ui.bgView === 'regal'}">📚 Regal</button></div></div>`; }
+
 /* ----- Videothek (Blu-rays & Games) ----- */
 const PLATFORM_BAND = p => {
   p = String(p || '');
@@ -1210,16 +1273,17 @@ function caseBand(it) {
 }
 function renderVideothek(list, typ) {
   const key = typ === 'game' ? (it => it.plattform || 'Sonstige') : (it => it.genre || 'Ohne Genre');
-  const groups = groupBy(list, key).sort((a, b) => a[0].localeCompare(b[0], 'de'));
-  const perRow = Math.max(2, Math.floor((contentWidth() - 40) / 106));
-  let html = `<div class="vt"><div class="vt-sign">Videothek</div><div class="vt-sub">${typ === 'game' ? 'Games · Konsolen · Retro' : 'Filme · Serien · Kult'}</div>`;
+  const groups = orderGroups(typ, groupBy(list, key));
+  const fixed = perRowGet(typ); const perRow = fixed || Math.max(2, Math.floor((contentWidth() - 40) / 106));
+  const zoom = fixed ? Math.max(.6, Math.min(4, ((contentWidth() - 40 - (fixed - 1) * 10) / fixed) / 96)) : 1;
+  let html = viewTools(typ, groups.map(g => g[0])) + `<div class="vt"><div class="vt-sign">Videothek</div><div class="vt-sub">${typ === 'game' ? 'Games · Konsolen · Retro' : 'Filme · Serien · Kult'}</div>`;
   for (const [g, arr] of groups) {
     arr.sort(cmpSeries);
     html += `<section class="vt-aisle"><div class="vt-label">${esc(g)}<span>${arr.length}</span></div>`;
     for (const row of chunk(arr, perRow)) {
       html += `<div class="vt-row">${row.map(it => {
         const [bc, bt] = caseBand(it); const c = colorFor(it.titel); const age = it.fsk || it.usk;
-        return `<button class="case" data-open="${it.id}" style="--c:${c}" title="${esc(it.titel)}"><div class="band" style="background:${bc}">${esc(bt)}</div>
+        return `<button class="case" data-open="${it.id}" style="--c:${c}${zoom !== 1 ? ';zoom:' + zoom.toFixed(3) : ''}" title="${esc(it.titel)}"><div class="band" style="background:${bc}">${esc(bt)}</div>
           <div class="art" data-cover="${it.id}"><div class="gen ph"><b>${esc(it.titel)}</b><i>${esc(it.jahr || '')}</i></div></div>
           ${age ? `<span class="fsk f${esc(age)}">${esc(age)}</span>` : ''}${it.verliehenAn ? '<span class="sticker out">Verliehen</span>' : isNew(it) ? '<span class="sticker new">Neu</span>' : ''}${it.digital === 'Ja' ? '<span class="digbadge">💾 Digital</span>' : ''}</button>`;
       }).join('')}</div><div class="vt-board"></div>`;
@@ -1628,14 +1692,15 @@ function renderGameStore(list) {
   return html + '</div>';
 }
 function renderRecordStore(list) {
-  const groups = groupBy(list, it => it.genre || 'Diverses').sort((a, b) => a[0].localeCompare(b[0], 'de'));
-  const per = Math.max(2, Math.floor((contentWidth() - 40) / 140));
-  let html = `<div class="rstore"><div class="rstore-sign"><b>Plattenladen</b><small>VINYL · NEU & GEBRAUCHT</small></div>`;
+  const groups = orderGroups('vinyl', groupBy(list, it => it.genre || 'Diverses'));
+  const fixed = perRowGet('vinyl'); const per = fixed || Math.max(2, Math.floor((contentWidth() - 40) / 140));
+  const rz = fixed ? Math.max(.4, Math.min(4, (contentWidth() - 36) / (fixed * 112 + (fixed - 1) * 30 + 28))) : 1;
+  let html = viewTools('vinyl', groups.map(g => g[0])) + `<div class="rstore"><div class="rstore-sign"><b>Plattenladen</b><small>VINYL · NEU & GEBRAUCHT</small></div>`;
   for (const [g, arr] of groups) {
     arr.sort(SORTS.interpret.fn);
     html += `<section class="crate"><div class="crate-card">${esc(g)}<span>${arr.length}</span></div>`;
     for (const row of chunk(arr, per)) {
-      html += `<div class="rec-row">${row.map(it => { const c = colorFor((it.interpret || '') + it.titel); const lab = COLORS[(hash(it.titel) + 3) % COLORS.length];
+      html += `<div class="rec-row"${rz !== 1 ? ` style="zoom:${rz.toFixed(3)}"` : ''}>${row.map(it => { const c = colorFor((it.interpret || '') + it.titel); const lab = COLORS[(hash(it.titel) + 3) % COLORS.length];
         return `<button class="rec" data-open="${it.id}" title="${esc(it.titel)}${it.interpret ? ' – ' + esc(it.interpret) : ''}"><span class="disc" style="--lab:${lab}"></span>
           <span class="sleeve" data-cover="${it.id}" style="background:${c};color:${textOn(c)}"><span class="gen ph"><i>${esc(it.interpret || '')}</i><b>${esc(it.titel)}</b></span></span>
           ${it.verliehenAn ? '<span class="ribbon out">Verliehen</span>' : it.weg ? '<span class="ribbon">🏷 ' + esc(it.weg.preis ? it.weg.preis + ' €' : it.weg.art) + '</span>' : ''}</button>`; }).join('')}</div>`;
@@ -1829,7 +1894,7 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     const thumbIt = { id: item?.id || '_new', titel: data.titel };
     const slot = (k, label) => `<div class="imgslot" data-slot="${k}"><div class="hint">${label}</div><div class="${k === 'spine' ? 'thumb spinethumb' : 'thumb'}" id="f${k}Thumb" style="background:${colorFor(data.titel)}"><span class="ph">${k === 'spine' ? '' : esc(initials(data.titel))}</span></div>
       <div class="acts"><label class="btn" title="Foto aufnehmen" aria-label="Foto aufnehmen">📷<input type="file" accept="image/*" capture="environment" hidden data-file="${k}"></label><label class="btn" title="Aus Galerie oder Datei" aria-label="Aus Galerie">🖼<input type="file" accept="image/*" hidden data-file="${k}"></label><button type="button" class="btn" data-edit="${k}" title="Zuschneiden und drehen" aria-label="Zuschneiden und drehen">✂️</button><button type="button" class="btn ghost" data-rm="${k}" title="Entfernen" aria-label="Entfernen">✕</button></div></div>`;
-    form.innerHTML = `<div class="coverbox2">${slot('cover', 'Cover (Vorderseite)')}${data.typ === 'buch' ? slot('spine', 'Buchrücken (fürs Regal)') : ''}</div>` + fields.map(f => inputHTML(data.typ, f, data[f.k])).join('');
+    form.innerHTML = `<div class="coverbox2">${slot('cover', 'Cover (Vorderseite)')}${data.typ === 'buch' ? slot('spine', 'Buchrücken (fürs Regal)') : data.typ === 'brettspiel' ? slot('spine', 'Schachtel-Seite (fürs Regal)') : ''}</div>` + fields.map(f => inputHTML(data.typ, f, data[f.k])).join('');
     showThumb();
     autoKeys.forEach(k => form.querySelector(`[data-f="${k}"]`)?.classList.add('autofilled'));
     wireLend(form);
@@ -2027,6 +2092,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.21', '22.10.2026', ['Brettspiele: dritte Ansicht „Regal“ – Schachteln stehen hochkant mit der Seite nach vorn, sortierbar nach Titel, Kategorie, Verlag oder Größe', 'Brettspiele haben jetzt wie Bücher zwei Bildplätze: Cover und Schachtel-Seite', 'Videothek und Plattenladen: Medien pro Reihe einstellbar (Auto oder 1–6), getrennt für hochkant und quer', 'Reihenfolge der Plattformen (Games) und Genres (Plattenladen) frei sortierbar, gilt auf beiden Handys']],
   ['1.20', '21.10.2026', ['Eigenes Cover: „🔎 Google Bilder“ und „🛒 Amazon“ öffnen die Suche, „📋 Einfügen“ übernimmt ein kopiertes Bild, „🖼 Bild/Screenshot“ lädt z. B. einen Screenshot aus der Amazon-App – jeweils mit Zuschneiden', 'Bilder lassen sich per „Teilen“ direkt an die Mediathek schicken (nach Neuinstallation der App)', 'Die gleichen Knöpfe gibt es bei „Cover für Medien ohne Bild suchen“']],
   ['1.19.1', '21.10.2026', ['Versionsverlauf um die frühen Versionen 1.0–1.6 ergänzt']],
   ['1.19', '21.10.2026', ['Info-Bereich in den Einstellungen: Versionsverlauf, Gerät & Speicher, Datenschutz, Quellen', 'Nach einem Update erscheint einmal kurz „Neu in dieser Version“', 'Knopf „Nach Update suchen“']],
@@ -4963,6 +5029,10 @@ $('#checkBtn').onclick = openCheck;
 $('#statsBtn').onclick = openStats;
 $('#syncBtn').onclick = () => (lastSyncErr && $('#syncBtn').classList.contains('err') && dbxReady()) ? openSyncError() : dbxReady() ? sync() : dbxConnected() ? openFolderPicker() : openSettings();
 $('#content').onclick = e => {
+  const pr = e.target.closest('[data-perrow]'); if (pr) { const k = perRowKey(ui.type); ui.perRow = Object.assign({}, ui.perRow, { [k]: Object.assign({}, ui.perRow?.[k], { [orient()]: +pr.dataset.perrow }) }); saveUi(); render(); return; }
+  const go = e.target.closest('[data-grouporder]'); if (go) { openGroupOrder(go.dataset.grouporder); return; }
+  const bv = e.target.closest('[data-bgview]'); if (bv) { ui.bgView = bv.dataset.bgview; saveUi(); render(); return; }
+  const bs = e.target.closest('[data-bgsort]'); if (bs) { ui.bgSort = bs.dataset.bgsort; saveUi(); render(); return; }
   const ss = e.target.closest('[data-shelfsort]'); if (ss) { ui.shelfSort = ss.dataset.shelfsort; homeEdit = false; homePick = null; saveUi(); render(); return; }
   const o = e.target.closest('[data-open]'); if (o) openDetail(o.dataset.open);
 };

@@ -1,5 +1,5 @@
 // Offline-Cache für die App selbst. Daten liegen in IndexedDB + Dropbox, nicht hier.
-const CACHE = 'mediathek-v34';
+const CACHE = 'mediathek-v35';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
