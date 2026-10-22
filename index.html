@@ -491,6 +491,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .spine.box{border-radius:3px;background:linear-gradient(90deg,rgba(0,0,0,.25),rgba(255,255,255,.16) 12%,rgba(255,255,255,0) 30%,rgba(0,0,0,.06) 75%,rgba(0,0,0,.28)),var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.25),inset 0 6px 0 rgba(255,255,255,.1)}
 .spine.box .st{font:800 12px/1.05 system-ui;letter-spacing:.02em;text-transform:uppercase;max-height:calc(var(--h) - 48px)}
 .spine.box .sa{max-height:40px}
+.spine.box.img{background-size:auto,100% 100%;background-repeat:no-repeat;background-color:#3d2614} /* Foto der Schachtel-Seite ganz zeigen, nicht abschneiden */
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -546,7 +547,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.21';
+const APP_VERSION = '1.21.1';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -876,7 +877,11 @@ async function loadCoverInto(el) {
   const it = byId(el.dataset.cover) || items.find(i => i.id === el.dataset.cover); if (!it) return;
   const url = await coverURL(it); if (!url) return;
   const img = new Image(); img.alt = ''; img.referrerPolicy = 'no-referrer'; img.decoding = 'async';
-  img.onload = () => { el.querySelectorAll('.ph').forEach(p => p.remove()); el.prepend(img); el.classList.add('hascover'); };
+  img.onload = () => {
+    el.querySelectorAll('.ph').forEach(p => p.remove()); el.prepend(img); el.classList.add('hascover');
+    const gb = el.closest('.gbox'); // Spieleladen: Schachtel im Seitenverhältnis des Covers, damit nichts abgeschnitten wird
+    if (gb && img.naturalWidth) { const w = parseFloat(gb.style.getPropertyValue('--bw')) || 112; const h = Math.round(Math.max(w * .55, Math.min(w * 1.7, w * img.naturalHeight / img.naturalWidth))); gb.style.setProperty('--bh', h + 'px'); }
+  };
   img.src = url;
 }
 // Ausschnitt aus einem Bild (box 0–1000) als kleines JPEG; aspect = Breite/Höhe
@@ -2092,6 +2097,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.21.1', '22.10.2026', ['Brettspiel-Regal: Fotos der Schachtel-Seite werden vollständig gezeigt statt abgeschnitten', 'Spieleladen: Schachteln passen sich dem Seitenverhältnis des Covers an']],
   ['1.21', '22.10.2026', ['Brettspiele: dritte Ansicht „Regal“ – Schachteln stehen hochkant mit der Seite nach vorn, sortierbar nach Titel, Kategorie, Verlag oder Größe', 'Brettspiele haben jetzt wie Bücher zwei Bildplätze: Cover und Schachtel-Seite', 'Videothek und Plattenladen: Medien pro Reihe einstellbar (Auto oder 1–6), getrennt für hochkant und quer', 'Reihenfolge der Plattformen (Games) und Genres (Plattenladen) frei sortierbar, gilt auf beiden Handys']],
   ['1.20', '21.10.2026', ['Eigenes Cover: „🔎 Google Bilder“ und „🛒 Amazon“ öffnen die Suche, „📋 Einfügen“ übernimmt ein kopiertes Bild, „🖼 Bild/Screenshot“ lädt z. B. einen Screenshot aus der Amazon-App – jeweils mit Zuschneiden', 'Bilder lassen sich per „Teilen“ direkt an die Mediathek schicken (nach Neuinstallation der App)', 'Die gleichen Knöpfe gibt es bei „Cover für Medien ohne Bild suchen“']],
   ['1.19.1', '21.10.2026', ['Versionsverlauf um die frühen Versionen 1.0–1.6 ergänzt']],
