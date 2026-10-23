@@ -435,15 +435,17 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .imgslot .spinethumb img{object-fit:contain;background:#3d2614}
 .imgslot .acts{display:flex;gap:4px}
 .imgslot .acts .btn{height:34px;min-width:36px;padding:0 8px}
-.ie-stage{height:min(58vh,560px);background:#18130e;border-radius:12px;display:grid;place-items:center;overflow:hidden;touch-action:none;margin-bottom:10px}
+.ie-stage{height:min(58vh,560px);background:#18130e;border-radius:12px;display:grid;place-items:center;overflow:hidden;touch-action:none;margin-bottom:10px;padding:18px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.ie-stage *{touch-action:none}
 .ie-wrap{position:relative;overflow:hidden}
 .ie-wrap canvas{display:block}
-.ie-crop{position:absolute;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.55);cursor:move;touch-action:none}
+.ie-crop{position:absolute;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.55);cursor:move;touch-action:none;pointer-events:none}
+.ie-crop.dragging{border-color:#fbbf24}
 .ie-crop i{position:absolute;background:rgba(255,255,255,.45);pointer-events:none}
 .ie-crop .g1,.ie-crop .g2{top:0;bottom:0;width:1px}.ie-crop .g1{left:33.3%}.ie-crop .g2{left:66.6%}
 .ie-crop .g3,.ie-crop .g4{left:0;right:0;height:1px}.ie-crop .g3{top:33.3%}.ie-crop .g4{top:66.6%}
 .ie-crop b{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;touch-action:none}
-.ie-crop b::after{content:"";position:absolute;inset:8px;background:#fff;border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.ie-crop b::after{content:"";position:absolute;inset:6px;background:#fff;border-radius:4px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
 .ie-crop .h-nw{left:0;top:0;cursor:nwse-resize}.ie-crop .h-n{left:50%;top:0;cursor:ns-resize}.ie-crop .h-ne{left:100%;top:0;cursor:nesw-resize}.ie-crop .h-e{left:100%;top:50%;cursor:ew-resize}
 .ie-crop .h-se{left:100%;top:100%;cursor:nwse-resize}.ie-crop .h-s{left:50%;top:100%;cursor:ns-resize}.ie-crop .h-sw{left:0;top:100%;cursor:nesw-resize}.ie-crop .h-w{left:0;top:50%;cursor:ew-resize}
 .ie-ctl{display:grid;gap:6px}
@@ -492,6 +494,12 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .spine.box .st{font:800 12px/1.05 system-ui;letter-spacing:.02em;text-transform:uppercase;max-height:calc(var(--h) - 48px)}
 .spine.box .sa{max-height:40px}
 .spine.box.img{background-size:auto,100% 100%;background-repeat:no-repeat;background-color:#3d2614} /* Foto der Schachtel-Seite ganz zeigen, nicht abschneiden */
+.bggsug{grid-column:1/-1;margin-top:-4px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:6px;display:grid;gap:4px;box-shadow:var(--shadow)}
+.bgghead{display:flex;justify-content:space-between;align-items:center;padding:0 4px}
+.bggopt{display:flex;gap:10px;align-items:center;text-align:left;border:0;background:none;padding:6px;border-radius:8px;cursor:pointer;color:var(--ink)}
+.bggopt:hover,.bggopt:focus-visible{background:var(--surface2)}
+.bggopt img,.bggph{width:40px;height:40px;object-fit:contain;border-radius:4px;flex:none;background:var(--surface2);display:grid;place-items:center}
+.bggopt span{display:grid}.bggopt b{font-size:14px}.bggopt small{font-size:12px;color:var(--ink2)}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -547,7 +555,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.21.1';
+const APP_VERSION = '1.23';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1903,6 +1911,14 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     showThumb();
     autoKeys.forEach(k => form.querySelector(`[data-f="${k}"]`)?.classList.add('autofilled'));
     wireLend(form);
+    wireSuggest(form, data.typ, rec => {
+      const cur = collect(); data = Object.assign({}, data, cur);
+      const filled = [];
+      for (const [k, v] of Object.entries(rec || {})) { if (k === 'cover' || isEmpty(v)) continue; const f = fieldDef(data.typ, k); if (!f) continue; if (f.t === 'select' && !optsOf(f).includes(String(v))) continue; if (k === 'titel' || isEmpty(data[k])) { data[k] = v; if (k !== 'titel') filled.push(k); } }
+      if (rec.cover && !coverData && !data.cover && !item?.coverLocal && !item?.cover) data.cover = rec.cover;
+      filled.forEach(k => autoKeys.add(k)); draw();
+      toast(`Übernommen: ${filled.length} Angaben${data.cover ? ' und Cover' : ''} – bitte kurz prüfen`);
+    });
     const dg = form.elements.digital, lb = form.querySelector('[data-f="verliehenAn"]');
     if (dg && lb) { const upd = () => { lb.hidden = dg.checked; }; dg.onchange = upd; upd(); }
     const setImg = (k, r) => { if (!r) return; if (k === 'cover') { coverData = r.data; removeCover = false; } else { spineData = r.data; spineAspect = r.aspect; removeSpine = false; } showThumb(); };
@@ -2036,7 +2052,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
       <div class="ie-ctl">
         <div class="ie-rot"><button class="btn" id="ieL" aria-label="90 Grad nach links">⟲ 90°</button><input type="range" id="ieFine" min="-45" max="45" step="0.1" value="0" aria-label="Feindrehung"><button class="btn" id="ieR" aria-label="90 Grad nach rechts">90° ⟳</button></div>
         <div class="ie-row"><span class="hint" id="ieDeg">0°</span><button class="btn ghost" id="ieStraight">Gerade</button><button class="btn ghost" id="ieAll">Ganzes Bild</button></div>
-        <p class="hint" style="margin:4px 0 0">Ecken und Kanten des Rahmens ziehen zum Zuschneiden, Rahmen in der Mitte ziehen zum Verschieben. Der Regler dreht stufenlos – die Hilfslinien helfen beim Geraderichten.</p>
+        <p class="hint" style="margin:4px 0 0">In die Nähe einer Ecke oder Kante tippen und ziehen = zuschneiden · im Rahmen ziehen = verschieben · außerhalb des Rahmens ziehen = neuen Rahmen aufziehen. Der Regler dreht stufenlos.</p>
       </div>
       <div class="formfoot"><button class="btn" data-close>Abbrechen</button><button class="btn primary" id="ieOk">Übernehmen</button></div>`, { full: true, onClose: () => finish(null) });
     const can = $('#ieCan', s), wrap = $('#ieWrap', s), stage = $('#ieStage', s), box = $('#ieCrop', s);
@@ -2045,7 +2061,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
     function layout() {
       const a = angle() * Math.PI / 180, c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
       BW = W * c + H * sn; BH = W * sn + H * c;
-      const SW = stage.clientWidth - 16, SH = stage.clientHeight - 16;
+      const SW = stage.clientWidth - 44, SH = stage.clientHeight - 44;
       const sc = Math.min(SW / BW, SH / BH); cw = Math.max(40, BW * sc); ch = Math.max(40, BH * sc);
       const dpr = Math.min(2, devicePixelRatio || 1);
       can.width = Math.round(cw * dpr); can.height = Math.round(ch * dpr); can.style.width = cw + 'px'; can.style.height = ch + 'px';
@@ -2057,12 +2073,26 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
     }
     function placeBox() { Object.assign(box.style, { left: crop.x * cw + 'px', top: crop.y * ch + 'px', width: crop.w * cw + 'px', height: crop.h * ch + 'px' }); }
     const clamp = () => { const m = .04; crop.w = Math.max(m, Math.min(1, crop.w)); crop.h = Math.max(m, Math.min(1, crop.h)); crop.x = Math.max(0, Math.min(1 - crop.w, crop.x)); crop.y = Math.max(0, Math.min(1 - crop.h, crop.y)); };
-    box.addEventListener('pointerdown', e => {
-      e.preventDefault(); const h = e.target.dataset.h || 'move'; const st = { ...crop }, sx = e.clientX, sy = e.clientY;
-      box.setPointerCapture(e.pointerId);
+    // Bedienung über die ganze Fläche: Ecke/Kante in der Nähe des Fingers greifen (großzügige Trefferzone),
+    // im Rahmen verschieben, außerhalb einen neuen Rahmen aufziehen. Ein Finger zur Zeit.
+    let active = null;
+    stage.addEventListener('pointerdown', e => {
+      if (active !== null || (e.pointerType === 'mouse' && e.button > 0)) return;
+      e.preventDefault(); active = e.pointerId; try { stage.setPointerCapture(e.pointerId); } catch { }
+      const r = wrap.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top;
+      const L = crop.x * cw, T = crop.y * ch, R = (crop.x + crop.w) * cw, B = (crop.y + crop.h) * ch;
+      const tol = e.pointerType === 'mouse' ? 14 : 34;
+      const nearX = Math.abs(px - L) < tol ? 'w' : Math.abs(px - R) < tol ? 'e' : '', nearY = Math.abs(py - T) < tol ? 'n' : Math.abs(py - B) < tol ? 's' : '';
+      const inX = px > L - tol && px < R + tol, inY = py > T - tol && py < B + tol;
+      let h = (inY ? '' : '') + ((nearY && inX) ? nearY : '') + ((nearX && inY) ? nearX : '');
+      if (!h) h = px > L && px < R && py > T && py < B ? 'move' : 'new';
+      const st = { ...crop }, sx = e.clientX, sy = e.clientY, ax = Math.max(0, Math.min(1, px / cw)), ay = Math.max(0, Math.min(1, py / ch));
+      box.classList.add('dragging');
       const mv = ev => {
+        if (ev.pointerId !== active) return; ev.preventDefault();
         const dx = (ev.clientX - sx) / cw, dy = (ev.clientY - sy) / ch; let { x, y, w, h: hh } = st;
         if (h === 'move') { x += dx; y += dy; }
+        else if (h === 'new') { const bx = Math.max(0, Math.min(1, ax + dx)), by = Math.max(0, Math.min(1, ay + dy)); if (Math.abs(bx - ax) < .02 && Math.abs(by - ay) < .02) return; x = Math.min(ax, bx); y = Math.min(ay, by); w = Math.abs(bx - ax); hh = Math.abs(by - ay); }
         else {
           if (h.includes('w')) { const nx = Math.max(0, Math.min(x + w - .04, x + dx)); w += x - nx; x = nx; }
           if (h.includes('e')) w = Math.max(.04, Math.min(1 - x, w + dx));
@@ -2071,8 +2101,8 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
         }
         crop = { x, y, w, h: hh }; clamp(); placeBox();
       };
-      const up = () => { box.removeEventListener('pointermove', mv); box.removeEventListener('pointerup', up); box.removeEventListener('pointercancel', up); };
-      box.addEventListener('pointermove', mv); box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+      const up = ev => { if (ev.pointerId !== active) return; active = null; box.classList.remove('dragging'); stage.removeEventListener('pointermove', mv); stage.removeEventListener('pointerup', up); stage.removeEventListener('pointercancel', up); };
+      stage.addEventListener('pointermove', mv); stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
     });
     $('#ieFine', s).oninput = e => { fine = +e.target.value; layout(); };
     $('#ieL', s).onclick = () => { quarter = (quarter + 3) % 4; crop = { x: 0, y: 0, w: 1, h: 1 }; layout(); };
@@ -2097,6 +2127,8 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.23', '24.10.2026', ['Titel-Vorschläge beim Tippen jetzt für alle Medienarten: Bücher (Google Books), Filme & Serien (TMDB, sonst iTunes/Wikidata), Games (RAWG, sonst Wikidata), Schallplatten (MusicBrainz), Brettspiele (BoardGameGeek)', 'Zuschneiden deutlich leichter: Ecken und Kanten haben eine große Trefferzone (auch knapp außerhalb des Bildes), im Rahmen verschieben, außerhalb einen neuen Rahmen aufziehen']],
+  ['1.22', '23.10.2026', ['Brettspiele: Beim Tippen des Titels erscheinen Vorschläge von BoardGameGeek (mit BGG-Token) – ein Tipp übernimmt Spieleranzahl, Dauer, Alter, Autor, Verlag, Komplexität, Kategorie, BGG-Link und Cover', 'Funktioniert beim Anlegen, auf der Wunschliste und bei „Von anderen geliehen“']],
   ['1.21.1', '22.10.2026', ['Brettspiel-Regal: Fotos der Schachtel-Seite werden vollständig gezeigt statt abgeschnitten', 'Spieleladen: Schachteln passen sich dem Seitenverhältnis des Covers an']],
   ['1.21', '22.10.2026', ['Brettspiele: dritte Ansicht „Regal“ – Schachteln stehen hochkant mit der Seite nach vorn, sortierbar nach Titel, Kategorie, Verlag oder Größe', 'Brettspiele haben jetzt wie Bücher zwei Bildplätze: Cover und Schachtel-Seite', 'Videothek und Plattenladen: Medien pro Reihe einstellbar (Auto oder 1–6), getrennt für hochkant und quer', 'Reihenfolge der Plattformen (Games) und Genres (Plattenladen) frei sortierbar, gilt auf beiden Handys']],
   ['1.20', '21.10.2026', ['Eigenes Cover: „🔎 Google Bilder“ und „🛒 Amazon“ öffnen die Suche, „📋 Einfügen“ übernimmt ein kopiertes Bild, „🖼 Bild/Screenshot“ lädt z. B. einen Screenshot aus der Amazon-App – jeweils mit Zuschneiden', 'Bilder lassen sich per „Teilen“ direkt an die Mediathek schicken (nach Neuinstallation der App)', 'Die gleichen Knöpfe gibt es bei „Cover für Medien ohne Bild suchen“']],
@@ -2571,7 +2603,7 @@ async function bggSearchIds(title) {
 async function bggThings(ids) {
   if (!ids.length) return [];
   const out = [], need = [];
-  for (const id of ids) { const c = await idb.get('bggt:' + id); if (c && Date.now() - c.at < 30 * 864e5) out.push(c.t); else need.push(id); }
+  for (const id of ids) { const c = await idb.get('bggt2:' + id); if (c && Date.now() - c.at < 30 * 864e5) out.push(c.t); else need.push(id); }
   if (need.length) {
     const doc = await bggFetch('thing?stats=1&id=' + need.join(','));
     for (const x of doc.querySelectorAll('item')) {
@@ -2579,8 +2611,14 @@ async function bggThings(ids) {
       const t = { id: x.getAttribute('id'), name: x.querySelector('name[type=primary]')?.getAttribute('value'), image: x.querySelector('image')?.textContent?.trim(), thumb: x.querySelector('thumbnail')?.textContent?.trim(),
         jahr: +v('yearpublished') || undefined, spielerMin: +v('minplayers') || undefined, spielerMax: +v('maxplayers') || undefined, dauer: +v('playingtime') || undefined, alterAb: +v('minage') || undefined,
         autor: [...x.querySelectorAll('link[type=boardgamedesigner]')].slice(0, 2).map(l => l.getAttribute('value')).join(', ') || undefined,
-        weight: +x.querySelector('averageweight')?.getAttribute('value') || 0 };
-      await idb.set('bggt:' + t.id, { at: Date.now(), t }); out.push(t);
+        weight: +x.querySelector('averageweight')?.getAttribute('value') || 0,
+        rank: +(x.querySelector('rank[name=boardgame]')?.getAttribute('value')) || 0,
+        verlag: x.querySelector('link[type=boardgamepublisher]')?.getAttribute('value') || undefined,
+        cats: [...x.querySelectorAll('link[type=boardgamecategory]')].map(l => l.getAttribute('value')),
+        mechs: [...x.querySelectorAll('link[type=boardgamemechanic]')].map(l => l.getAttribute('value')),
+        base: x.getAttribute('type') === 'boardgameexpansion' ? x.querySelector('link[type=boardgameexpansion][inbound=true]')?.getAttribute('value') : undefined };
+      t.minp = t.spielerMin; t.maxp = t.spielerMax;
+      await idb.set('bggt2:' + t.id, { at: Date.now(), t }); out.push(t);
     }
   }
   return ids.map(id => out.find(t => t.id === id)).filter(Boolean);
@@ -2623,6 +2661,109 @@ async function keyTest(kind) {
     }
   } catch { return [false, 'Der Dienst ist nicht erreichbar. Internetverbindung prüfen; bei Werbeblockern oder Firmen-WLAN kann die Verbindung blockiert sein.']; }
   return [false, 'Unbekannt'];
+}
+// --- BGG-Vorschläge beim Tippen des Titels (Formular für Brettspiele) ---
+function bggKategorie(t) {
+  const c = (t.cats || []).join('|') + '|' + (t.mechs || []).join('|');
+  if (/Legacy/i.test(c)) return 'Legacy'; if (/Cooperative/i.test(c)) return 'Kooperativ'; if (/Children's Game/i.test(c)) return 'Kinderspiel';
+  if (/Party Game/i.test(c)) return 'Partyspiel'; if (/Trivia/i.test(c)) return 'Quiz'; if (/Deduction/i.test(c)) return 'Deduktion'; if (/Murder|Mystery|Puzzle/i.test(c) && /Escape|Murder|Mystery/i.test(c)) return 'Escape / Krimi';
+  if (t.maxp === 2 && t.minp === 2) return 'Zwei-Personen'; const light = !t.weight || t.weight < 1.9; if (light && /Card Game/i.test(c)) return 'Kartenspiel'; if (light && /Dice/i.test(c)) return 'Würfelspiel';
+  if (t.weight >= 3.2) return 'Strategiespiel'; if (t.weight >= 2.3) return 'Kennerspiel'; if (t.weight) return 'Familienspiel'; return undefined;
+}
+async function bggSuggest(q) {
+  q = q.trim(); if (q.length < 3) return [];
+  const ck = 'bggq:' + q.toLowerCase(); const c = await idb.get(ck);
+  let hits = c && Date.now() - c.at < 30 * 864e5 ? c.hits : null;
+  if (!hits) {
+    const doc = await bggFetch('search?type=boardgame,boardgameexpansion&query=' + encodeURIComponent(q));
+    const nq = normDup(q);
+    const all = [...doc.querySelectorAll('item')].map(x => ({ id: x.getAttribute('id'), name: x.querySelector('name')?.getAttribute('value') || '', year: +(x.querySelector('yearpublished')?.getAttribute('value') || 0), exp: x.getAttribute('type') === 'boardgameexpansion' }));
+    const sc = h => { const k = normDup(h.name); return k === nq ? 3 : k.startsWith(nq) ? 2 : k.includes(nq) ? 1 : 0; };
+    hits = all.map(h => Object.assign(h, { s: sc(h) })).sort((a, b) => b.s - a.s || (a.exp - b.exp) || b.year - a.year).filter((h, i, a) => a.findIndex(x => x.id === h.id) === i).slice(0, 12);
+    await idb.set(ck, { at: Date.now(), hits });
+  }
+  const things = await bggThings(hits.map(h => h.id));
+  return hits.map(h => Object.assign({}, h, { t: things.find(t => t.id === h.id) })).filter(h => h.t)
+    .sort((a, b) => b.s - a.s || (a.t.rank || 1e6) - (b.t.rank || 1e6)).slice(0, 8);
+}
+function bggRecord(h) {
+  const t = h.t;
+  return { titel: h.name, jahr: t.jahr, spielerMin: t.spielerMin, spielerMax: t.spielerMax, dauer: t.dauer, alterAb: t.alterAb, autor: t.autor, verlag: t.verlag,
+    komplexitaet: t.weight ? (t.weight < 2 ? 'Leicht' : t.weight < 3.2 ? 'Mittel' : 'Schwer') : undefined, kategorie: bggKategorie(t), erweiterungVon: t.base,
+    bgg: 'https://boardgamegeek.com/boardgame' + (h.exp ? 'expansion' : '') + '/' + t.id, cover: t.image || t.thumb };
+}
+// --- Vorschläge beim Tippen des Titels für alle Medienarten ---
+// Jede Quelle liefert [{name, sub, thumb, rec | pick()}]; ein Tipp füllt die leeren Felder.
+const sugCache = new Map();
+async function wdSuggest(q, typ) {
+  const conf = WD_TYPES[typ]; if (!conf) return [];
+  const j = await fetchJSON(WD + 'action=wbsearchentities&type=item&limit=12&language=de&uselang=de&search=' + encodeURIComponent(q), 6000);
+  return (j?.search || []).filter(x => conf.words.some(w => String(x.description || '').toLowerCase().includes(w.trim()))).slice(0, 6)
+    .map(x => ({ name: x.label, sub: x.description, pick: async () => Object.assign({}, await wikidataLookup({ typ, titel: x.label }).catch(() => null), { titel: x.label }) }));
+}
+const SUGGEST = {
+  buch: { src: 'Google Books', async search(q) {
+    const g = await fetchJSON('https://www.googleapis.com/books/v1/volumes?maxResults=10&printType=books&q=' + encodeURIComponent(q), 7000);
+    return (g?.items || []).map(x => x.volumeInfo || {}).filter(v => v.title).slice(0, 8).map(v => { const rec = bookFromGoogle(v); rec.genre = mapGenre('buch', v.categories || []); if (v.description) rec.inhalt = shortText(v.description);
+      return { name: v.title + (v.subtitle ? ' – ' + v.subtitle : ''), sub: [(v.authors || []).join(', '), (v.publishedDate || '').slice(0, 4), v.publisher].filter(Boolean).join(' · '), thumb: (v.imageLinks?.smallThumbnail || '').replace('http://', 'https://'), rec }; });
+  } },
+  bluray: { src: () => settings.tmdbKey ? 'TMDB' : 'iTunes / Wikidata', async search(q) {
+    if (settings.tmdbKey) {
+      const key = settings.tmdbKey, bearer = key.length > 40;
+      const url = 'https://api.themoviedb.org/3/search/multi?language=de-DE&query=' + encodeURIComponent(q) + (bearer ? '' : '&api_key=' + encodeURIComponent(key));
+      const j = await (bearer ? fetch(url, { headers: { Authorization: 'Bearer ' + key } }).then(r => r.ok ? r.json() : null).catch(() => null) : fetchJSON(url));
+      return (j?.results || []).filter(r => ['movie', 'tv'].includes(r.media_type)).slice(0, 8).map(r => { const name = r.title || r.name, jahr = parseInt((r.release_date || r.first_air_date || '').slice(0, 4)) || undefined, art = r.media_type === 'tv' ? 'Serie' : 'Film';
+        return { name, sub: [jahr, art].filter(Boolean).join(' · '), thumb: r.poster_path ? 'https://image.tmdb.org/t/p/w92' + r.poster_path : '', pick: async () => Object.assign({ titel: name, jahr, art }, await tmdbLookup({ titel: name, jahr, art }).catch(() => null), { titel: name }) }; });
+    }
+    const j = await fetchJSON(`https://itunes.apple.com/search?country=de&limit=8&entity=movie&term=${encodeURIComponent(q)}`, 7000);
+    const it = (j?.results || []).map(r => { const jahr = parseInt(String(r.releaseDate || '').slice(0, 4)) || undefined;
+      return { name: r.trackName, sub: [jahr, r.artistName, r.primaryGenreName].filter(Boolean).join(' · '), thumb: r.artworkUrl60 || r.artworkUrl100, rec: { titel: r.trackName, jahr, regie: r.artistName, art: 'Film', genre: mapGenre('bluray', [r.primaryGenreName || '']), cover: String(r.artworkUrl100 || '').replace(/\/\d+x\d+bb\./, '/600x600bb.') } }; });
+    return it.length ? it : wdSuggest(q, 'bluray');
+  } },
+  game: { src: () => settings.rawgKey ? 'RAWG' : 'Wikidata', async search(q) {
+    if (settings.rawgKey) {
+      const j = await fetchJSON(`https://api.rawg.io/api/games?key=${encodeURIComponent(settings.rawgKey)}&page_size=8&search=${encodeURIComponent(q)}`, 7000);
+      return (j?.results || []).map(g => ({ name: g.name, sub: [String(g.released || '').slice(0, 4), (g.platforms || []).map(p => p.platform?.name).slice(0, 3).join(', ')].filter(Boolean).join(' · '), thumb: g.background_image ? g.background_image.replace('/media/games/', '/media/crop/600/400/games/') : '',
+        pick: async () => Object.assign({ titel: g.name }, await rawgLookup({ titel: g.name, jahr: parseInt(String(g.released || '').slice(0, 4)) || undefined }).catch(() => null), { titel: g.name }) }));
+    }
+    return wdSuggest(q, 'game');
+  } },
+  vinyl: { src: 'MusicBrainz', async search(q) {
+    const j = await fetchJSON('https://musicbrainz.org/ws/2/release-group?fmt=json&limit=10&query=' + encodeURIComponent(q), 7000);
+    return (j?.['release-groups'] || []).filter(g => g.score >= 60).slice(0, 8).map(g => { const artist = (g['artist-credit'] || []).map(a => (a.name || '') + (a.joinphrase || '')).join('').trim(); const jahr = parseInt(String(g['first-release-date'] || '').slice(0, 4)) || undefined;
+      return { name: g.title, sub: [artist, jahr, g['primary-type']].filter(Boolean).join(' · '), thumb: `https://coverartarchive.org/release-group/${g.id}/front-250`, rec: { titel: g.title, interpret: artist, jahr, cover: `https://coverartarchive.org/release-group/${g.id}/front-500` } }; });
+  } },
+  brettspiel: { src: 'BoardGameGeek', needs: () => settings.bggToken ? '' : 'Mit einem BoardGameGeek-Token (Einstellungen → Fehlende Angaben ergänzen) erscheinen hier beim Tippen Vorschläge.', async search(q) {
+    return (await bggSuggest(q)).map(h => ({ name: h.name, sub: [h.year || '', h.exp ? 'Erweiterung' : '', h.t.spielerMin ? `${h.t.spielerMin}${h.t.spielerMax && h.t.spielerMax !== h.t.spielerMin ? '–' + h.t.spielerMax : ''} Spieler` : '', h.t.dauer ? h.t.dauer + ' Min.' : ''].filter(Boolean).join(' · '), thumb: h.t.thumb, rec: bggRecord(h) }));
+  } },
+};
+function wireSuggest(form, typ, onPick) {
+  const P = SUGGEST[typ]; const inp = form.elements.titel; if (!P || !inp) return;
+  const box = document.createElement('div'); box.className = 'bggsug'; box.hidden = true; inp.closest('.fld').after(box);
+  let timer = null, seq = 0; const srcName = () => typeof P.src === 'function' ? P.src() : P.src;
+  inp.setAttribute('autocomplete', 'off');
+  inp.addEventListener('input', () => {
+    clearTimeout(timer); const q = inp.value.trim(); const my = ++seq;
+    if (q.length < 3) { box.hidden = true; return; }
+    const need = P.needs?.(); if (need) { box.hidden = false; box.innerHTML = `<p class="hint" style="margin:0">💡 ${esc(need)}</p>`; return; }
+    timer = setTimeout(async () => {
+      box.hidden = false; box.innerHTML = `<p class="hint" style="margin:0">Suche bei ${esc(srcName())} …</p>`;
+      try {
+        const ck = typ + ':' + q.toLowerCase(); const list = sugCache.get(ck) || await P.search(q); sugCache.set(ck, list); if (my !== seq) return;
+        box._list = list;
+        box.innerHTML = list.length ? `<div class="bgghead"><span class="hint">Vorschläge von ${esc(srcName())}</span><button type="button" class="btn ghost" data-bggx style="height:26px;padding:0 6px" aria-label="Vorschläge schließen">✕</button></div>` + list.map((h, i) => `<button type="button" class="bggopt" data-bgi="${i}">${h.thumb ? `<img src="${esc(h.thumb)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'bggph',textContent:'•'}))">` : '<span class="bggph">•</span>'}<span><b>${esc(h.name)}</b><small>${esc(h.sub || '')}</small></span></button>`).join('')
+          : '<p class="hint" style="margin:0">Keine Vorschläge – einfach weiter selbst eintragen.</p>';
+      } catch (e) { if (my === seq) box.innerHTML = `<p class="hint" style="margin:0">${esc(srcName())} nicht erreichbar: ${esc(e.message)}</p>`; }
+    }, typ === 'brettspiel' ? 900 : 600);
+  });
+  box.addEventListener('click', async e => {
+    if (e.target.closest('[data-bggx]')) { box.hidden = true; return; }
+    const b = e.target.closest('[data-bgi]'); if (!b || !box._list) return;
+    const h = box._list[+b.dataset.bgi]; seq++;
+    box.innerHTML = '<p class="hint" style="margin:0">Übernehme Angaben …</p>';
+    const rec = h.rec || await h.pick?.().catch(() => null) || { titel: h.name };
+    box.hidden = true; onPick(rec);
+  });
 }
 async function bggTest() {
   try { const doc = await bggFetch('search?type=boardgame&query=Catan'); const n = doc.querySelectorAll('item').length; return n ? [true, `Verbindung funktioniert (${n} Treffer für „Catan“)`] : [false, 'Verbindung steht, aber keine Treffer – Token prüfen']; }
