@@ -572,7 +572,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.24';
+const APP_VERSION = '1.25';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -913,6 +913,14 @@ async function loadCoverInto(el) {
   img.src = url;
 }
 // Ausschnitt aus einem Bild (box 0–1000) als kleines JPEG; aspect = Breite/Höhe
+async function rotateDataURL(dataURL, deg) {
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataURL; });
+    const c = document.createElement('canvas'); c.width = img.naturalHeight; c.height = img.naturalWidth; const g = c.getContext('2d');
+    g.translate(c.width / 2, c.height / 2); g.rotate(deg * Math.PI / 180); g.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+    return { data: c.toDataURL('image/jpeg', .82) };
+  } catch { return null; }
+}
 async function cropImage(dataURL, box, maxSide = 420) {
   try {
     const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataURL; });
@@ -2322,6 +2330,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.25', '25.10.2026', ['Foto erkennen → Mehrere: neue Auswahl „Ausrichtung“ (Automatisch / Seite / Cover). Bei „Seite“ werden alle Ausschnitte als Rücken bzw. Schachtel-Seite gespeichert (liegend fotografierte werden aufgestellt), bei „Cover“ als Cover']],
   ['1.24', '25.10.2026', ['Brettspiele: Schachtelmaße (Breite, Höhe, Tiefe in cm) – mit BGG-Token automatisch aus BoardGameGeek, deutsche Ausgabe bevorzugt', 'Regal zeigt die Schachteln maßstabsgetreu; Fachgröße in cm einstellbar', 'Brettspiel-Regal „Wie zuhause“: Fächer mit eigenen Maßen, Spiele stehend oder liegend, drehbar, übereinander stapelbar per Drag & Drop – was nicht passt, lässt sich nicht hineinlegen', 'Sichern und Wiederherstellen der Aufstellung, neue Spiele in „Noch nicht einsortiert“']],
   ['1.23', '24.10.2026', ['Titel-Vorschläge beim Tippen jetzt für alle Medienarten: Bücher (Google Books), Filme & Serien (TMDB, sonst iTunes/Wikidata), Games (RAWG, sonst Wikidata), Schallplatten (MusicBrainz), Brettspiele (BoardGameGeek)', 'Zuschneiden deutlich leichter: Ecken und Kanten haben eine große Trefferzone (auch knapp außerhalb des Bildes), im Rahmen verschieben, außerhalb einen neuen Rahmen aufziehen']],
   ['1.22', '23.10.2026', ['Brettspiele: Beim Tippen des Titels erscheinen Vorschläge von BoardGameGeek (mit BGG-Token) – ein Tipp übernimmt Spieleranzahl, Dauer, Alter, Autor, Verlag, Komplexität, Kategorie, BGG-Link und Cover', 'Funktioniert beim Anlegen, auf der Wunschliste und bei „Von anderen geliehen“']],
@@ -2425,16 +2434,19 @@ function openAddMenu() {
 /* ---------- Foto-Erkennung (KI) ---------- */
 function aiKey() { return settings.provider === 'claude' ? settings.claudeKey : settings.provider === 'gemini' ? settings.geminiKey : ''; }
 function openPhoto() {
-  let mode = 'single', hint = '';
+  let mode = 'single', hint = '', orient = '';
   const s = openSheet(`${sheetHead('Foto erkennen')}
     <div class="hint" style="margin-bottom:6px">Was ist auf dem Foto?</div>
     <div class="seg" id="pMode" style="margin-bottom:12px"><button data-m="single" aria-pressed="true">Ein Medium</button><button data-m="multi" aria-pressed="false">Mehrere (z. B. Buchrücken)</button></div>
     <div class="hint" style="margin-bottom:6px">Medienart</div>
     <div class="seg" id="pType" style="margin-bottom:14px"><button data-t="" aria-pressed="true">Automatisch</button>${TYPE_KEYS.map(t => `<button data-t="${t}" aria-pressed="false">${TYPES[t].single.replace(' / Film', '')}</button>`).join('')}</div>
+    <div id="pOrientWrap" hidden><div class="hint" style="margin-bottom:6px">Ausrichtung der Medien auf dem Foto</div>
+    <div class="seg" id="pOrient" style="margin-bottom:14px"><button data-o="" aria-pressed="true">Automatisch</button><button data-o="seite" aria-pressed="false">Seite / Rücken</button><button data-o="cover" aria-pressed="false">Cover</button></div></div>
     <div class="note" id="pTip">Tipp: Cover oder Rückseite gerade und gut beleuchtet fotografieren.</div>
     <div id="pBusy"></div>
     <div class="formfoot"><label class="btn">🖼 Aus Galerie<input type="file" accept="image/*" hidden id="pGal"></label><label class="btn primary">📷 Foto aufnehmen<input type="file" accept="image/*" capture="environment" hidden id="pCam"></label></div>`);
-  $('#pMode', s).onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; mode = b.dataset.m; $$('#pMode button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); $('#pTip', s).textContent = mode === 'multi' ? 'Tipp: Regal frontal und scharf fotografieren, gutes Licht, lieber max. ca. 20 Medien pro Foto. Jeder Treffer wird dir danach einzeln zur Bestätigung gezeigt.' : 'Tipp: Cover oder Rückseite gerade und gut beleuchtet fotografieren.'; };
+  $('#pMode', s).onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; mode = b.dataset.m; $$('#pMode button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); $('#pOrientWrap', s).hidden = mode !== 'multi'; $('#pTip', s).textContent = mode === 'multi' ? 'Tipp: Regal frontal und scharf fotografieren, gutes Licht, lieber max. ca. 20 Medien pro Foto. Jeder Treffer wird dir danach einzeln zur Bestätigung gezeigt.' : 'Tipp: Cover oder Rückseite gerade und gut beleuchtet fotografieren.'; };
+  $('#pOrient', s).onclick = e => { const b = e.target.closest('[data-o]'); if (!b) return; orient = b.dataset.o; $$('#pOrient button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); };
   $('#pType', s).onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; hint = b.dataset.t; $$('#pType button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); };
   const go = async e => {
     const file = e.target.files[0]; if (!file) return;
@@ -2443,11 +2455,17 @@ function openPhoto() {
     $$('.formfoot label', s).forEach(l => l.style.pointerEvents = 'none');
     try {
       const img = await resizeImage(file, 1568, .85);
-      const found = await recognize(img, mode, hint);
+      const ori = mode === 'multi' ? orient : '';
+      const found = await recognize(img, mode, hint, undefined, ori);
       if (!found.length) throw new Error('Auf dem Foto wurde kein Medium erkannt.');
       // Jedes erkannte Medium aus dem Foto ausschneiden und als Cover nutzen
       for (const r of found) {
-        if (r._box) { const c = await cropImage(img, r._box); if (c) { r._coverData = c.data; if (c.aspect < 0.45) { r._coverSpine = true; r._coverAspect = c.aspect; } } }
+        if (!r._box) continue;
+        const c = await cropImage(img, r._box); if (!c) continue;
+        // Automatisch: schmal = Rücken/Seite. „Seite“/„Cover“ legt es fest; liegend fotografierte Seiten werden aufgestellt.
+        const spine = ori === 'seite' || (!ori && c.aspect < 0.45);
+        if (spine) { const v = c.aspect > 1 ? await rotateDataURL(c.data, -90) : null; r._coverData = v ? v.data : c.data; r._coverSpine = true; r._coverAspect = v ? 1 / c.aspect : c.aspect; }
+        else r._coverData = c.data;
       }
       if (mode === 'single' && found.length === 1 && !found[0]._coverData) found[0]._coverData = await resizeImage(file, 500, .78);
       await closeSheet();
@@ -2460,11 +2478,11 @@ function openPhoto() {
   };
   $('#pCam', s).onchange = go; $('#pGal', s).onchange = go;
 }
-function aiPrompt(mode, hint, barcode) {
+function aiPrompt(mode, hint, barcode, orient) {
   const schema = TYPE_KEYS.map(t => `- "${t}" (${TYPES[t].single}): ` + fieldsOf(t).filter(f => f.ai && !['titel', 'inhalt'].includes(f.k)).map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]` : f.k).join(', ')).join('\n');
   return `Du hilfst beim Katalogisieren einer privaten Mediensammlung (Blu-rays/DVDs, Bücher, Videospiele, Brettspiele).
 ${mode === 'multi' ? 'Auf dem Foto sind MEHRERE Medien, z. B. Buchrücken im Regal oder ein Stapel. Erkenne JEDES einzelne erkennbare Medium und liste alle in Lesereihenfolge (links nach rechts, oben nach unten). Lass keines aus, auch wenn nur der Rücken zu sehen ist.' : 'Auf dem Foto ist EIN Medium (Cover, Rückseite oder Rücken). Erkenne genau dieses.'}
-${hint ? `Alle Medien auf dem Foto sind vom Typ "${hint}".` : ''}${barcode ? `\nDer Barcode/EAN des Mediums lautet ${barcode}.` : ''}
+${hint ? `Alle Medien auf dem Foto sind vom Typ "${hint}".` : ''}${orient === 'seite' ? '\nVon allen Medien ist nur die SEITE bzw. der RÜCKEN zu sehen (schmale Kante der Hülle/Schachtel, stehend oder liegend). Die "box" umschließt genau diese eine Seite.' : orient === 'cover' ? '\nVon allen Medien ist das COVER (Vorderseite) zu sehen. Die "box" umschließt genau dieses eine Cover.' : ''}${barcode ? `\nDer Barcode/EAN des Mediums lautet ${barcode}.` : ''}
 
 Medientypen und ihre Felder (bei [..] genau einen dieser Werte verwenden):
 ${schema}
@@ -2510,8 +2528,8 @@ async function aiCall(prompt, b64, maxTokens = 2000) {
   }
   throw new Error('Keine KI ausgewählt.');
 }
-async function recognize(dataURL, mode, hint, barcode) {
-  const text = await aiCall(aiPrompt(mode, hint, barcode), dataURL.split(',')[1], mode === 'multi' ? 8000 : 2000);
+async function recognize(dataURL, mode, hint, barcode, orient) {
+  const text = await aiCall(aiPrompt(mode, hint, barcode, orient), dataURL.split(',')[1], mode === 'multi' ? 8000 : 2000);
   return parseAI(text, hint);
 }
 function parseAI(text, hint) {
