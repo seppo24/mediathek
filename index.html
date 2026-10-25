@@ -500,6 +500,23 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .bggopt:hover,.bggopt:focus-visible{background:var(--surface2)}
 .bggopt img,.bggph{width:40px;height:40px;object-fit:contain;border-radius:4px;flex:none;background:var(--surface2);display:grid;place-items:center}
 .bggopt span{display:grid}.bggopt b{font-size:14px}.bggopt small{font-size:12px;color:var(--ink2)}
+.gshelf2 .bgfach{display:flex;align-items:flex-end;gap:0;margin:0 auto;background:linear-gradient(#2a1a0d,#3d2614 40%,#3a2412);box-shadow:inset 0 14px 18px -8px rgba(0,0,0,.7);border-radius:3px 3px 0 0;position:relative;overflow:visible}
+.gshelf2 .bgfach.loose{flex-wrap:wrap;min-height:90px;padding:6px 0;gap:3px 2px;align-content:flex-end}
+.gshelf2 .bgfach.over{box-shadow:inset 0 0 0 3px #ef4444}
+.gshelf2 .bs-board{margin-left:auto;margin-right:auto}
+.bgstack{display:flex;flex-direction:column;align-items:flex-start}
+.bgbox{position:relative;flex:none;border:0;padding:0;border-radius:2px;overflow:hidden;color:var(--t);background:linear-gradient(90deg,rgba(0,0,0,.22),rgba(255,255,255,.14) 14%,rgba(255,255,255,0) 32%,rgba(0,0,0,.25)),var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.3);cursor:pointer}
+.bgbox.li{background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,0) 35%,rgba(0,0,0,.25)),var(--c)}
+.bgbox .bt{position:absolute;inset:3px;display:flex;align-items:center;justify-content:center;font:800 10px/1.05 system-ui;text-transform:uppercase;overflow:hidden;text-align:center}
+.bgbox.st .bt{writing-mode:vertical-rl;transform:rotate(180deg)}
+.bgbox .bface{position:absolute;left:50%;top:50%;background-size:100% 100%;background-repeat:no-repeat}
+.bgbox.hasimg .bt{visibility:hidden}
+.bgbox.edit{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:grab}
+.bgbox.picked{outline:3px solid #fbbf24;outline-offset:-1px;z-index:2}
+.bgbox.dragging{opacity:.25}.bgbox.dim{opacity:.22;filter:grayscale(.8)}.bgbox.hit{outline:2px solid #fbbf24}
+.bgbox .lentmark{z-index:2}
+.bgpickbar{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:20;display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 10px;box-shadow:0 8px 24px rgba(0,0,0,.25);margin-top:10px}
+.bgpickbar b{flex:1 1 100%;font-size:13px}
 /* ====== SPIELELADEN ====== */
 .gs{border-radius:20px;padding:20px 10px 6px;background:
   linear-gradient(rgba(255,255,255,.0),rgba(0,0,0,.04)),repeating-linear-gradient(90deg,#f5ead6 0 40px,#efe1c6 40px 80px);color:#2b1d0e;box-shadow:inset 0 0 40px rgba(120,80,20,.18)}
@@ -555,7 +572,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.23';
+const APP_VERSION = '1.24';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -679,6 +696,9 @@ const TYPES = {
       { k: 'spielerMin', l: 'Spieler min.', t: 'number', ai: 1 },
       { k: 'spielerMax', l: 'Spieler max.', t: 'number', ai: 1 },
       { k: 'dauer', l: 'Spieldauer (Min.)', t: 'number', ai: 1 },
+      { k: 'boxB', l: 'Schachtel Breite (cm)', t: 'number', step: '0.1', web: 'bgg', ph: 'z. B. 29,6' },
+      { k: 'boxH', l: 'Schachtel Höhe (cm)', t: 'number', step: '0.1', web: 'bgg', ph: 'z. B. 29,6' },
+      { k: 'boxT', l: 'Schachtel Tiefe (cm)', t: 'number', step: '0.1', web: 'bgg', ph: 'z. B. 7,2' },
       { k: 'alterAb', l: 'Alter ab', t: 'number', ai: 1 },
       { k: 'komplexitaet', l: 'Komplexität', t: 'select', o: ['Leicht', 'Mittel', 'Schwer'], f: 1, ai: 1 },
       { k: 'digital', l: 'Digital', t: 'bool', f: 1, lab: 'Digital vorhanden (z. B. App oder Board Game Arena)' },
@@ -1135,7 +1155,7 @@ function render() {
   const special = TYPES[ui.type] && ui.special[ui.type];
   if (special) {
     if (ui.type === 'buch') { el.innerHTML = renderBookshelf(list); if (ui.shelfSort === 'zuhause' && !VIEW) bindHome(el); }
-    else if (ui.type === 'brettspiel') el.innerHTML = bgViewSwitch() + (ui.bgView === 'regal' ? renderGameShelf(list) : renderGameStore(list));
+    else if (ui.type === 'brettspiel') { el.innerHTML = bgViewSwitch() + (ui.bgView === 'regal' ? renderGameShelf(list) : renderGameStore(list)); if (ui.bgView === 'regal' && ui.bgSort === 'zuhause' && !VIEW) bindBgHome(el); }
     else if (ui.type === 'vinyl') el.innerHTML = renderRecordStore(list);
     else el.innerHTML = renderVideothek(list, ui.type);
   } else {
@@ -1237,32 +1257,207 @@ function openGroupOrder(typ) {
   $('#goList', s).onclick = e => { const u = e.target.closest('[data-up]'), d = e.target.closest('[data-down]'); if (!u && !d) return; const i = +(u || d).dataset[u ? 'up' : 'down'], j = u ? i - 1 : i + 1; [ord[i], ord[j]] = [ord[j], ord[i]]; draw(); save(); };
   $('#goReset', s).onclick = () => { ord.sort((a, b) => a.localeCompare(b, 'de')); draw(); shared.groupOrder = Object.assign({}, shared.groupOrder, { [typ]: [] }); saveShared().then(render); };
 }
-// Brettspiel-Regal: Schachteln stehen hochkant, man sieht die Seite
-function boxSpineDims(it) {
-  if (hasSpine(it) && it.coverAspect) { const h = 168; return { w: Math.round(Math.min(90, Math.max(14, h * it.coverAspect))), h, img: true }; }
-  const k = it.kategorie || '', x = it.komplexitaet || '';
-  if (k === 'Kartenspiel') return { w: 24, h: 112 };
-  if (it.erweiterungVon) return { w: 20, h: 150 + hash(it.id) % 14 };
-  const w = x === 'Schwer' ? 50 : x === 'Leicht' ? 30 : k === 'Kinderspiel' ? 34 : 40;
-  return { w: w + hash(it.id) % 6, h: k === 'Kinderspiel' ? 140 : 160 + hash(it.id) % 20 };
+// ===== Brettspiel-Regal mit echten Maßen (cm) =====
+// Schachtel: B × H = Deckel, T = Dicke. Stehend sieht man die Seite (T breit, H hoch), liegend die lange Kante (H breit, T hoch).
+// „Drehen“ (r) tauscht B und H. Fachgröße in cm (für alle Fächer, im Regal „Wie zuhause“ auch je Fach).
+const BOX_DEF = it => it.kategorie === 'Kartenspiel' ? { B: 12, H: 19, T: 4 } : it.erweiterungVon ? { B: 29.5, H: 29.5, T: 5 } : it.kategorie === 'Kinderspiel' ? { B: 27, H: 27, T: 7 } : { B: 29.5, H: 29.5, T: 7.5 };
+function boxCm(it) { const d = BOX_DEF(it); const B = +it.boxB || d.B, H = +it.boxH || d.H, T = +it.boxT || d.T; return { B, H, T, est: !(+it.boxB && +it.boxH && +it.boxT) }; }
+function placedCm(it, or) { const d = boxCm(it); const o = or?.o || 'st', side = or?.r ? d.B : d.H; return o === 'st' ? { w: d.T, h: side, o } : { w: side, h: d.T, o }; }
+const bgShelfSize = () => Object.assign({ w: 33, h: 33 }, shared.bgShelf);
+async function editShelfSize(cur, cb) {
+  const v = prompt('Innenmaße des Regalfachs in cm (Breite × Höhe), z. B. 33 x 33:', `${cur.w} x ${cur.h}`); if (v === null) return;
+  const m = v.replace(',', '.').match(/(\d+(?:\.\d+)?)\s*[x×*\/ ]\s*(\d+(?:\.\d+)?)/i); if (!m) return toast('Bitte so eingeben: 33 x 33');
+  await cb({ w: Math.max(10, Math.min(300, +m[1])), h: Math.max(10, Math.min(200, +m[2])) });
 }
+// Eine Schachtel als Element (stehend: Seitenfoto bzw. senkrechter Titel; liegend: um 90° gedreht)
+function bgBoxHTML(it, pc, k, extra = '', attrs = '') {
+  const c = colorFor(it.titel), w = Math.max(6, pc.w * k), h = Math.max(6, pc.h * k);
+  const img = hasSpine(it) ? `<span class="bface" data-spine="${it.id}" style="${pc.o === 'li' ? `width:${h}px;height:${w}px;transform:translate(-50%,-50%) rotate(-90deg)` : `width:${w}px;height:${h}px;transform:translate(-50%,-50%)`}"></span>` : '';
+  return `<button class="bgbox ${pc.o}${img ? ' hasimg' : ''}${extra}" ${attrs} title="${esc(it.titel)}" style="width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;--c:${c};--t:${textOn(c)}">${img}
+    ${it.verliehenAn ? '<span class="lentmark"></span>' : ''}<span class="bt">${esc(it.titel)}</span></button>`;
+}
+// Normale Regalansicht: alle stehend, Fächer in Fachgröße
 function renderGameShelf(list) {
   const s = ui.bgSort || 'titel';
   const cmpT = (a, b) => (a.erweiterungVon || a.titel || '').localeCompare(b.erweiterungVon || b.titel || '', 'de') || (a.erweiterungVon ? 1 : -1);
+  const tools = `<div class="bs-tools">Sortiert nach <div class="seg" style="width:auto">${[['titel', 'Titel'], ['kategorie', 'Kategorie'], ['verlag', 'Verlag'], ['groesse', 'Größe'], ...(VIEW ? [] : [['zuhause', '🏠 Wie zuhause']])].map(([k, l]) => `<button data-bgsort="${k}" aria-pressed="${s === k}">${l}</button>`).join('')}</div></div>`;
+  if (s === 'zuhause' && !VIEW) return tools + renderBgHome(list);
   if (s === 'kategorie') list.sort((a, b) => (a.kategorie || '~').localeCompare(b.kategorie || '~', 'de') || cmpT(a, b));
   else if (s === 'verlag') list.sort((a, b) => (a.verlag || '~').localeCompare(b.verlag || '~', 'de') || cmpT(a, b));
-  else if (s === 'groesse') list.sort((a, b) => boxSpineDims(b).h - boxSpineDims(a).h || cmpT(a, b));
+  else if (s === 'groesse') list.sort((a, b) => boxCm(b).H - boxCm(a).H || boxCm(b).T - boxCm(a).T || cmpT(a, b));
   else list.sort(cmpT);
-  const avail = contentWidth() - 48; const rows = []; let cur = [], used = 0;
-  for (const it of list) { const d = boxSpineDims(it); if (used + d.w + 2 > avail && cur.length) { rows.push(cur); cur = []; used = 0; } cur.push([it, d]); used += d.w + 2; }
+  const F = bgShelfSize(); const k = (contentWidth() - 48) / F.w;
+  const rows = []; let cur = [], used = 0;
+  for (const it of list) { let pc = placedCm(it); if (pc.h > F.h) pc = placedCm(it, { o: 'st', r: 1 }); if (pc.h > F.h) pc = placedCm(it, { o: 'li' }); if (used + pc.w > F.w && cur.length) { rows.push(cur); cur = []; used = 0; } cur.push([it, pc]); used += pc.w; }
   if (cur.length) rows.push(cur);
-  let html = `<div class="bs-tools">Sortiert nach <div class="seg" style="width:auto">${[['titel', 'Titel'], ['kategorie', 'Kategorie'], ['verlag', 'Verlag'], ['groesse', 'Größe']].map(([k, l]) => `<button data-bgsort="${k}" aria-pressed="${s === k}">${l}</button>`).join('')}</div></div><div class="bookcase gshelf">`;
-  rows.forEach(row => {
-    html += `<div class="bs-row">${row.map(([it, d]) => { const c = colorFor(it.titel); const thin = d.w < 26;
-      return `<button class="spine box${thin ? ' thin' : ''}" ${d.img ? `data-spine="${it.id}"` : ''} data-open="${it.id}" title="${esc(it.titel)}" style="--w:${d.w}px;--h:${d.h}px;--c:${c};--t:${textOn(c)}">
-        ${it.verliehenAn ? '<span class="lentmark"></span>' : ''}<span class="st">${esc(it.titel)}</span><span class="sa">${esc(it.verlag || '')}</span></button>`; }).join('')}</div><div class="bs-board"></div>`;
+  let html = tools + `<div class="bs-tools" style="margin-top:-4px">Fach ${F.w} × ${F.h} cm ${VIEW ? '' : '<button class="btn ghost" data-bgsize style="height:28px;padding:0 8px">✎ ändern</button>'}</div><div class="bookcase gshelf2">`;
+  rows.forEach(row => { html += `<div class="bgfach" style="width:${(F.w * k).toFixed(1)}px;height:${(F.h * k).toFixed(1)}px">${row.map(([it, pc]) => bgBoxHTML(it, pc, k, '', `data-open="${it.id}"`)).join('')}</div><div class="bs-board"></div>`; });
+  return html + '</div><p class="hint" style="text-align:center">Schachteln ohne eingetragene Maße werden mit üblichen Größen gezeigt.</p>';
+}
+// ---- „Wie zuhause“ für Brettspiele: Fächer mit Stapeln ----
+let bgEdit = false, bgPick = null;
+const bgHomeGet = () => shared.home?.brettspiel || null;
+async function bgHomeSet(h) { shared.home = Object.assign({}, shared.home, { brettspiel: Object.assign({}, h, { updatedAt: Date.now() }) }); await saveShared(); }
+const bgClone = h => JSON.parse(JSON.stringify(h));
+function bgLayout() {
+  const books = live().filter(i => i.typ === 'brettspiel'); const map = new Map(books.map(b => [b.id, b]));
+  const h = bgHomeGet(); const or = h?.or || {};
+  const shelves = (h?.shelves || []).map(f => ({ ...f, stacks: f.stacks.map(st => st.filter(id => map.has(id))).filter(st => st.length) }));
+  const placed = new Set(shelves.flatMap(f => f.stacks.flat()));
+  const rest = books.filter(b => !placed.has(b.id)).sort((a, b) => (a.titel || '').localeCompare(b.titel || '', 'de')).map(b => b.id);
+  return { shelves, rest, map, or };
+}
+function stackCm(st, map, or) { let w = 0, h = 0; for (const id of st) { const pc = placedCm(map.get(id), or[id]); w = Math.max(w, pc.w); h += pc.h; } return { w, h }; }
+function fachFits(f, map, or) { const F = { w: f.w || bgShelfSize().w, h: f.h || bgShelfSize().h }; let w = 0; for (const st of f.stacks) { const s = stackCm(st, map, or); if (s.h > F.h + .3) return false; w += s.w; } return w <= F.w + .3; }
+function renderBgHome(list) {
+  const h = bgHomeGet();
+  if (!h) return `<div class="card home-intro"><h3 style="margin-top:0">Euer Spieleregal wie zuhause</h3><p>Stellt eure Spiele so auf, wie sie bei euch stehen – stehend oder liegend, auch übereinander gestapelt. Die Fächer haben echte Maße in cm, die Schachteln ebenso (eingetragen oder übliche Größe). Was nicht passt, lässt sich nicht hineinlegen.</p>
+    <div class="formfoot" style="position:static;margin:0;padding:0;background:none;border:0"><button class="btn" data-bgh="start-empty">Leer beginnen</button><button class="btn primary" data-bgh="start-auto">Automatisch einräumen</button></div></div>`;
+  const { shelves, rest, map, or } = bgLayout();
+  const hits = new Set(list.map(i => i.id)); const filtering = hits.size < map.size;
+  const G = bgShelfSize(); const maxW = Math.max(G.w, ...shelves.map(f => f.w || G.w)); const k = (contentWidth() - 48) / maxW;
+  const box = (id, fid, si, bi) => { const it = map.get(id); const pc = placedCm(it, or[id]);
+    return bgBoxHTML(it, pc, k, `${bgEdit ? ' edit' : ''}${bgPick === id ? ' picked' : ''}${filtering && !hits.has(id) ? ' dim' : ''}${filtering && hits.has(id) ? ' hit' : ''}`, bgEdit ? `data-hid="${id}" data-f="${fid}" data-si="${si}" data-bi="${bi}"` : `data-open="${id}"`); };
+  const fachHTML = (f, i, isNew) => {
+    const F = { w: f.w || G.w, h: f.h || G.h }; const ok = isNew || fachFits(f, map, or);
+    let o = `<div class="fach${isNew ? ' fach-new' : ''}" data-fach="${f.id}">`;
+    const label = isNew ? '📥 Noch nicht einsortiert' : (f.name || 'Fach ' + (i + 1));
+    if (bgEdit) o += `<div class="fach-h">${isNew ? `<span class="fn">${label}</span>` : `<button class="fn" data-bga="rename">${esc(label)} ✎</button>`}<span class="fc">${isNew ? f.stacks.length : `${F.w}×${F.h} cm`}</span>${isNew ? '' : `<span class="fa"><button data-bga="size" title="Maße dieses Fachs">📏</button><button data-bga="up" ${i === 0 ? 'disabled' : ''} aria-label="Fach nach oben">▲</button><button data-bga="down" ${i === shelves.length - 1 ? 'disabled' : ''} aria-label="Fach nach unten">▼</button><button data-bga="add">＋ Fach</button><button data-bga="del" aria-label="Fach entfernen">✕</button></span>`}</div>`;
+    else if (f.name || isNew) o += `<div class="bs-label">${esc(label)}${isNew ? ' · ' + f.stacks.length : ''}</div>`;
+    o += `<div class="bgfach${isNew ? ' loose' : ''}${ok ? '' : ' over'}" data-f="${f.id}" style="${isNew ? `width:${(maxW * k).toFixed(1)}px` : `width:${(F.w * k).toFixed(1)}px;height:${(F.h * k).toFixed(1)}px`}">`;
+    o += f.stacks.map((st, si) => `<div class="bgstack" data-f="${f.id}" data-si="${si}">${st.map((id, bi) => box(id, f.id, si, bi)).reverse().join('')}</div>`).join('');
+    if (!f.stacks.length) o += `<span class="fach-empty">${bgEdit ? (isNew ? 'Alles einsortiert ✓' : 'Leeres Fach – Spiele hierher ziehen') : 'leer'}</span>`;
+    o += `</div>${ok ? '' : '<p class="fach-hint" style="color:#fca5a5">⚠ Passt nicht mehr (Maße geändert?) – bitte umräumen.</p>'}<div class="bs-board"></div></div>`;
+    return o;
+  };
+  let html = `<div class="home-bar">${bgEdit ? `<button class="btn primary" data-bgh="done">✓ Fertig</button><button class="btn" data-bgh="addend">＋ Neues Fach</button>` : `<button class="btn" data-bgh="edit">✏️ Umstellen</button>`}<button class="btn" data-bgh="gsize">📏 Fach ${G.w}×${G.h} cm</button><button class="btn" data-bgh="save">💾 Sichern</button><button class="btn" data-bgh="restore" ${(shared.bgHomeSaves || []).length ? '' : 'disabled'}>↺ Wiederherstellen</button></div>`;
+  if (bgEdit) html += `<p class="hint home-tip">Spiel <b>gedrückt halten und ziehen</b>: zwischen zwei Spiele = einreihen, <b>auf ein Spiel</b> = obendrauf stapeln. Oder antippen und dann das Ziel antippen. Ein angetipptes Spiel lässt sich unten <b>drehen</b> oder <b>hinlegen/aufstellen</b>.</p>`;
+  if (filtering) html += `<p class="hint home-tip">🔎 ${hits.size} Treffer hervorgehoben.</p>`;
+  html += '<div class="bookcase gshelf2 home">' + shelves.map((f, i) => fachHTML(f, i, false)).join('');
+  if (rest.length || bgEdit) html += fachHTML({ id: HOME_NEW, stacks: rest.map(id => [id]) }, shelves.length, true);
+  html += '</div>';
+  if (bgEdit && bgPick && map.get(bgPick)) { const pc = placedCm(map.get(bgPick), or[bgPick]); html += `<div class="bgpickbar"><b>${esc(map.get(bgPick).titel)}</b><button class="btn" data-bgh="rot">⟲ Drehen</button><button class="btn" data-bgh="flip">${pc.o === 'st' ? '⤵ Hinlegen' : '⤴ Aufstellen'}</button><button class="btn ghost" data-bgh="unpick">✕</button></div>`; }
+  return html;
+}
+// Spiel an neue Stelle: tgt = { f: Fach-ID, before: Stapel-Objekt|null (null = ans Ende), onto: Stapel-Objekt|null }
+async function bgMove(id, f, ref, mode) {
+  const h = bgClone(bgHomeGet()); const { map } = bgLayout(); h.or = h.or || {};
+  const fach = f === HOME_NEW ? null : h.shelves.find(x => x.id === f);
+  // Referenz-Stapel über seinen Inhalt wiederfinden (vor dem Entfernen)
+  const refKey = ref ? ref.join('|') : null;
+  for (const x of h.shelves) x.stacks = x.stacks.map(st => st.filter(i => i !== id && map.has(i))).filter(st => st.length);
+  if (fach) {
+    const findRef = () => fach.stacks.find(st => st.join('|') === (refKey || '').split('|').filter(i => i !== id).join('|'));
+    if (mode === 'onto') { const st = findRef(); if (!st) return toast('Ziel nicht gefunden'); st.push(id); st.forEach(i => h.or[i] = Object.assign({}, h.or[i], { o: 'li' })); }
+    else { const st = refKey ? findRef() : null; const ix = st ? fach.stacks.indexOf(st) : fach.stacks.length; fach.stacks.splice(ix < 0 ? fach.stacks.length : ix, 0, [id]); }
+    if (!fachFits(fach, map, h.or)) { toast('Passt nicht in dieses Fach – zu breit oder zu hoch', 3500); return false; }
+  }
+  bgPick = null; await bgHomeSet(h); render(); return true;
+}
+async function bgOrient(id, change) {
+  const h = bgClone(bgHomeGet()); const { map } = bgLayout(); h.or = h.or || {}; const cur = Object.assign({ o: 'st', r: 0 }, h.or[id]);
+  if (change === 'rot') cur.r = cur.r ? 0 : 1; else cur.o = cur.o === 'st' ? 'li' : 'st';
+  h.or[id] = cur;
+  const fach = h.shelves.find(f => f.stacks.some(st => st.includes(id)));
+  if (fach) { const st = fach.stacks.find(s => s.includes(id)); if (change === 'flip' && cur.o === 'st' && st.length > 1) { fach.stacks.splice(fach.stacks.indexOf(st), 1, ...[st.filter(i => i !== id), [id]]); }
+    if (!fachFits(fach, map, h.or)) return toast('So passt es nicht ins Fach', 3000); }
+  await bgHomeSet(h); render();
+}
+function bgAutoShelves() {
+  const G = bgShelfSize(); const books = live().filter(i => i.typ === 'brettspiel').sort((a, b) => (a.titel || '').localeCompare(b.titel || '', 'de'));
+  const shelves = []; let cur = { id: uid(), name: '', stacks: [] }, used = 0;
+  for (const b of books) { const pc = placedCm(b); if (pc.h > G.h) continue; if (used + pc.w > G.w && cur.stacks.length) { shelves.push(cur); cur = { id: uid(), name: '', stacks: [] }; used = 0; } cur.stacks.push([b.id]); used += pc.w; }
+  shelves.push(cur); return shelves;
+}
+function bindBgHome(el) {
+  el.querySelectorAll('[data-bgh]').forEach(b => b.onclick = async () => {
+    const a = b.dataset.bgh; const h = bgHomeGet() ? bgClone(bgHomeGet()) : null;
+    if (a === 'start-empty') { await bgHomeSet({ shelves: [{ id: uid(), name: '', stacks: [] }], or: {} }); bgEdit = true; render(); }
+    else if (a === 'start-auto') { await bgHomeSet({ shelves: bgAutoShelves(), or: {} }); bgEdit = true; render(); toast('Eingeräumt – jetzt an den echten Platz ziehen'); }
+    else if (a === 'edit') { bgEdit = true; bgPick = null; render(); }
+    else if (a === 'done') { bgEdit = false; bgPick = null; render(); toast('Aufstellung gespeichert'); }
+    else if (a === 'addend') { h.shelves.push({ id: uid(), name: '', stacks: [] }); await bgHomeSet(h); render(); }
+    else if (a === 'gsize') editShelfSize(bgShelfSize(), async v => { shared.bgShelf = v; await saveShared(); render(); });
+    else if (a === 'rot' || a === 'flip') bgOrient(bgPick, a);
+    else if (a === 'unpick') { bgPick = null; render(); }
+    else if (a === 'save') { const n = prompt('Name für diese Sicherung:', 'Stand vom ' + new Date().toLocaleDateString('de-DE')); if (n === null) return; shared.bgHomeSaves = [{ id: uid(), name: n.trim() || 'Sicherung', at: Date.now(), h: bgClone(bgHomeGet()) }, ...(shared.bgHomeSaves || [])].slice(0, 12); await saveShared(); render(); toast('Gesichert'); }
+    else if (a === 'restore') {
+      const saves = shared.bgHomeSaves || []; const s = openSheet(`${sheetHead('Spieleregal wiederherstellen')}<p class="hint" style="margin-top:0">Neue Spiele seit der Sicherung landen in „📥 Noch nicht einsortiert“. Der jetzige Stand wird vorher automatisch gesichert.</p><div class="list">${saves.map(v => `<div class="row" style="cursor:default"><div class="ri"><div class="rt">${esc(v.name)}</div><div class="rs">${new Date(v.at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })} · ${v.h.shelves.length} Fächer</div></div><button class="btn primary" data-r="${v.id}" style="flex:none">Wiederherstellen</button></div>`).join('')}</div>`);
+      s.onclick = async e => { const r = e.target.closest('[data-r]'); if (!r) return; const v = saves.find(x => x.id === r.dataset.r); shared.bgHomeSaves = [{ id: uid(), name: 'Automatisch vor dem Wiederherstellen', at: Date.now(), h: bgClone(bgHomeGet()) }, ...saves].slice(0, 12); await bgHomeSet(bgClone(v.h)); await closeSheet(); render(); toast(`„${v.name}“ wiederhergestellt`); };
+    }
   });
-  return html + '</div>';
+  el.querySelectorAll('.fach-h [data-bga]').forEach(b => b.onclick = async e => {
+    e.stopPropagation(); const fid = b.closest('[data-fach]').dataset.fach; const h = bgClone(bgHomeGet()); const i = h.shelves.findIndex(f => f.id === fid); if (i < 0) return; const a = b.dataset.bga;
+    if (a === 'rename') { const n = prompt('Name für dieses Fach (z. B. „Kallax links oben“):', h.shelves[i].name || ''); if (n === null) return; h.shelves[i].name = n.trim(); }
+    else if (a === 'size') return editShelfSize({ w: h.shelves[i].w || bgShelfSize().w, h: h.shelves[i].h || bgShelfSize().h }, async v => { const { map } = bgLayout(); const t = Object.assign({}, h.shelves[i], v); if (!fachFits(t, map, h.or || {})) toast('Achtung: Der jetzige Inhalt passt bei diesen Maßen nicht mehr', 4000); h.shelves[i] = t; await bgHomeSet(h); render(); });
+    else if (a === 'up' && i > 0) [h.shelves[i - 1], h.shelves[i]] = [h.shelves[i], h.shelves[i - 1]];
+    else if (a === 'down' && i < h.shelves.length - 1) [h.shelves[i + 1], h.shelves[i]] = [h.shelves[i], h.shelves[i + 1]];
+    else if (a === 'add') h.shelves.splice(i + 1, 0, { id: uid(), name: '', stacks: [] });
+    else if (a === 'del') { if (h.shelves[i].stacks.length && !confirm('Fach entfernen? Die Spiele darin kommen zu „Noch nicht einsortiert“.')) return; h.shelves.splice(i, 1); if (!h.shelves.length) h.shelves.push({ id: uid(), name: '', stacks: [] }); }
+    await bgHomeSet(h); render();
+  });
+  if (!bgEdit) return;
+  const { shelves, rest } = bgLayout();
+  const stackOf = (f, si) => f === HOME_NEW ? [rest[si]] : (shelves.find(x => x.id === f)?.stacks[si] || null);
+  // Ziel unter dem Finger bestimmen
+  const targetAt = (x, y, selfId) => {
+    const under = document.elementFromPoint(x, y);
+    const bx = under?.closest('.bgbox[data-hid]'); const stEl = under?.closest('.bgstack[data-si]');
+    const stack = bx?.closest('.bgstack') || stEl;
+    if (stack && stack.dataset.f) {
+      const f = stack.dataset.f, si = +stack.dataset.si, r = stack.getBoundingClientRect(), st = stackOf(f, si);
+      if (st && !(st.length === 1 && st[0] === selfId)) {
+        if (f !== HOME_NEW && y < r.top + Math.min(r.height * .4, 34)) return { f, mode: 'onto', ref: st, mk: { x: r.left, y: r.top - 4, w: r.width, h: 4 } };
+        const after = x > r.left + r.width / 2; const next = after ? stackOf(f, si + 1) : st;
+        return { f, mode: 'before', ref: next, mk: { x: after ? r.right + 1 : r.left - 3, y: r.top, w: 4, h: r.height } };
+      }
+    }
+    const fe = under?.closest('.bgfach[data-f]'); if (fe) { const r = fe.getBoundingClientRect(); return { f: fe.dataset.f, mode: 'before', ref: null, mk: { x: r.right - 8, y: r.top + 4, w: 4, h: r.height - 8 } }; }
+    return null;
+  };
+  const tap = (id, ev) => {
+    if (!bgPick || bgPick === id) { bgPick = bgPick === id ? null : id; render(); return; }
+    const t = targetAt(ev.clientX, ev.clientY, bgPick); if (t) bgMove(bgPick, t.f, t.ref, t.mode);
+  };
+  el.querySelectorAll('.bgfach[data-f]').forEach(fe => fe.addEventListener('click', e => { if (e.target.closest('.bgbox') || !bgPick) return; bgMove(bgPick, fe.dataset.f, null, 'before'); }));
+  el.querySelectorAll('.bgbox[data-hid]').forEach(sp => {
+    sp.addEventListener('contextmenu', e => e.preventDefault());
+    // Antippen über „click“ (nicht pointerup), damit kein Geister-Klick auf die danach eingeblendete Leiste fällt
+    sp.addEventListener('click', e => { e.stopPropagation(); if (Date.now() - (+sp.dataset.dragged || 0) < 600) return; tap(sp.dataset.hid, e); });
+    sp.addEventListener('pointerdown', e => {
+      if (e.button > 0) return;
+      const id = sp.dataset.hid, sx = e.clientX, sy = e.clientY, touch = e.pointerType !== 'mouse';
+      let drag = null, timer = null, last = e, done = false;
+      const start = () => {
+        const r = sp.getBoundingClientRect(); const ghost = sp.cloneNode(true); ghost.className += ' dragghost'; ghost.removeAttribute('data-hid');
+        Object.assign(ghost.style, { left: r.left + 'px', top: r.top + 'px' }); const mark = document.createElement('div'); mark.className = 'dropmark'; mark.hidden = true;
+        document.body.append(ghost, mark); sp.classList.add('dragging'); drag = { ghost, mark, dx: sx - r.left, dy: sy - r.top, t: null, raf: 0 };
+        if (touch) navigator.vibrate?.(12);
+        const loop = () => { if (!drag) return; const y = last.clientY; if (y < 80) scrollBy(0, -14); else if (y > innerHeight - 80) scrollBy(0, 14); pos(); drag.raf = requestAnimationFrame(loop); }; drag.raf = requestAnimationFrame(loop);
+      };
+      const pos = () => { const x = last.clientX, y = last.clientY; drag.ghost.style.transform = `translate(${x - drag.dx - parseFloat(drag.ghost.style.left)}px,${y - drag.dy - parseFloat(drag.ghost.style.top)}px)`;
+        const t = targetAt(x, y, id); drag.t = t; drag.mark.hidden = !t; if (t) Object.assign(drag.mark.style, { left: t.mk.x + 'px', top: t.mk.y + 'px', width: t.mk.w + 'px', height: t.mk.h + 'px' }); };
+      const block = ev => { if (drag) ev.preventDefault(); };
+      const cleanup = () => { done = true; clearTimeout(timer); document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', cleanup); document.removeEventListener('touchmove', block, { passive: false }); if (drag) { cancelAnimationFrame(drag.raf); drag.ghost.remove(); drag.mark.remove(); sp.classList.remove('dragging'); } };
+      const mv = ev => { if (ev.pointerId !== e.pointerId) return; last = ev; if (!drag) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) { if (touch) { cleanup(); return; } start(); } else return; } ev.preventDefault(); pos(); };
+      const up = ev => { if (ev.pointerId !== e.pointerId) return; const d = drag, t = d?.t; cleanup(); if (d) { sp.dataset.dragged = Date.now(); if (t) bgMove(id, t.f, t.ref, t.mode); } };
+      if (touch) timer = setTimeout(() => { if (!done) start(); }, 280);
+      document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', cleanup); document.addEventListener('touchmove', block, { passive: false });
+    });
+  });
+}
+// Schachtelmaße von BoardGameGeek (Versionen; Zoll → cm; deutsche Ausgabe bevorzugt)
+async function bggBox(id) {
+  if (!settings.bggToken || !id) return {};
+  const ck = 'bggv:' + id; const c = await idb.get(ck); if (c && Date.now() - c.at < 60 * 864e5) return c.v;
+  let v = {};
+  try {
+    const doc = await bggFetch('thing?versions=1&id=' + id);
+    const vs = [...doc.querySelectorAll('versions > item')].map(x => { const n = s => +(x.querySelector(s)?.getAttribute('value') || 0); return { w: n('width'), l: n('length'), d: n('depth'), de: [...x.querySelectorAll('link[type=language]')].some(l => /German/i.test(l.getAttribute('value') || '')) }; }).filter(x => x.w && x.l && x.d);
+    const best = vs.find(x => x.de) || vs[0];
+    if (best) { const cm = i => Math.round(i * 25.4) / 10; v = { boxB: cm(best.w), boxH: cm(best.l), boxT: cm(best.d) }; }
+  } catch { }
+  await idb.set(ck, { at: Date.now(), v }); return v;
 }
 function bgViewSwitch() { return `<div class="bs-tools" style="justify-content:flex-start">Ansicht <div class="seg" style="width:auto"><button data-bgview="laden" aria-pressed="${(ui.bgView || 'laden') === 'laden'}">🎲 Spieleladen</button><button data-bgview="regal" aria-pressed="${ui.bgView === 'regal'}">📚 Regal</button></div></div>`; }
 
@@ -1867,7 +2062,7 @@ function inputHTML(typ, f, val) {
     case 'select': { const o = optsOf(f); if (v !== '' && !o.includes(String(v))) o.push(String(v)); inp = `<select name="${f.k}"><option value="">—</option>${o.map(x => `<option ${String(v) === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`; break; }
     case 'textarea': inp = `<textarea name="${f.k}" rows="3">${esc(v)}</textarea>`; break;
     case 'rating': inp = `<div class="starsin" data-rating="${f.k}">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-star="${n}" class="${+v >= n ? 'on' : ''}">★</button>`).join('')}<input type="hidden" name="${f.k}" value="${esc(v)}"></div>`; break;
-    case 'number': inp = `<input type="number" inputmode="decimal" step="${f.step || 1}" min="0" name="${f.k}" value="${esc(v)}">`; break;
+    case 'number': inp = `<input type="number" inputmode="decimal" step="${f.step || 1}" min="0" ${f.ph ? `placeholder="${esc(f.ph)}"` : ''} name="${f.k}" value="${esc(v)}">`; break;
     case 'year': inp = `<input type="number" inputmode="numeric" min="1800" max="2100" name="${f.k}" value="${esc(v)}" placeholder="JJJJ">`; break;
     case 'date': inp = `<input type="date" name="${f.k}" value="${esc(v)}">`; break;
     case 'url': inp = `<div class="inrow"><input type="url" inputmode="url" name="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || 'https://…')}" autocomplete="off">${f.site === 'bgg' ? '<button type="button" class="btn" data-bggsearch title="Auf BoardGameGeek suchen">🔍 BGG</button>' : '<button type="button" class="btn" data-ytsearch title="Auf YouTube suchen">🔍 YT</button>'}<button type="button" class="btn" data-openlink="${f.k}" title="Link öffnen">↗</button></div>`; break;
@@ -2127,6 +2322,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.24', '25.10.2026', ['Brettspiele: Schachtelmaße (Breite, Höhe, Tiefe in cm) – mit BGG-Token automatisch aus BoardGameGeek, deutsche Ausgabe bevorzugt', 'Regal zeigt die Schachteln maßstabsgetreu; Fachgröße in cm einstellbar', 'Brettspiel-Regal „Wie zuhause“: Fächer mit eigenen Maßen, Spiele stehend oder liegend, drehbar, übereinander stapelbar per Drag & Drop – was nicht passt, lässt sich nicht hineinlegen', 'Sichern und Wiederherstellen der Aufstellung, neue Spiele in „Noch nicht einsortiert“']],
   ['1.23', '24.10.2026', ['Titel-Vorschläge beim Tippen jetzt für alle Medienarten: Bücher (Google Books), Filme & Serien (TMDB, sonst iTunes/Wikidata), Games (RAWG, sonst Wikidata), Schallplatten (MusicBrainz), Brettspiele (BoardGameGeek)', 'Zuschneiden deutlich leichter: Ecken und Kanten haben eine große Trefferzone (auch knapp außerhalb des Bildes), im Rahmen verschieben, außerhalb einen neuen Rahmen aufziehen']],
   ['1.22', '23.10.2026', ['Brettspiele: Beim Tippen des Titels erscheinen Vorschläge von BoardGameGeek (mit BGG-Token) – ein Tipp übernimmt Spieleranzahl, Dauer, Alter, Autor, Verlag, Komplexität, Kategorie, BGG-Link und Cover', 'Funktioniert beim Anlegen, auf der Wunschliste und bei „Von anderen geliehen“']],
   ['1.21.1', '22.10.2026', ['Brettspiel-Regal: Fotos der Schachtel-Seite werden vollständig gezeigt statt abgeschnitten', 'Spieleladen: Schachteln passen sich dem Seitenverhältnis des Covers an']],
@@ -2464,7 +2660,7 @@ async function checkAfterCode(id, code) {
    Es werden NUR leere Felder gefüllt – eigene Eingaben werden nie überschrieben. */
 const COPY_FIELDS = new Set(['titel', 'format', 'edition', 'plattform', 'ausgabe', 'staffel', 'lieferumfang', 'sprachen', 'barcode', 'katalognummer', 'pressung', 'farbe', 'rpm']);
 const isEmpty = v => v == null || v === '';
-const completableFields = typ => fieldsOf(typ).filter(f => (f.ai || f.web) && !COPY_FIELDS.has(f.k));
+const completableFields = typ => fieldsOf(typ).filter(f => (f.ai || (f.web && (f.web !== 'bgg' || settings.bggToken))) && !COPY_FIELDS.has(f.k));
 const missingFields = rec => completableFields(rec.typ).filter(f => isEmpty(rec[f.k]));
 const GENRE_MAP = {
   vinyl: [['hip hop', 'Hip-Hop'], ['hip-hop', 'Hip-Hop'], ['rap', 'Hip-Hop'], ['metal', 'Metal'], ['punk', 'Punk'], ['indie', 'Indie'], ['alternative', 'Indie'], ['electro', 'Elektronisch'], ['elektro', 'Elektronisch'], ['techno', 'Elektronisch'], ['house', 'Elektronisch'], ['jazz', 'Jazz'], ['blues', 'Blues'], ['soul', 'Soul / Funk'], ['funk', 'Soul / Funk'], ['r&b', 'Soul / Funk'], ['reggae', 'Reggae'], ['klassi', 'Klassik'], ['classical', 'Klassik'], ['singer', 'Singer-Songwriter'], ['country', 'Country / Folk'], ['folk', 'Country / Folk'], ['schlager', 'Schlager'], ['soundtrack', 'Soundtrack'], ['filmmusik', 'Soundtrack'], ['rock', 'Rock'], ['pop', 'Pop']],
@@ -2628,8 +2824,9 @@ async function bggLookup(rec) {
   const direct = bggIdFromUrl(rec.bgg);
   const ids = direct ? [direct] : await bggSearchIds(rec.titel);
   const t = (await bggThings(ids.slice(0, 1)))[0]; if (!t) return null;
-  return { bgg: 'https://boardgamegeek.com/boardgame/' + t.id, jahr: t.jahr, spielerMin: t.spielerMin, spielerMax: t.spielerMax, dauer: t.dauer, alterAb: t.alterAb, autor: t.autor,
-    komplexitaet: t.weight ? (t.weight < 2 ? 'Leicht' : t.weight < 3.2 ? 'Mittel' : 'Schwer') : undefined, cover: t.image || t.thumb };
+  const box = isEmpty(rec.boxB) || isEmpty(rec.boxH) || isEmpty(rec.boxT) ? await bggBox(t.id) : {};
+  return Object.assign({ bgg: 'https://boardgamegeek.com/boardgame/' + t.id, jahr: t.jahr, spielerMin: t.spielerMin, spielerMax: t.spielerMax, dauer: t.dauer, alterAb: t.alterAb, autor: t.autor,
+    komplexitaet: t.weight ? (t.weight < 2 ? 'Leicht' : t.weight < 3.2 ? 'Mittel' : 'Schwer') : undefined, cover: t.image || t.thumb }, box);
 }
 async function bggCoverCands(it) {
   if (!settings.bggToken) return [];
@@ -2734,7 +2931,7 @@ const SUGGEST = {
       return { name: g.title, sub: [artist, jahr, g['primary-type']].filter(Boolean).join(' · '), thumb: `https://coverartarchive.org/release-group/${g.id}/front-250`, rec: { titel: g.title, interpret: artist, jahr, cover: `https://coverartarchive.org/release-group/${g.id}/front-500` } }; });
   } },
   brettspiel: { src: 'BoardGameGeek', needs: () => settings.bggToken ? '' : 'Mit einem BoardGameGeek-Token (Einstellungen → Fehlende Angaben ergänzen) erscheinen hier beim Tippen Vorschläge.', async search(q) {
-    return (await bggSuggest(q)).map(h => ({ name: h.name, sub: [h.year || '', h.exp ? 'Erweiterung' : '', h.t.spielerMin ? `${h.t.spielerMin}${h.t.spielerMax && h.t.spielerMax !== h.t.spielerMin ? '–' + h.t.spielerMax : ''} Spieler` : '', h.t.dauer ? h.t.dauer + ' Min.' : ''].filter(Boolean).join(' · '), thumb: h.t.thumb, rec: bggRecord(h) }));
+    return (await bggSuggest(q)).map(h => ({ name: h.name, sub: [h.year || '', h.exp ? 'Erweiterung' : '', h.t.spielerMin ? `${h.t.spielerMin}${h.t.spielerMax && h.t.spielerMax !== h.t.spielerMin ? '–' + h.t.spielerMax : ''} Spieler` : '', h.t.dauer ? h.t.dauer + ' Min.' : ''].filter(Boolean).join(' · '), thumb: h.t.thumb, pick: async () => Object.assign(bggRecord(h), await bggBox(h.t.id)) }));
   } },
 };
 function wireSuggest(form, typ, onPick) {
@@ -5179,7 +5376,8 @@ $('#content').onclick = e => {
   const pr = e.target.closest('[data-perrow]'); if (pr) { const k = perRowKey(ui.type); ui.perRow = Object.assign({}, ui.perRow, { [k]: Object.assign({}, ui.perRow?.[k], { [orient()]: +pr.dataset.perrow }) }); saveUi(); render(); return; }
   const go = e.target.closest('[data-grouporder]'); if (go) { openGroupOrder(go.dataset.grouporder); return; }
   const bv = e.target.closest('[data-bgview]'); if (bv) { ui.bgView = bv.dataset.bgview; saveUi(); render(); return; }
-  const bs = e.target.closest('[data-bgsort]'); if (bs) { ui.bgSort = bs.dataset.bgsort; saveUi(); render(); return; }
+  const bs = e.target.closest('[data-bgsort]'); if (bs) { ui.bgSort = bs.dataset.bgsort; bgEdit = false; bgPick = null; saveUi(); render(); return; }
+  const bz = e.target.closest('[data-bgsize]'); if (bz) { editShelfSize(bgShelfSize(), async v => { shared.bgShelf = v; await saveShared(); render(); }); return; }
   const ss = e.target.closest('[data-shelfsort]'); if (ss) { ui.shelfSort = ss.dataset.shelfsort; homeEdit = false; homePick = null; saveUi(); render(); return; }
   const o = e.target.closest('[data-open]'); if (o) openDetail(o.dataset.open);
 };
