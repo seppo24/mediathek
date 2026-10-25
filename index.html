@@ -271,7 +271,9 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .ytbox .lbl{position:absolute;left:10px;bottom:8px;color:#fff;font-weight:600;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .mini{font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;background:#ff5100;color:#fff;text-decoration:none;letter-spacing:.02em}
 .mini.yt{background:#ff0000}
-.vlinks{display:flex;gap:6px;flex-wrap:wrap}.vlinks .mini{font-size:11px;padding:3px 8px}
+.vlinks{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+.vlink{flex:1 1 auto;text-align:center;font-size:12px;font-weight:800;border-radius:8px;padding:7px 8px;text-decoration:none;color:#fff;background:#3f3a74}
+.vlink.bgg{background:#ff5100}.vlink.yt{background:#d40000}
 .vcard{cursor:pointer}
 .borrow{font-size:11px;font-weight:600;color:#0369a1;border:1px solid currentColor;border-radius:999px;padding:1px 7px}
 .borrow.late{color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent)}
@@ -579,7 +581,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.27';
+const APP_VERSION = '1.28';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2337,6 +2339,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.28', '25.10.2026', ['Abstimmungsseite: auch eure selbst fotografierten/hochgeladenen Cover sind für die Gäste sichtbar (kleine Datei über Dropbox)', 'BGG- und YouTube-Links als gut sichtbare Knöpfe „ℹ️ Infos (BGG)“ und „▶ YouTube“ an jedem Titel']],
   ['1.27', '25.10.2026', ['Abendplaner: Uhrzeit (von/bis) und Ort angeben', '„📅 In den Kalender“ für euch und eure Gäste (Google Kalender oder .ics-Datei für jede Kalender-App); Ort öffnet Google Maps', 'Gäste sehen Datum, Uhrzeit und Ort oben auf der Abstimmungsseite', 'Eure Nachricht an die Gäste steht jetzt groß und farbig ganz oben', 'Gäste können ihrer Stimme eine Nachricht mitgeben – erscheint im Postfach und beim Abend']],
   ['1.26', '25.10.2026', ['Abendplaner: Gäste senden ihre Top 3 mit „Abstimmen & senden“ direkt in die App (über den Briefkasten) – kein Antwort-Link mehr nötig', 'Neue Stimmen erscheinen im „📬 Postfach“ (früher „Anfragen“), sind gleich dem richtigen Abend zugeordnet und lösen eine Benachrichtigung aus', 'Ohne eingerichteten Briefkasten oder bei Verbindungsproblemen bleibt der Weg per Nachricht als Ersatz']],
   ['1.25', '25.10.2026', ['Foto erkennen → Mehrere: neue Auswahl „Ausrichtung“ (Automatisch / Seite / Cover). Bei „Seite“ werden alle Ausschnitte als Rücken bzw. Schachtel-Seite gespeichert (liegend fotografierte werden aufgestellt), bei „Cover“ als Cover']],
@@ -4796,17 +4799,37 @@ function openAbendEditor(ab) {
     await closeSheet(); render(); openAbendDetail(rec.id, !ab);
   };
 }
+// Eigene Cover (fotografiert/hochgeladen) passen nicht in den Link → als kleine Datei über Dropbox freigeben
+async function abendCoverFile(ab, its) {
+  const own = its.filter(it => !/^https:/.test(it.cover || '') && it.coverLocal && !it.coverSpine);
+  if (!own.length || !dbxReady()) return '';
+  try {
+    const c = {}; for (const it of own) { const t = await shareThumb(it); if (t) c[it.id] = t; }
+    if (!Object.keys(c).length) return '';
+    const path = P('/freigabe/abend_' + ab.id.replace(/[^\w-]/g, '') + '.json');
+    await dbxUpload(path, JSON.stringify({ app: 'mediathek-abend', a: ab.id, c }), { '.tag': 'overwrite' });
+    if (ab.cvRaw) return ab.cvRaw;
+    let url;
+    try { url = (await dbxRpc('sharing/create_shared_link_with_settings', { path, settings: { requested_visibility: 'public', audience: 'public', access: 'viewer' } })).url; }
+    catch (e) { if (/shared_link_already_exists/.test(e.summary || e.message)) url = (await dbxRpc('sharing/list_shared_links', { path, direct_only: true })).links?.[0]?.url; else throw e; }
+    if (!url) return '';
+    const u = new URL(url); u.hostname = 'dl.dropboxusercontent.com'; u.searchParams.delete('dl');
+    ab.cvRaw = u.toString(); await upsertExtra(ab); return ab.cvRaw;
+  } catch (e) { console.warn('Abend-Cover', e); return ''; }
+}
 async function abendLink(ab) {
   const tips = new Set(ab.tips || []);
   const its = ab.itemIds.map(id => byId(id)).filter(Boolean).sort((a, b) => (tips.has(b.id) ? 1 : 0) - (tips.has(a.id) ? 1 : 0)).slice(0, 80);
   const rows = [...(ab.customs || []).map(c => [c.id, c.titel, 'eigen', c.info || 'Nicht aus unserer Sammlung', '', 1]),
     ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, it.bgg || '', it.youtube || ''])];
   const mb = shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined; // Gäste dürfen nur einwerfen
-  const code = await packObj({ k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', z: ab.zeit || '', b: ab.bis || '', l: ab.ort || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb });
+  const cv = await abendCoverFile(ab, its);
+  const code = await packObj({ c: cv || undefined, k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', z: ab.zeit || '', b: ab.bis || '', l: ab.ort || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb });
   return baseURL() + '#abend=' + code;
 }
 async function shareAbend(ab) {
-  const url = await abendLink(ab);
+  const btn = $('#adShare'); if (btn) { btn.disabled = true; btn.textContent = 'Bereite Link vor …'; }
+  const url = await abendLink(ab).finally(() => { if (btn) { btn.disabled = false; btn.textContent = '📤 Abstimmungs-Link teilen'; } });
   shareOut({ title: 'Abstimmung teilen', intro: `${abCount(ab)} Titel zur Auswahl${(ab.tips || []).length + (ab.customs || []).length ? `, davon ${(ab.tips || []).length + (ab.customs || []).length} eure Vorschläge (⭐)` : ''}. Schick den Link an eure Gäste oder in die Gruppe.`,
     text: `🎲 ${ab.titel}${abWhen(ab) ? '\n🗓 ' + abWhen(ab) : ''}${ab.ort ? '\n📍 ' + ab.ort : ''}\nWas wollen wir ${ab.typ === 'brettspiel' ? 'spielen' : ab.typ === 'bluray' ? 'gucken' : ab.typ === 'vinyl' ? 'hören' : 'machen'}? Wähl deine Top 3 aus:`, url });
 }
@@ -4851,11 +4874,12 @@ async function initVote(code) {
   el.innerHTML = `${d.n ? `<div class="hostmsg"><span class="who">💬 Nachricht${d.o ? ' von ' + esc(d.o) : ''}</span>${esc(d.n)}</div>` : ''}${evBoxHTML(ev, 'vCal')}<p style="margin:4px 0 14px">${d.o ? `<b>${esc(d.o)}</b> fragen: ` : ''}Was wollt ihr ${d.i.filter(x => x[2] !== 'eigen').every(x => x[2] === 'brettspiel') ? 'spielen' : d.i.filter(x => x[2] !== 'eigen').every(x => x[2] === 'bluray') ? 'gucken' : 'machen'}? Tippe deine <b>Top ${need}</b> in der Reihenfolge an: zuerst deinen Favoriten.</p><div class="vgrid" id="vg"></div>
     <div class="votebar"><div class="in"><div class="sum" id="vSum"></div><input id="vName" placeholder="Dein Name" value="${esc(lsGet('mt_myname', ''))}" autocomplete="name"><button class="btn primary" id="vSend" style="height:46px">Abstimmen & senden</button><input id="vMsg" placeholder="Nachricht dazu (optional), z. B. „Ich bringe Chips mit“" maxlength="300" value="${esc(lsGet('mt_vote_' + d.a, null)?.m || '')}"></div></div>`;
   const vc = $('#vCal', el); if (vc) vc.onclick = () => openCalendar(ev);
+  if (/^https:\/\/[a-z0-9.-]*dropbox(usercontent)?\.com\//.test(d.c || '')) fetch(d.c, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (!j?.c) return; let n = 0; for (const x of d.i) if (!x[4] && /^data:image\/jpeg;base64,/.test(j.c[x[0]] || '')) { x[4] = j.c[x[0]]; n++; } if (n) draw(); }).catch(() => { });
   const draw = () => {
     const card = ([id, t, typ, sub, cov, tip, bgg, yt]) => {
       const r = picks.indexOf(id) + 1; const c = colorFor(t);
-      const lk = `${/^https:\/\/([\w-]+\.)?boardgamegeek\.com\//.test(bgg || '') ? `<a class="mini" href="${esc(bgg)}" target="_blank" rel="noopener">BGG ↗</a>` : ''}${/^https:\/\/([\w-]+\.)?(youtube\.com|youtu\.be)\//.test(yt || '') ? `<a class="mini yt" href="${esc(yt)}" target="_blank" rel="noopener">▶ Video</a>` : ''}`;
-      return `<div role="button" tabindex="0" class="vcard${r ? ' r' + r : ''}${tip ? ' tip' : ''}" data-v="${esc(id)}">${r ? `<span class="rk r${r}">${r}</span>` : ''}${tip ? '<span class="tipb">⭐ Vorschlag</span>' : ''}<div class="cv" style="background:${c};color:${textOn(c)}">${cov ? `<img src="${esc(cov)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : esc(initials(t))}</div><div class="t">${esc(t)}</div><div class="s">${esc(sub || '')}</div>${lk ? `<div class="vlinks">${lk}</div>` : ''}</div>`;
+      const lk = `${/^https:\/\/([\w-]+\.)?boardgamegeek\.com\//.test(bgg || '') ? `<a class="vlink bgg" href="${esc(bgg)}" target="_blank" rel="noopener">ℹ️ Infos (BGG)</a>` : ''}${/^https:\/\/([\w-]+\.)?(youtube\.com|youtu\.be)\//.test(yt || '') ? `<a class="vlink yt" href="${esc(yt)}" target="_blank" rel="noopener">▶ YouTube</a>` : ''}`;
+      return `<div role="button" tabindex="0" class="vcard${r ? ' r' + r : ''}${tip ? ' tip' : ''}" data-v="${esc(id)}">${r ? `<span class="rk r${r}">${r}</span>` : ''}${tip ? '<span class="tipb">⭐ Vorschlag</span>' : ''}<div class="cv" style="background:${c};color:${textOn(c)}">${cov ? `<img src="${esc(cov)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.replaceWith(document.createTextNode(this.dataset.i))" data-i="${esc(initials(t))}">` : esc(initials(t))}</div><div class="t">${esc(t)}</div><div class="s">${esc(sub || '')}</div>${lk ? `<div class="vlinks">${lk}</div>` : ''}</div>`;
     };
     const tipsL = d.i.filter(x => x[5]), rest = d.i.filter(x => !x[5]);
     $('#vg', el).innerHTML = hasTips
