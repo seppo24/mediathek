@@ -243,7 +243,7 @@ body.view #fab,body.view #settingsBtn,body.view #syncBtn,body.view #checkBtn{dis
 .basketbar{position:fixed;left:50%;transform:translateX(-50%);bottom:max(18px,env(safe-area-inset-bottom));z-index:40;border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:700;padding:14px 22px;box-shadow:0 10px 24px rgba(194,65,12,.45);font-size:15px}
 /* Abstimmungsseite */
 body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .iconbtn,body.vote #fab{display:none!important}
-.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding-bottom:140px}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding-bottom:230px}
 .vcard{position:relative;border:2px solid var(--line);background:var(--surface);border-radius:16px;padding:8px;text-align:left;display:flex;flex-direction:column;gap:6px}
 .vcard .cv{aspect-ratio:3/4;border-radius:10px;overflow:hidden;display:grid;place-items:center;font:800 26px Fraunces,serif}
 .vcard .cv img{width:100%;height:100%;object-fit:cover}
@@ -254,6 +254,13 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .votebar{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:12px 16px calc(14px + env(safe-area-inset-bottom));z-index:40;box-shadow:0 -6px 18px rgba(0,0,0,.08)}
 .votebar .in{max-width:1160px;margin:0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .votebar .sum{flex:1 1 220px;font-size:13px}
+.evbox{display:grid;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:4px 0 12px;font-size:15px}
+.evbox .evrow{display:flex;gap:8px;align-items:flex-start}.evbox .evrow>span:first-child{width:22px;text-align:center;flex:none}
+.evbox .btn{justify-self:start;margin-top:6px}
+.hostmsg{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#422006;border-radius:14px;padding:14px 16px;margin:4px 0 12px;font-size:16px;line-height:1.4;box-shadow:0 4px 14px rgba(180,120,0,.18);border-left:6px solid #f59e0b}
+.hostmsg .who{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.75;margin-bottom:4px}
+.votebar #vMsg{flex:1 1 100%;order:2}.votebar #vSend{order:3;flex:1 1 100%}
+.vmsg{display:block;font-style:italic;color:var(--muted);font-size:13px;margin-top:2px}
 .votebar input{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);flex:1 1 140px;min-width:0}
 .links{display:grid;gap:8px;margin:0 0 12px}
 .linkbtn{display:flex;align-items:center;gap:8px;justify-content:center;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;text-decoration:none;color:var(--ink)}
@@ -572,7 +579,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.26';
+const APP_VERSION = '1.27';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2330,6 +2337,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.27', '25.10.2026', ['Abendplaner: Uhrzeit (von/bis) und Ort angeben', '„📅 In den Kalender“ für euch und eure Gäste (Google Kalender oder .ics-Datei für jede Kalender-App); Ort öffnet Google Maps', 'Gäste sehen Datum, Uhrzeit und Ort oben auf der Abstimmungsseite', 'Eure Nachricht an die Gäste steht jetzt groß und farbig ganz oben', 'Gäste können ihrer Stimme eine Nachricht mitgeben – erscheint im Postfach und beim Abend']],
   ['1.26', '25.10.2026', ['Abendplaner: Gäste senden ihre Top 3 mit „Abstimmen & senden“ direkt in die App (über den Briefkasten) – kein Antwort-Link mehr nötig', 'Neue Stimmen erscheinen im „📬 Postfach“ (früher „Anfragen“), sind gleich dem richtigen Abend zugeordnet und lösen eine Benachrichtigung aus', 'Ohne eingerichteten Briefkasten oder bei Verbindungsproblemen bleibt der Weg per Nachricht als Ersatz']],
   ['1.25', '25.10.2026', ['Foto erkennen → Mehrere: neue Auswahl „Ausrichtung“ (Automatisch / Seite / Cover). Bei „Seite“ werden alle Ausschnitte als Rücken bzw. Schachtel-Seite gespeichert (liegend fotografierte werden aufgestellt), bei „Cover“ als Cover']],
   ['1.24', '25.10.2026', ['Brettspiele: Schachtelmaße (Breite, Höhe, Tiefe in cm) – mit BGG-Token automatisch aus BoardGameGeek, deutsche Ausgabe bevorzugt', 'Regal zeigt die Schachteln maßstabsgetreu; Fachgröße in cm einstellbar', 'Brettspiel-Regal „Wie zuhause“: Fächer mit eigenen Maßen, Spiele stehend oder liegend, drehbar, übereinander stapelbar per Drag & Drop – was nicht passt, lässt sich nicht hineinlegen', 'Sichern und Wiederherstellen der Aufstellung, neue Spiele in „Noch nicht einsortiert“']],
@@ -4658,6 +4666,34 @@ function pasteIncoming() {
 /* =========================================================
    Abendplaner
    ========================================================= */
+// Termin: Datum, Uhrzeit (von/bis), Ort → Kalender (Google oder .ics-Datei für jede Kalender-App)
+const abWhen = ab => [ab.datum ? deDate(ab.datum) : '', ab.zeit ? ab.zeit + (ab.bis ? '–' + ab.bis : '') + ' Uhr' : ''].filter(Boolean).join(', ');
+function calTimes(ev) {
+  const d = ev.datum.replace(/-/g, '');
+  if (!ev.zeit) { const n = new Date(ev.datum + 'T12:00'); n.setDate(n.getDate() + 1); return { allDay: true, s: d, e: n.toISOString().slice(0, 10).replace(/-/g, '') }; }
+  const st = new Date(ev.datum + 'T' + ev.zeit); let en = ev.bis ? new Date(ev.datum + 'T' + ev.bis) : new Date(st.getTime() + 3 * 3600e3); if (en <= st) en = new Date(en.getTime() + 864e5);
+  const f = x => `${x.getFullYear()}${String(x.getMonth() + 1).padStart(2, '0')}${String(x.getDate()).padStart(2, '0')}T${String(x.getHours()).padStart(2, '0')}${String(x.getMinutes()).padStart(2, '0')}00`;
+  return { allDay: false, s: f(st), e: f(en) };
+}
+function openCalendar(ev) {
+  if (!ev.datum) return toast('Für den Kalender fehlt das Datum');
+  const t = calTimes(ev); const esI = x => String(x || '').replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  const g = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(ev.titel) + '&dates=' + t.s + '/' + t.e + (t.allDay ? '' : '&ctz=Europe/Berlin') + (ev.ort ? '&location=' + encodeURIComponent(ev.ort) : '') + (ev.info ? '&details=' + encodeURIComponent(ev.info) : '');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mediathek//Abendplaner//DE', 'BEGIN:VEVENT', 'UID:' + (ev.uid || uid()) + '@mediathek', 'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z',
+    t.allDay ? 'DTSTART;VALUE=DATE:' + t.s : 'DTSTART;TZID=Europe/Berlin:' + t.s, t.allDay ? 'DTEND;VALUE=DATE:' + t.e : 'DTEND;TZID=Europe/Berlin:' + t.e, 'SUMMARY:' + esI(ev.titel), ev.ort ? 'LOCATION:' + esI(ev.ort) : '', ev.info ? 'DESCRIPTION:' + esI(ev.info) : '', 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
+  const file = new File([ics], (ev.titel.replace(/[^\wäöüÄÖÜß -]/g, '').trim() || 'Termin') + '.ics', { type: 'text/calendar' });
+  const s = openSheet(`${sheetHead('In den Kalender')}<p class="hint" style="margin-top:0"><b>${esc(ev.titel)}</b><br>${esc([abWhen(ev), ev.ort].filter(Boolean).join(' · '))}</p>
+    <div class="menu"><a class="btn primary" style="height:50px;text-decoration:none" href="${esc(g)}" target="_blank" rel="noopener">📅 Google Kalender</a>
+    ${navigator.canShare?.({ files: [file] }) ? '<button class="btn" id="calShare" style="height:48px">📲 An Kalender-App senden …</button>' : ''}
+    <button class="btn" id="calDl" style="height:48px">⬇ Kalenderdatei (.ics) laden</button></div>
+    <p class="hint">Google Kalender öffnet den Termin zum Speichern. Die .ics-Datei passt für jeden Kalender (Samsung, Outlook, Apple …).</p>`);
+  const sh = $('#calShare', s); if (sh) sh.onclick = async () => { try { await navigator.share({ files: [file], title: ev.titel }); } catch { } };
+  $('#calDl', s).onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); };
+}
+function evBoxHTML(ev, btnId) {
+  const rows = [ev.datum || ev.zeit ? `<div class="evrow"><span>🗓</span><span><b>${esc(abWhen(ev))}</b></span></div>` : '', ev.ort ? `<div class="evrow"><span>📍</span><span>${/^https?:\/\//.test(ev.ort) ? `<a href="${esc(ev.ort)}" target="_blank" rel="noopener">${esc(ev.ort)}</a>` : `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.ort)}" target="_blank" rel="noopener">${esc(ev.ort)}</a>`}</span></div>` : ''].join('');
+  return rows ? `<div class="evbox">${rows}${ev.datum ? `<button class="btn" id="${btnId}">📅 In den Kalender</button>` : ''}</div>` : '';
+}
 function abendVotes(id) { return xLive('vote').filter(v => v.a === id).sort((a, b) => a.at - b.at); }
 const abCount = ab => ab.itemIds.length + (ab.customs || []).length;
 const isTip = (ab, id) => (ab.tips || []).includes(id) || (ab.customs || []).some(c => c.id === id);
@@ -4674,7 +4710,7 @@ function renderPlanner(el) {
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="plPaste" title="Link aus einer Nachricht einfügen">🔗 Link einfügen</button><button class="btn primary" id="plNew">+ Neuer Abend</button></div></div>
     ${list.length ? list.map(ab => {
       const r = abendRanking(ab).slice(0, 3); const nv = abendVotes(ab.id).length; const past = ab.datum && ab.datum < today;
-      return `<button class="pcard" data-abend="${ab.id}"${past ? ' style="opacity:.7"' : ''}><h3>${esc(ab.titel)}</h3><div class="meta">${ab.datum ? esc(deDate(ab.datum)) + ' · ' : ''}${ab.typ && TYPES[ab.typ] ? esc(TYPES[ab.typ].label) + ' · ' : ''}${abCount(ab)} zur Auswahl${(ab.tips || []).length + (ab.customs || []).length ? ` · ⭐ ${(ab.tips || []).length + (ab.customs || []).length} Vorschläge` : ''} · ${nv} ${nv === 1 ? 'Stimme' : 'Stimmen'}</div>
+      return `<button class="pcard" data-abend="${ab.id}"${past ? ' style="opacity:.7"' : ''}><h3>${esc(ab.titel)}</h3><div class="meta">${abWhen(ab) ? esc(abWhen(ab)) + ' · ' : ''}${ab.ort ? '📍 ' + esc(ab.ort) + ' · ' : ''}${ab.typ && TYPES[ab.typ] ? esc(TYPES[ab.typ].label) + ' · ' : ''}${abCount(ab)} zur Auswahl${(ab.tips || []).length + (ab.customs || []).length ? ` · ⭐ ${(ab.tips || []).length + (ab.customs || []).length} Vorschläge` : ''} · ${nv} ${nv === 1 ? 'Stimme' : 'Stimmen'}</div>
         <div class="podium">${r.length ? r.map((x, i) => `<span>${['🥇', '🥈', '🥉'][i]} ${esc(x.t)} · ${x.p} P.</span>`).join('') : '<span>Noch keine Stimmen</span>'}</div></button>`;
     }).join('') : `<div class="empty"><div class="big">Noch kein Abend geplant</div>Z. B. „Spieleabend Freitag“: Brettspiele für 4 Personen auswählen, Link in die Gruppe schicken, fertig.</div>`}`;
   $('#plNew', el).onclick = () => openAbendEditor();
@@ -4686,7 +4722,9 @@ function openAbendEditor(ab) {
     tips: new Set(ab?.tips || []), customs: (ab?.customs || []).map(c => Object.assign({}, c)) };
   const s = openSheet(`${sheetHead(ab ? 'Auswahl bearbeiten' : 'Neuer Abend')}
     <div class="form"><label class="fld"><span>Name des Abends *</span><input id="aeT" value="${esc(ab?.titel || '')}" placeholder="z. B. Spieleabend Freitag"></label>
-    <label class="fld"><span>Datum</span><input type="date" id="aeD" value="${esc(ab?.datum || '')}"></label></div>
+    <label class="fld"><span>Datum</span><input type="date" id="aeD" value="${esc(ab?.datum || '')}"></label>
+    <div class="inrow" style="gap:8px"><label class="fld" style="flex:1"><span>Uhrzeit</span><input type="time" id="aeZ" value="${esc(ab?.zeit || '')}"></label><label class="fld" style="flex:1"><span>bis (optional)</span><input type="time" id="aeZ2" value="${esc(ab?.bis || '')}"></label></div>
+    <label class="fld"><span>Ort</span><input id="aeO" value="${esc(ab?.ort || '')}" placeholder="z. B. bei uns, Musterstraße 5, Köln" autocomplete="street-address"></label></div>
     <div class="hint" style="margin:14px 0 6px">Was steht zur Wahl?</div>
     <div class="seg" id="aeTyp">${[...TYPE_KEYS, 'alle'].map(t => `<button data-t="${t}" aria-pressed="${st.typ === t}">${t === 'alle' ? 'Gemischt' : TYPES[t].label}</button>`).join('')}</div>
     <div class="hint" style="margin:14px 0 6px">Vorher filtern (optional)</div>
@@ -4699,7 +4737,7 @@ function openAbendEditor(ab) {
     <div class="hint" style="margin:16px 0 6px">Weitere Vorschläge, die nicht in eurer Sammlung sind (optional)</div>
     <div class="votelist" id="aeCust"></div>
     <div class="inrow" style="margin-top:8px;flex-wrap:wrap"><input class="select" id="aeCT" placeholder="Titel, z. B. Flügelschlag" style="flex:2 1 160px"><input class="select" id="aeCI" placeholder="Info, z. B. bringt Max mit" style="flex:2 1 140px"><button class="btn" id="aeCAdd" type="button">+ Vorschlag</button></div>
-    <label class="fld wide" style="margin-top:14px"><span>Nachricht an die Gäste (optional)</span><textarea id="aeN" rows="2" placeholder="z. B. Wir starten um 19 Uhr, für Snacks ist gesorgt!">${esc(ab?.note || '')}</textarea></label>
+    <label class="fld wide" style="margin-top:14px"><span>Nachricht an die Gäste (optional)</span><textarea id="aeN" rows="2" placeholder="z. B. Für Snacks ist gesorgt – bringt gute Laune mit!">${esc(ab?.note || '')}</textarea></label>
     <div class="formfoot"><button class="btn" data-close>Abbrechen</button><button class="btn primary" id="aeSave">${ab ? 'Speichern' : 'Abend anlegen'}</button></div>`);
   const pool = () => live().filter(it => (st.typ === 'alle' || it.typ === st.typ) && (!st.hideLent || !it.verliehenAn) && matchesFilters(it, st.filters));
   const visible = () => { const terms = st.q.toLowerCase().split(/\s+/).filter(Boolean); return pool().filter(it => !terms.length || terms.every(t => hayOf(it).includes(t))).sort(SORTS.titel.fn); };
@@ -4754,7 +4792,7 @@ function openAbendEditor(ab) {
     const ids = [...st.sel].filter(id => byId(id)); if (ids.length + st.customs.length < 2) return toast('Bitte mindestens 2 Titel auswählen oder vorschlagen');
     const titles = {}; ids.forEach(id => titles[id] = byId(id).titel); st.customs.forEach(c => titles[c.id] = c.titel);
     const tips = [...st.tips].filter(id => ids.includes(id));
-    const rec = await upsertExtra(Object.assign(ab || { id: 'a_' + uid(), kind: 'abend', createdAt: Date.now() }, { titel, datum: $('#aeD', s).value, typ: st.typ, filters: st.filters, itemIds: ids, titles, tips, customs: st.customs, note: $('#aeN', s).value.trim().slice(0, 300) }));
+    const rec = await upsertExtra(Object.assign(ab || { id: 'a_' + uid(), kind: 'abend', createdAt: Date.now() }, { titel, datum: $('#aeD', s).value, zeit: $('#aeZ', s).value, bis: $('#aeZ', s).value ? $('#aeZ2', s).value : '', ort: $('#aeO', s).value.trim().slice(0, 160), typ: st.typ, filters: st.filters, itemIds: ids, titles, tips, customs: st.customs, note: $('#aeN', s).value.trim().slice(0, 300) }));
     await closeSheet(); render(); openAbendDetail(rec.id, !ab);
   };
 }
@@ -4764,20 +4802,21 @@ async function abendLink(ab) {
   const rows = [...(ab.customs || []).map(c => [c.id, c.titel, 'eigen', c.info || 'Nicht aus unserer Sammlung', '', 1]),
     ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, it.bgg || '', it.youtube || ''])];
   const mb = shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined; // Gäste dürfen nur einwerfen
-  const code = await packObj({ k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb });
+  const code = await packObj({ k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', z: ab.zeit || '', b: ab.bis || '', l: ab.ort || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb });
   return baseURL() + '#abend=' + code;
 }
 async function shareAbend(ab) {
   const url = await abendLink(ab);
   shareOut({ title: 'Abstimmung teilen', intro: `${abCount(ab)} Titel zur Auswahl${(ab.tips || []).length + (ab.customs || []).length ? `, davon ${(ab.tips || []).length + (ab.customs || []).length} eure Vorschläge (⭐)` : ''}. Schick den Link an eure Gäste oder in die Gruppe.`,
-    text: `🎲 ${ab.titel}${ab.datum ? ' (' + deDate(ab.datum) + ')' : ''}\nWas wollen wir ${ab.typ === 'brettspiel' ? 'spielen' : ab.typ === 'bluray' ? 'gucken' : ab.typ === 'vinyl' ? 'hören' : 'machen'}? Wähl deine Top 3 aus:`, url });
+    text: `🎲 ${ab.titel}${abWhen(ab) ? '\n🗓 ' + abWhen(ab) : ''}${ab.ort ? '\n📍 ' + ab.ort : ''}\nWas wollen wir ${ab.typ === 'brettspiel' ? 'spielen' : ab.typ === 'bluray' ? 'gucken' : ab.typ === 'vinyl' ? 'hören' : 'machen'}? Wähl deine Top 3 aus:`, url });
 }
 function openAbendDetail(id, fresh) {
   const ab = xLive('abend').find(a => a.id === id); if (!ab) return;
   const unseen = abendVotes(id).filter(v => v.neu); if (unseen.length) { unseen.forEach(v => delete v.neu); Promise.all(unseen.map(v => upsertExtra(v))).then(() => renderChips()); }
   const rank = abendRanking(ab); const votes = abendVotes(ab.id); const max = Math.max(1, ...rank.map(r => r.p));
   const s = openSheet(`${sheetHead(ab.titel)}
-    <p class="hint" style="margin-top:0">${ab.datum ? esc(deDate(ab.datum)) + ' · ' : ''}${abCount(ab)} Titel zur Auswahl · ${votes.length} ${votes.length === 1 ? 'Stimme' : 'Stimmen'} · Platz 1 = 3 Punkte, Platz 2 = 2, Platz 3 = 1</p>
+    ${evBoxHTML(ab, 'adCal')}
+    <p class="hint" style="margin-top:0">${abCount(ab)} Titel zur Auswahl · ${votes.length} ${votes.length === 1 ? 'Stimme' : 'Stimmen'} · Platz 1 = 3 Punkte, Platz 2 = 2, Platz 3 = 1</p>
     ${(ab.tips || []).length + (ab.customs || []).length ? `<p style="margin:0 0 10px;font-size:14px"><b>⭐ Eure Vorschläge:</b> ${[...(ab.tips || []).map(id => byId(id)?.titel || ab.titles?.[id]), ...(ab.customs || []).map(c => c.titel + (c.info ? ' (' + c.info + ')' : ''))].filter(Boolean).map(esc).join(', ')}</p>` : ''}
     ${ab.note ? `<div class="note" style="margin-bottom:10px">💬 ${esc(ab.note)}</div>` : ''}
     ${fresh ? `<div class="note" style="margin-bottom:12px">Abend angelegt. Jetzt den Link teilen – jede Antwort kommt als Link zurück, den ihr nur antippen müsst.</div>` : ''}
@@ -4785,9 +4824,10 @@ function openAbendDetail(id, fresh) {
     <h3 style="font:800 17px Fraunces,serif;margin:18px 0 6px">Platzierung</h3>
     ${rank.length ? rank.map((r, i) => { const it = byId(r.id); return `<div class="rankrow"><span class="pos">${i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</span><div><b>${esc(r.t)}</b>${isTip(ab, r.id) ? ' <span class="tipb inl">⭐ Vorschlag</span>' : ''}${it ? ` <span class="hint">${esc(subtitle(it))}</span>` : ''}<div class="tr"><div class="fl" style="width:${r.p / max * 100}%"></div></div><div class="medals">${r.m[0] ? r.m[0] + '× Platz 1 ' : ''}${r.m[1] ? r.m[1] + '× Platz 2 ' : ''}${r.m[2] ? r.m[2] + '× Platz 3' : ''}</div></div><span class="pts">${r.p} P.</span></div>`; }).join('')
       : '<p class="hint">Noch keine Stimmen. Sobald jemand abgestimmt hat und ihr seinen Link antippt, erscheint hier die Platzierung.</p>'}
-    ${votes.length ? `<h3 style="font:800 17px Fraunces,serif;margin:18px 0 6px">Wer hat was gewählt</h3><div class="votelist">${votes.map(v => `<div><span><b>${esc(v.n)}</b>: ${v.p.map((id, k) => `${k + 1}. ${esc(byId(id)?.titel || ab.titles?.[id] || '?')}`).join(' · ')}</span><button class="btn ghost" data-delvote="${v.id}" style="height:28px;padding:0 6px" aria-label="Stimme löschen">✕</button></div>`).join('')}</div>` : ''}
+    ${votes.length ? `<h3 style="font:800 17px Fraunces,serif;margin:18px 0 6px">Wer hat was gewählt</h3><div class="votelist">${votes.map(v => `<div><span><b>${esc(v.n)}</b>: ${v.p.map((id, k) => `${k + 1}. ${esc(byId(id)?.titel || ab.titles?.[id] || '?')}`).join(' · ')}${v.m ? `<span class="vmsg">💬 „${esc(v.m)}“</span>` : ''}</span><button class="btn ghost" data-delvote="${v.id}" style="height:28px;padding:0 6px" aria-label="Stimme löschen">✕</button></div>`).join('')}</div>` : ''}
     <div class="formfoot"><button class="btn danger" id="adDel">Löschen</button><button class="btn" id="adPaste">🔗 Antwort einfügen</button><button class="btn" id="adEdit">Auswahl ändern</button></div>`);
   $('#adShare', s).onclick = () => shareAbend(ab);
+  const ac = $('#adCal', s); if (ac) ac.onclick = () => openCalendar({ titel: ab.titel, datum: ab.datum, zeit: ab.zeit, bis: ab.bis, ort: ab.ort, info: ab.note, uid: ab.id });
   $('#adEdit', s).onclick = () => closeSheet().then(() => openAbendEditor(ab));
   $('#adPaste', s).onclick = () => closeSheet().then(pasteIncoming);
   $('#adDel', s).onclick = async () => { if (!confirm(`„${ab.titel}“ mit allen Stimmen löschen?`)) return; ab.deleted = true; votes.forEach(v => { v.deleted = true; v.updatedAt = Date.now(); }); await upsertExtra(ab); await closeSheet(); render(); };
@@ -4807,8 +4847,10 @@ async function initVote(code) {
   const old = lsGet('mt_vote_' + d.a, null); if (old?.p) old.p.forEach(id => d.i.some(x => x[0] === id) && picks.push(id));
   const el = $('#content');
   const hasTips = d.i.some(x => x[5]);
-  el.innerHTML = `${d.n ? `<div class="note" style="margin:4px 0 10px">💬 ${esc(d.n)}${d.o ? ` <span class="hint">– ${esc(d.o)}</span>` : ''}</div>` : ''}<p style="margin:4px 0 14px">${d.o ? `<b>${esc(d.o)}</b> fragen: ` : ''}Was wollt ihr ${d.i.filter(x => x[2] !== 'eigen').every(x => x[2] === 'brettspiel') ? 'spielen' : d.i.filter(x => x[2] !== 'eigen').every(x => x[2] === 'bluray') ? 'gucken' : 'machen'}? Tippe deine <b>Top ${need}</b> in der Reihenfolge an: zuerst deinen Favoriten.</p><div class="vgrid" id="vg"></div>
-    <div class="votebar"><div class="in"><div class="sum" id="vSum"></div><input id="vName" placeholder="Dein Name" value="${esc(lsGet('mt_myname', ''))}" autocomplete="name"><button class="btn primary" id="vSend" style="height:46px">Abstimmen & senden</button></div></div>`;
+  const ev = { titel: d.t, datum: d.d, zeit: d.z, bis: d.b, ort: d.l, info: d.n, uid: d.a };
+  el.innerHTML = `${d.n ? `<div class="hostmsg"><span class="who">💬 Nachricht${d.o ? ' von ' + esc(d.o) : ''}</span>${esc(d.n)}</div>` : ''}${evBoxHTML(ev, 'vCal')}<p style="margin:4px 0 14px">${d.o ? `<b>${esc(d.o)}</b> fragen: ` : ''}Was wollt ihr ${d.i.filter(x => x[2] !== 'eigen').every(x => x[2] === 'brettspiel') ? 'spielen' : d.i.filter(x => x[2] !== 'eigen').every(x => x[2] === 'bluray') ? 'gucken' : 'machen'}? Tippe deine <b>Top ${need}</b> in der Reihenfolge an: zuerst deinen Favoriten.</p><div class="vgrid" id="vg"></div>
+    <div class="votebar"><div class="in"><div class="sum" id="vSum"></div><input id="vName" placeholder="Dein Name" value="${esc(lsGet('mt_myname', ''))}" autocomplete="name"><button class="btn primary" id="vSend" style="height:46px">Abstimmen & senden</button><input id="vMsg" placeholder="Nachricht dazu (optional), z. B. „Ich bringe Chips mit“" maxlength="300" value="${esc(lsGet('mt_vote_' + d.a, null)?.m || '')}"></div></div>`;
+  const vc = $('#vCal', el); if (vc) vc.onclick = () => openCalendar(ev);
   const draw = () => {
     const card = ([id, t, typ, sub, cov, tip, bgg, yt]) => {
       const r = picks.indexOf(id) + 1; const c = colorFor(t);
@@ -4827,20 +4869,21 @@ async function initVote(code) {
   $('#vg', el).onclick = e => { if (e.target.closest('a')) return; const b = e.target.closest('[data-v]'); if (!b) return; const id = b.dataset.v; const i = picks.indexOf(id); if (i >= 0) picks.splice(i, 1); else if (picks.length < need) picks.push(id); else toast(`Du hast schon ${need} gewählt – tippe einen an, um ihn zu entfernen`); draw(); };
   $('#vSend', el).onclick = async () => {
     const name = $('#vName', el).value.trim(); if (!name) { $('#vName', el).focus(); return toast('Bitte deinen Namen eingeben'); }
-    lsSet('mt_myname', name); lsSet('mt_vote_' + d.a, { p: picks });
-    const vote = { k: 'v', id: myId, a: d.a, n: name, p: picks, at: Date.now(), t: d.t };
+    const msg = $('#vMsg', el).value.trim().slice(0, 300);
+    lsSet('mt_myname', name); lsSet('mt_vote_' + d.a, { p: picks, m: msg });
+    const vote = { k: 'v', id: myId, a: d.a, n: name, p: picks, at: Date.now(), t: d.t, m: msg || undefined };
     const nm = id => d.i.find(x => x[0] === id)?.[1] || '';
     if (d.m?.k && d.m?.r) {
       const b = $('#vSend', el); b.disabled = true; b.textContent = 'Sende …';
       try {
         await mbxSend(d.m, vote);
-        openSheet(`${sheetHead('Stimme gesendet')}<p style="font-size:40px;text-align:center;margin:8px 0">🗳</p><p style="text-align:center">Deine Top ${picks.length} ist bei ${esc(d.o || 'den Gastgebern')} angekommen:</p><ol style="max-width:320px;margin:8px auto">${picks.map(id => `<li>${esc(nm(id))}</li>`).join('')}</ol><p class="hint" style="text-align:center">Du kannst jederzeit neu abstimmen – die neue Stimme ersetzt die alte.</p><div class="formfoot"><button class="btn primary" data-close>Fertig</button></div>`);
+        openSheet(`${sheetHead('Stimme gesendet')}<p style="font-size:40px;text-align:center;margin:8px 0">🗳</p><p style="text-align:center">Deine Top ${picks.length} ist bei ${esc(d.o || 'den Gastgebern')} angekommen:</p><ol style="max-width:320px;margin:8px auto">${picks.map(id => `<li>${esc(nm(id))}</li>`).join('')}</ol>${msg ? `<p class="note" style="max-width:320px;margin:8px auto">💬 „${esc(msg)}“</p>` : ''}<p class="hint" style="text-align:center">Du kannst jederzeit neu abstimmen – die neue Stimme ersetzt die alte.</p><div class="formfoot"><button class="btn primary" data-close>Fertig</button></div>`);
         b.textContent = 'Erneut abstimmen & senden'; b.disabled = false; return;
       } catch (e) { b.textContent = 'Abstimmen & senden'; b.disabled = false; toast('Direkt senden hat nicht geklappt – du kannst die Stimme stattdessen per Nachricht schicken', 4500); }
     }
     const url = baseURL() + '#stimme=' + await packObj(vote);
     shareOut({ title: 'Stimme senden', intro: `Schick die Nachricht an ${d.o ? esc(d.o) : 'die Gastgeber'}. Du kannst später erneut abstimmen – die neue Stimme ersetzt die alte.`,
-      text: `🎲 Meine Top ${picks.length} für „${d.t}“:\n${picks.map((id, k) => `${k + 1}. ${nm(id)}`).join('\n')}\n\nZum Eintragen in eure Mediathek antippen:`, url });
+      text: `🎲 Meine Top ${picks.length} für „${d.t}“:\n${picks.map((id, k) => `${k + 1}. ${nm(id)}`).join('\n')}${msg ? '\n\n💬 ' + msg : ''}\n\nZum Eintragen in eure Mediathek antippen:`, url });
   };
 }
 
@@ -4938,6 +4981,7 @@ async function importVote(d, viaMbox) {
   const ex = xLive('vote').find(v => v.id === 'v_' + d.id) || xLive('vote').find(v => v.a === d.a && v.n.toLowerCase() === name.toLowerCase());
   if (ex && (d.at || 0) && ex.at > d.at) return { rec: ex, ex, old: true }; // ältere Stimme kam später an
   const rec = { id: ex?.id || 'v_' + String(d.id || uid()).slice(0, 30), kind: 'vote', a: String(d.a), n: name, p: d.p.slice(0, 3).map(String), at: d.at || Date.now() };
+  if (d.m) rec.m = String(d.m).slice(0, 300);
   if (viaMbox) { rec.neu = true; rec.t = String(d.t || '').slice(0, 80); }
   await upsertExtra(rec); return { rec, ex };
 }
@@ -5076,7 +5120,7 @@ function renderInbox(el) {
   const open = all.filter(r => r.status === 'offen'), done = all.filter(r => r.status !== 'offen');
   const nv = newVotes().sort((a, b) => b.at - a.at);
   const vcard = v => { const ab = xLive('abend').find(a => a.id === v.a);
-    return `<div class="req"><b>🗳 ${esc(v.n)}</b> <span class="hint">· ${new Date(v.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })} · für „${esc(ab?.titel || v.t || '?')}“${ab?.datum ? ' (' + esc(deDate(ab.datum)) + ')' : ''}</span><ol style="margin:6px 0 8px;padding-left:22px">${v.p.map(id => `<li>${esc(byId(id)?.titel || ab?.titles?.[id] || (ab?.customs || []).find(c => c.id === id)?.titel || '?')}</li>`).join('')}</ol>
+    return `<div class="req"><b>🗳 ${esc(v.n)}</b> <span class="hint">· ${new Date(v.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })} · für „${esc(ab?.titel || v.t || '?')}“${ab?.datum ? ' (' + esc(deDate(ab.datum)) + ')' : ''}</span><ol style="margin:6px 0 8px;padding-left:22px">${v.p.map(id => `<li>${esc(byId(id)?.titel || ab?.titles?.[id] || (ab?.customs || []).find(c => c.id === id)?.titel || '?')}</li>`).join('')}</ol>${v.m ? `<div class="note" style="margin-bottom:8px">💬 „${esc(v.m)}“</div>` : ''}
       <div class="chkacts"><button class="btn primary" data-vt="open" data-id="${v.id}">Zum Abend & Ergebnis</button><button class="btn" data-vt="seen" data-id="${v.id}">✓ Gesehen</button></div></div>`; };
   const card = r => {
     const lines = r.i.map(([id, t]) => { const it = byId(id); return `<li>${esc(it?.titel || t)} – ${!it || it.deleted ? '<span class="bad">nicht mehr in der Sammlung</span>' : it.verliehenAn ? `<span class="bad">${esc(lentText(it))}</span>` : it.digital === 'Ja' ? '<span class="bad">nur digital – nicht verleihbar</span>' : '<span class="ok">verfügbar</span>'}</li>`; }).join('');
