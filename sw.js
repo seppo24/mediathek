@@ -1,5 +1,5 @@
 // Offline-Cache für die App selbst. Daten liegen in IndexedDB + Dropbox, nicht hier.
-const CACHE = 'mediathek-v40';
+const CACHE = 'mediathek-v41';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -53,7 +53,7 @@ async function checkMailbox() {
   const seen = (await kv('readonly', s => s.get('mboxSeen'))) || [];
   const fresh = names.filter(n => !seen.includes(n));
   if (fresh.length) {
-    await self.registration.showNotification('📬 Neue Ausleih-Anfrage', { body: fresh.length === 1 ? 'Eine neue Anfrage wartet in der Mediathek.' : fresh.length + ' neue Anfragen warten in der Mediathek.', icon: 'icon-192.png', badge: 'icon-192.png', tag: 'mediathek-anfrage', data: { url: './?aktion=anfragen' } });
+    await self.registration.showNotification('📬 Neu im Postfach', { body: fresh.length === 1 ? 'Eine neue Anfrage oder Stimme wartet in der Mediathek.' : fresh.length + ' neue Anfragen/Stimmen warten in der Mediathek.', icon: 'icon-192.png', badge: 'icon-192.png', tag: 'mediathek-anfrage', data: { url: './?aktion=anfragen' } });
     await kv('readwrite', s => s.put([...seen, ...fresh].slice(-300), 'mboxSeen'));
   }
   try { if (self.navigator.setAppBadge && names.length) await self.navigator.setAppBadge(names.length); } catch { }

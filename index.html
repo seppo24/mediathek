@@ -572,7 +572,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.25';
+const APP_VERSION = '1.26';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1068,13 +1068,13 @@ function renderChips() {
   counts.verliehen = live().filter(i => i.verliehenAn).length;
   counts.wunsch = wishes().length;
   counts.abend = xLive('abend').length;
-  counts.anfragen = xLive('anfrage').filter(r => r.status === 'offen').length;
+  counts.anfragen = inboxOpen();
   if (!VIEW && counts.anfragen !== renderChips.lastReq) { renderChips.lastReq = counts.anfragen; updateAppBadge(); }
   const defs = [['alle', 'Alle'], ...TYPE_KEYS.map(t => [t, TYPES[t].label]), ['verliehen', '↗ Verliehen'], ['wunsch', '★ Wunschliste']];
   counts.geliehen = borrowed().length; counts.weg = live().filter(i => i.weg).length;
   if (!VIEW && counts.geliehen) defs.push(['geliehen', borrowed().some(isOverdue) ? '↙ Geliehen ⚠' : '↙ Geliehen']);
   if (!VIEW && counts.weg) defs.push(['weg', '🏷 Aussortieren']);
-  if (!VIEW) { defs.push(['abend', '🎲 Abendplaner']); if (xLive('anfrage').length) defs.push(['anfragen', '📬 Anfragen']); }
+  if (!VIEW) { defs.push(['abend', '🎲 Abendplaner']); if (xLive('anfrage').length || newVotes().length) defs.push(['anfragen', '📬 Postfach']); }
   // eigene Reihenfolge / ausgeblendete Tabs (pro Gerät)
   const tc = tabCfg(); const ord = k => { const i = tc.order.indexOf(k); return i < 0 ? 999 : i; };
   let shown = defs.filter(([k]) => VIEW || k === ui.type || (k === 'anfragen' && counts.anfragen) || (!tc.hidden.includes(k) && !(tc.hideEmpty && TYPES[k] && !counts[k]))); // offene Anfragen immer zeigen
@@ -1086,7 +1086,7 @@ function renderChips() {
 const TAB_DEFAULT = { order: [], hidden: [], hideEmpty: true, hideCheck: false, hideStats: false, simple: false };
 const tabCfg = () => Object.assign({}, TAB_DEFAULT, lsGet('mt_tabs', {}));
 const saveTabCfg = c => { lsSet('mt_tabs', c); render(); };
-const ALL_TABS = () => [['alle', 'Alle'], ...TYPE_KEYS.map(t => [t, TYPES[t].label]), ['verliehen', '↗ Verliehen'], ['wunsch', '★ Wunschliste'], ['geliehen', '↙ Geliehen'], ['weg', '🏷 Aussortieren'], ['abend', '🎲 Abendplaner'], ['anfragen', '📬 Anfragen']];
+const ALL_TABS = () => [['alle', 'Alle'], ...TYPE_KEYS.map(t => [t, TYPES[t].label]), ['verliehen', '↗ Verliehen'], ['wunsch', '★ Wunschliste'], ['geliehen', '↙ Geliehen'], ['weg', '🏷 Aussortieren'], ['abend', '🎲 Abendplaner'], ['anfragen', '📬 Postfach']];
 function openTabSettings() {
   let c = tabCfg();
   const s = openSheet(`${sheetHead('Tabs & Ansicht')}
@@ -2330,6 +2330,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.26', '25.10.2026', ['Abendplaner: Gäste senden ihre Top 3 mit „Abstimmen & senden“ direkt in die App (über den Briefkasten) – kein Antwort-Link mehr nötig', 'Neue Stimmen erscheinen im „📬 Postfach“ (früher „Anfragen“), sind gleich dem richtigen Abend zugeordnet und lösen eine Benachrichtigung aus', 'Ohne eingerichteten Briefkasten oder bei Verbindungsproblemen bleibt der Weg per Nachricht als Ersatz']],
   ['1.25', '25.10.2026', ['Foto erkennen → Mehrere: neue Auswahl „Ausrichtung“ (Automatisch / Seite / Cover). Bei „Seite“ werden alle Ausschnitte als Rücken bzw. Schachtel-Seite gespeichert (liegend fotografierte werden aufgestellt), bei „Cover“ als Cover']],
   ['1.24', '25.10.2026', ['Brettspiele: Schachtelmaße (Breite, Höhe, Tiefe in cm) – mit BGG-Token automatisch aus BoardGameGeek, deutsche Ausgabe bevorzugt', 'Regal zeigt die Schachteln maßstabsgetreu; Fachgröße in cm einstellbar', 'Brettspiel-Regal „Wie zuhause“: Fächer mit eigenen Maßen, Spiele stehend oder liegend, drehbar, übereinander stapelbar per Drag & Drop – was nicht passt, lässt sich nicht hineinlegen', 'Sichern und Wiederherstellen der Aufstellung, neue Spiele in „Noch nicht einsortiert“']],
   ['1.23', '24.10.2026', ['Titel-Vorschläge beim Tippen jetzt für alle Medienarten: Bücher (Google Books), Filme & Serien (TMDB, sonst iTunes/Wikidata), Games (RAWG, sonst Wikidata), Schallplatten (MusicBrainz), Brettspiele (BoardGameGeek)', 'Zuschneiden deutlich leichter: Ecken und Kanten haben eine große Trefferzone (auch knapp außerhalb des Bildes), im Rahmen verschieben, außerhalb einen neuen Rahmen aufziehen']],
@@ -4635,10 +4636,7 @@ function shareOut({ title, intro, text, url, onDone }) {
 async function handleIncoming(kind, code) {
   let d; try { d = await unpackObj(code); } catch { return toast('Der Link ist unvollständig.'); }
   if (kind === 'stimme' && d?.k === 'v' && d.a && Array.isArray(d.p)) {
-    const name = String(d.n || 'Gast').trim().slice(0, 40);
-    const ex = xLive('vote').find(v => v.id === 'v_' + d.id) || xLive('vote').find(v => v.a === d.a && v.n.toLowerCase() === name.toLowerCase());
-    const rec = { id: ex?.id || 'v_' + String(d.id || uid()).slice(0, 30), kind: 'vote', a: String(d.a), n: name, p: d.p.slice(0, 3).map(String), at: d.at || Date.now() };
-    await upsertExtra(rec);
+    const { rec, ex } = await importVote(d); const name = rec.n;
     ui.type = 'abend'; saveUi(); render();
     const ab = xLive('abend').find(x => x.id === rec.a);
     toast(ex ? `Stimme von ${name} aktualisiert` : `Stimme von ${name} eingetragen`);
@@ -4765,7 +4763,8 @@ async function abendLink(ab) {
   const its = ab.itemIds.map(id => byId(id)).filter(Boolean).sort((a, b) => (tips.has(b.id) ? 1 : 0) - (tips.has(a.id) ? 1 : 0)).slice(0, 80);
   const rows = [...(ab.customs || []).map(c => [c.id, c.titel, 'eigen', c.info || 'Nicht aus unserer Sammlung', '', 1]),
     ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, it.bgg || '', it.youtube || ''])];
-  const code = await packObj({ k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', o: ownersTitle(), n: ab.note || '', i: rows });
+  const mb = shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined; // Gäste dürfen nur einwerfen
+  const code = await packObj({ k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb });
   return baseURL() + '#abend=' + code;
 }
 async function shareAbend(ab) {
@@ -4775,6 +4774,7 @@ async function shareAbend(ab) {
 }
 function openAbendDetail(id, fresh) {
   const ab = xLive('abend').find(a => a.id === id); if (!ab) return;
+  const unseen = abendVotes(id).filter(v => v.neu); if (unseen.length) { unseen.forEach(v => delete v.neu); Promise.all(unseen.map(v => upsertExtra(v))).then(() => renderChips()); }
   const rank = abendRanking(ab); const votes = abendVotes(ab.id); const max = Math.max(1, ...rank.map(r => r.p));
   const s = openSheet(`${sheetHead(ab.titel)}
     <p class="hint" style="margin-top:0">${ab.datum ? esc(deDate(ab.datum)) + ' · ' : ''}${abCount(ab)} Titel zur Auswahl · ${votes.length} ${votes.length === 1 ? 'Stimme' : 'Stimmen'} · Platz 1 = 3 Punkte, Platz 2 = 2, Platz 3 = 1</p>
@@ -4828,8 +4828,17 @@ async function initVote(code) {
   $('#vSend', el).onclick = async () => {
     const name = $('#vName', el).value.trim(); if (!name) { $('#vName', el).focus(); return toast('Bitte deinen Namen eingeben'); }
     lsSet('mt_myname', name); lsSet('mt_vote_' + d.a, { p: picks });
-    const url = baseURL() + '#stimme=' + await packObj({ k: 'v', id: myId, a: d.a, n: name, p: picks, at: Date.now() });
+    const vote = { k: 'v', id: myId, a: d.a, n: name, p: picks, at: Date.now(), t: d.t };
     const nm = id => d.i.find(x => x[0] === id)?.[1] || '';
+    if (d.m?.k && d.m?.r) {
+      const b = $('#vSend', el); b.disabled = true; b.textContent = 'Sende …';
+      try {
+        await mbxSend(d.m, vote);
+        openSheet(`${sheetHead('Stimme gesendet')}<p style="font-size:40px;text-align:center;margin:8px 0">🗳</p><p style="text-align:center">Deine Top ${picks.length} ist bei ${esc(d.o || 'den Gastgebern')} angekommen:</p><ol style="max-width:320px;margin:8px auto">${picks.map(id => `<li>${esc(nm(id))}</li>`).join('')}</ol><p class="hint" style="text-align:center">Du kannst jederzeit neu abstimmen – die neue Stimme ersetzt die alte.</p><div class="formfoot"><button class="btn primary" data-close>Fertig</button></div>`);
+        b.textContent = 'Erneut abstimmen & senden'; b.disabled = false; return;
+      } catch (e) { b.textContent = 'Abstimmen & senden'; b.disabled = false; toast('Direkt senden hat nicht geklappt – du kannst die Stimme stattdessen per Nachricht schicken', 4500); }
+    }
+    const url = baseURL() + '#stimme=' + await packObj(vote);
     shareOut({ title: 'Stimme senden', intro: `Schick die Nachricht an ${d.o ? esc(d.o) : 'die Gastgeber'}. Du kannst später erneut abstimmen – die neue Stimme ersetzt die alte.`,
       text: `🎲 Meine Top ${picks.length} für „${d.t}“:\n${picks.map((id, k) => `${k + 1}. ${nm(id)}`).join('\n')}\n\nZum Eintragen in eure Mediathek antippen:`, url });
   };
@@ -4903,23 +4912,34 @@ async function pollMailbox({ quiet = false } = {}) {
     if (!lr.ok) { const tx = await lr.text().catch(() => ''); mbxStatus = { at: Date.now(), n: 0, files: 0, err: /not_found/.test(tx) ? '' : 'files/list_folder (' + lr.status + '): ' + tx.slice(0, 200) }; return 0; } // Ordner gibt es erst nach der ersten Anfrage
     const all = (await lr.json()).entries || [];
     const files = all.filter(e => e['.tag'] === 'file' && /\.json$/.test(e.name)).slice(0, 30);
-    const added = [];
+    const added = [], votesIn = [];
     for (const f of files) {
       const dr = await fetch('https://content.dropboxapi.com/2/files/download', { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Dropbox-API-Arg': JSON.stringify({ path: f.path_lower }) } });
       if (!dr.ok) { mbxStatus = { at: Date.now(), err: 'files/download (' + dr.status + '): ' + (await dr.text().catch(() => '')).slice(0, 200) }; continue; } // nicht löschen, später erneut
-      try { const d = JSON.parse(await dr.text()); const res = await importRequest(d); if (res) added.push(res); } catch { }
+      try { const d = JSON.parse(await dr.text()); if (d?.k === 'v') { const v = await importVote(d, true); if (v && !v.old) votesIn.push(v); } else { const res = await importRequest(d); if (res) added.push(res); } } catch { }
       await api('files/delete_v2', { path: f.path_lower });
     }
-    n = added.length;
+    n = added.length + votesIn.length;
     if (!mbxStatus?.err || mbxStatus.at < Date.now() - 5000) mbxStatus = { at: Date.now(), n, files: files.length, err: '' };
     if (n) {
       render(); updateAppBadge();
-      if (!quiet) toast(n === 1 ? `📬 Neue Ausleih-Anfrage von ${added[0].n}` : `📬 ${n} neue Ausleih-Anfragen`, 4000);
-      if (document.visibilityState !== 'visible' || ui.type !== 'anfragen') notifyRequests(added);
+      const abT = v => xLive('abend').find(a => a.id === v.rec.a)?.titel || v.rec.t || 'euren Abend';
+      if (!quiet) toast(added.length && votesIn.length ? `📬 ${added.length} Anfrage(n) und ${votesIn.length} Stimme(n) neu` : added.length ? (added.length === 1 ? `📬 Neue Ausleih-Anfrage von ${added[0].n}` : `📬 ${added.length} neue Ausleih-Anfragen`) : votesIn.length === 1 ? `🗳 ${votesIn[0].rec.n} hat für „${abT(votesIn[0])}“ abgestimmt` : `🗳 ${votesIn.length} neue Stimmen`, 4000);
+      if (document.visibilityState !== 'visible' || ui.type !== 'anfragen') notifyRequests(added, votesIn.map(v => `🗳 ${v.rec.n} → ${abT(v)}`));
     }
   } catch (e) { console.warn('Briefkasten', e); mbxStatus = { at: Date.now(), err: String(e.message || e) }; }
   finally { mbxBusy = false; }
   return n;
+}
+// Stimme eintragen (per Link oder aus dem Briefkasten). Dieselbe Person ersetzt ihre alte Stimme.
+async function importVote(d, viaMbox) {
+  if (!(d?.k === 'v' && d.a && Array.isArray(d.p))) return null;
+  const name = String(d.n || 'Gast').trim().slice(0, 40);
+  const ex = xLive('vote').find(v => v.id === 'v_' + d.id) || xLive('vote').find(v => v.a === d.a && v.n.toLowerCase() === name.toLowerCase());
+  if (ex && (d.at || 0) && ex.at > d.at) return { rec: ex, ex, old: true }; // ältere Stimme kam später an
+  const rec = { id: ex?.id || 'v_' + String(d.id || uid()).slice(0, 30), kind: 'vote', a: String(d.a), n: name, p: d.p.slice(0, 3).map(String), at: d.at || Date.now() };
+  if (viaMbox) { rec.neu = true; rec.t = String(d.t || '').slice(0, 80); }
+  await upsertExtra(rec); return { rec, ex };
 }
 async function importRequest(d) {
   if (!(d?.k === 'a' && Array.isArray(d.i))) return null;
@@ -4929,17 +4949,20 @@ async function importRequest(d) {
   await upsertExtra(rec); return rec;
 }
 // App-Symbol: Zahl (Windows/macOS) bzw. Punkt über eine Benachrichtigung (Android)
+const newVotes = () => xLive('vote').filter(v => v.neu && xLive('abend').some(a => a.id === v.a));
+const inboxOpen = () => xLive('anfrage').filter(r => r.status === 'offen').length + newVotes().length;
 function updateAppBadge() {
-  const n = xLive('anfrage').filter(r => r.status === 'offen').length;
+  const n = inboxOpen();
   try { if (navigator.setAppBadge) n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch { }
   if (!n) clearRequestNotes();
 }
-async function notifyRequests(list) {
+async function notifyRequests(list, voteLines = []) {
   try {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const reg = await navigator.serviceWorker?.ready; if (!reg) return;
     const open = xLive('anfrage').filter(r => r.status === 'offen');
-    await reg.showNotification(open.length > 1 ? `📬 ${open.length} offene Ausleih-Anfragen` : '📬 Neue Ausleih-Anfrage', { body: list.map(r => `${r.n}: ${r.i.map(x => x[1]).join(', ')}`).join('\n').slice(0, 200), icon: 'icon-192.png', badge: 'icon-192.png', tag: 'mediathek-anfrage', renotify: true, data: { url: './?aktion=anfragen' } });
+    const title = !list.length ? (voteLines.length > 1 ? `🗳 ${voteLines.length} neue Stimmen` : '🗳 Neue Stimme im Abendplaner') : open.length > 1 ? `📬 ${open.length} offene Ausleih-Anfragen` : '📬 Neue Ausleih-Anfrage';
+    await reg.showNotification(title, { body: [...list.map(r => `${r.n}: ${r.i.map(x => x[1]).join(', ')}`), ...voteLines].join('\n').slice(0, 200), icon: 'icon-192.png', badge: 'icon-192.png', tag: 'mediathek-anfrage', renotify: true, data: { url: './?aktion=anfragen' } });
   } catch { }
 }
 async function clearRequestNotes() { try { const reg = await navigator.serviceWorker?.getRegistration(); (await reg?.getNotifications({ tag: 'mediathek-anfrage' }) || []).forEach(n => n.close()); } catch { } }
@@ -5051,16 +5074,25 @@ function renderInbox(el) {
   clearRequestNotes();
   const all = xLive('anfrage').sort((a, b) => b.at - a.at);
   const open = all.filter(r => r.status === 'offen'), done = all.filter(r => r.status !== 'offen');
+  const nv = newVotes().sort((a, b) => b.at - a.at);
+  const vcard = v => { const ab = xLive('abend').find(a => a.id === v.a);
+    return `<div class="req"><b>🗳 ${esc(v.n)}</b> <span class="hint">· ${new Date(v.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })} · für „${esc(ab?.titel || v.t || '?')}“${ab?.datum ? ' (' + esc(deDate(ab.datum)) + ')' : ''}</span><ol style="margin:6px 0 8px;padding-left:22px">${v.p.map(id => `<li>${esc(byId(id)?.titel || ab?.titles?.[id] || (ab?.customs || []).find(c => c.id === id)?.titel || '?')}</li>`).join('')}</ol>
+      <div class="chkacts"><button class="btn primary" data-vt="open" data-id="${v.id}">Zum Abend & Ergebnis</button><button class="btn" data-vt="seen" data-id="${v.id}">✓ Gesehen</button></div></div>`; };
   const card = r => {
     const lines = r.i.map(([id, t]) => { const it = byId(id); return `<li>${esc(it?.titel || t)} – ${!it || it.deleted ? '<span class="bad">nicht mehr in der Sammlung</span>' : it.verliehenAn ? `<span class="bad">${esc(lentText(it))}</span>` : it.digital === 'Ja' ? '<span class="bad">nur digital – nicht verleihbar</span>' : '<span class="ok">verfügbar</span>'}</li>`; }).join('');
     const avail = r.i.filter(([id]) => { const it = byId(id); return it && !it.deleted && !it.verliehenAn && it.digital !== 'Ja'; }).length;
     return `<div class="req${r.status !== 'offen' ? ' done' : ''}"><b>${esc(r.n)}</b> <span class="hint">· ${new Date(r.at).toLocaleDateString('de-DE')}${r.status !== 'offen' ? ' · ' + esc(r.status) : ''}</span><ul>${lines}</ul>${r.m ? `<div class="note" style="margin-bottom:8px">„${esc(r.m)}“</div>` : ''}
       <div class="chkacts">${r.status === 'offen' ? `${avail ? `<button class="btn ok" data-rq="lend" data-id="${r.id}">✓ An ${esc(r.n)} verleihen (${avail})</button>` : ''}<button class="btn" data-rq="reply" data-id="${r.id}">💬 Antworten</button><button class="btn" data-rq="no" data-id="${r.id}">Ablehnen</button>` : ''}<button class="btn ghost" data-rq="del" data-id="${r.id}" aria-label="Löschen">🗑</button></div></div>`;
   };
-  el.innerHTML = `<div class="planhead"><div><h2>Ausleih-Anfragen</h2><p class="hint" style="margin:4px 0 0">${shared.mbox?.guest ? 'Kommen über euren Teilen-Link direkt hier an (📬 Briefkasten).' : 'Kommen über euren Teilen-Link. Ein Tipp auf den Link in der Nachricht trägt die Anfrage hier ein. Tipp: Unter Einstellungen → „Anfragen direkt empfangen“ kommen sie ohne WhatsApp an.'}</p></div><button class="btn" id="ibPaste">🔗 Link einfügen</button></div>
+  el.innerHTML = `${nv.length ? `<div class="planhead"><div><h2>Neue Stimmen</h2><p class="hint" style="margin:4px 0 0">Direkt von der Abstimmungsseite eurer Gäste – schon beim jeweiligen Abend eingetragen.</p></div>${nv.length > 1 ? '<button class="btn" data-vt="allseen">✓ Alle gesehen</button>' : ''}</div>${nv.map(vcard).join('')}` : ''}<div class="planhead"${nv.length ? ' style="margin-top:18px"' : ''}><div><h2>Ausleih-Anfragen</h2><p class="hint" style="margin:4px 0 0">${shared.mbox?.guest ? 'Kommen über euren Teilen-Link direkt hier an (📬 Briefkasten).' : 'Kommen über euren Teilen-Link. Ein Tipp auf den Link in der Nachricht trägt die Anfrage hier ein. Tipp: Unter Einstellungen → „Anfragen direkt empfangen“ kommen sie ohne WhatsApp an.'}</p></div><button class="btn" id="ibPaste">🔗 Link einfügen</button></div>
     ${open.length ? open.map(card).join('') : '<div class="empty" style="padding:30px"><div class="big">Keine offenen Anfragen</div></div>'}
     ${done.length ? `<details><summary class="hint" style="margin:12px 0">Erledigt (${done.length})</summary>${done.map(card).join('')}</details>` : ''}`;
   $('#ibPaste', el).onclick = pasteIncoming;
+  el.querySelectorAll('[data-vt]').forEach(b => b.onclick = async () => {
+    const act = b.dataset.vt; const vs = act === 'allseen' ? newVotes() : [extra.find(x => x.id === b.dataset.id)].filter(Boolean);
+    for (const v of vs) { delete v.neu; await upsertExtra(v); }
+    if (act === 'open' && vs[0]) { const a = vs[0].a; ui.type = 'abend'; saveUi(); render(); openAbendDetail(a); } else { if (!inboxOpen() && !xLive('anfrage').length) ui.type = 'alle'; render(); }
+  });
   el.querySelectorAll('[data-rq]').forEach(b => b.onclick = async () => {
     const r = extra.find(x => x.id === b.dataset.id); if (!r) return;
     const act = b.dataset.rq;
@@ -5073,7 +5105,7 @@ function renderInbox(el) {
       const text = `Hallo ${r.n}! Zu deiner Anfrage (${r.i.map(x => x[1]).join(', ')}): `;
       window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
     } else if (act === 'no') { r.status = 'abgelehnt'; await upsertExtra(r); render(); }
-    else if (act === 'del') { if (!confirm('Anfrage löschen?')) return; r.deleted = true; await upsertExtra(r); if (!xLive('anfrage').length) ui.type = 'alle'; render(); }
+    else if (act === 'del') { if (!confirm('Anfrage löschen?')) return; r.deleted = true; await upsertExtra(r); if (!xLive('anfrage').length && !newVotes().length) ui.type = 'alle'; render(); }
   });
 }
 
