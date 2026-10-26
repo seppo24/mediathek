@@ -271,6 +271,19 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .ytbox .lbl{position:absolute;left:10px;bottom:8px;color:#fff;font-weight:600;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .mini{font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;background:#ff5100;color:#fff;text-decoration:none;letter-spacing:.02em}
 .mini.yt{background:#ff0000}
+.rirow .cst{width:100%}.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+.cmpopt{display:flex;flex-direction:column;gap:4px;align-items:stretch;border:2px solid var(--line);border-radius:12px;background:var(--surface);padding:6px;color:var(--ink)}
+.cmpopt small{font-weight:700;font-size:12px;text-align:center}
+.cmpopt[aria-pressed=true]{border-color:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}.cmpopt[aria-pressed=true] small::before{content:'✓ '}
+.cmpopt:disabled{opacity:.5}
+.cmpimg{height:170px;border-radius:8px;background-size:contain!important;background-repeat:no-repeat!important;background-position:center!important;display:grid;place-items:center;font:800 18px Fraunces,serif;background-color:var(--surface2)}
+.cmpimg.empty{font:600 12px system-ui;text-align:center;padding:8px}
+.cmpimg img{max-width:100%;max-height:100%;object-fit:contain}
+.cmpk{display:flex;align-items:center;gap:6px}
+.typepick{display:grid;gap:8px}.typepick button{display:flex;align-items:center;gap:10px;height:50px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0 14px;font-size:16px;font-weight:600;text-align:left;color:var(--ink)}
+.typepick .ck{width:24px;height:24px;border-radius:7px;border:2px solid var(--line);display:grid;place-items:center;color:transparent;font-size:15px;flex:none}
+.typepick button[aria-pressed=true]{border-color:var(--accent);background:var(--surface2)}.typepick button[aria-pressed=true] .ck{background:var(--accent);border-color:var(--accent);color:#fff}
+.typepick .n{margin-left:auto;font-size:13px;color:var(--ink2);font-weight:700}
 .kxb{font-size:11px;font-weight:800;border-radius:6px;padding:1px 6px;background:var(--surface2);border:1px solid var(--line);color:var(--ink)}
 .kxgrid{display:grid;gap:8px;margin:10px 0}.kxgrid>div{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.kxgrid input{width:76px;height:36px;border:1px solid var(--line);border-radius:8px;padding:0 6px;background:var(--surface)}
 .vkx{font-size:12px;font-weight:700;color:var(--ink2)}
@@ -584,7 +597,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.29';
+const APP_VERSION = '1.31';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2367,6 +2380,8 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.31', '26.10.2026', ['Foto erkennen: neue Auswahl „Wofür?“ – Neue Medien, Schon vorhanden (Bild ersetzen) oder ★ Wunschliste', 'Schon vorhanden: Die KI bekommt eure Titelliste, die App ordnet jeden Ausschnitt dem passenden Titel zu und zeigt bisheriges und neues Cover bzw. Rücken nebeneinander – ihr wählt, welches bleibt (Titel änderbar, Cover/Rücken umschaltbar)', 'Wunschliste: „Cover fotografieren“ – Angaben werden wie gewohnt aus dem Internet ergänzt, mit Hinweis „Habt ihr schon!“, falls es schon in der Sammlung ist']],
+  ['1.30', '26.10.2026', ['„Bei allen vorhandenen Medien ergänzen“ und „Cover für Medien ohne Bild suchen“: vorher auswählen, welche Medienarten (mehrere möglich) – mit Anzahl je Art, die Auswahl wird gemerkt']],
   ['1.29', '26.10.2026', ['Brettspiele: Komplexität von BGG (Skala 1–5) wird übernommen und in der Liste als Zahl (⚖ 2,4) gezeigt', 'Daraus die Komplexitätsstufe: Familien- & Einstiegsspiel, Kennerspiel, Gehobenes Kennerspiel, Expertenspiel – Grenzen unter Einstellungen → Brettspiel-Komplexität', 'Stufe im Spiel weiterhin von Hand änderbar (bleibt dann manuell)', 'Neues Feld „Mechanismen“ (mehrere, von BGG, auf Deutsch übersetzt) – auch als Filter', 'Abstimmungsseite zeigt den Gästen Komplexität und Stufe']],
   ['1.28', '25.10.2026', ['Abstimmungsseite: auch eure selbst fotografierten/hochgeladenen Cover sind für die Gäste sichtbar (kleine Datei über Dropbox)', 'BGG- und YouTube-Links als gut sichtbare Knöpfe „ℹ️ Infos (BGG)“ und „▶ YouTube“ an jedem Titel']],
   ['1.27', '25.10.2026', ['Abendplaner: Uhrzeit (von/bis) und Ort angeben', '„📅 In den Kalender“ für euch und eure Gäste (Google Kalender oder .ics-Datei für jede Kalender-App); Ort öffnet Google Maps', 'Gäste sehen Datum, Uhrzeit und Ort oben auf der Abstimmungsseite', 'Eure Nachricht an die Gäste steht jetzt groß und farbig ganz oben', 'Gäste können ihrer Stimme eine Nachricht mitgeben – erscheint im Postfach und beim Abend']],
@@ -2468,25 +2483,105 @@ function openAddMenu() {
   s.querySelector('[data-help]').onclick = () => closeSheet().then(openHelp);
   s.onclick = e => {
     const b = e.target.closest('[data-a]'); if (!b || b.disabled) return;
-    closeSheet().then(() => ({ manual: () => openForm(), photo: openPhoto, scan: openScanner, wish: () => openForm({ prefill: { wunsch: true, typ: TYPES[ui.type] ? ui.type : 'buch' }, title: 'Neuer Wunsch' }), borrow: () => openForm({ prefill: { geliehen: true, geliehenAm: todayISO(), typ: TYPES[ui.type] ? ui.type : 'buch' }, title: 'Von anderen geliehen' }), weg: () => openWegPicker(), check: openCheck })[b.dataset.a]());
+    closeSheet().then(() => ({ manual: () => openForm(), photo: openPhoto, scan: openScanner, wish: openWishMenu, borrow: () => openForm({ prefill: { geliehen: true, geliehenAm: todayISO(), typ: TYPES[ui.type] ? ui.type : 'buch' }, title: 'Von anderen geliehen' }), weg: () => openWegPicker(), check: openCheck })[b.dataset.a]());
   };
 }
 
+function openWishMenu() {
+  const ai = settings.provider !== 'barcode' && aiKey(); const typ = TYPES[ui.type] ? ui.type : 'buch';
+  const s = openSheet(`${sheetHead('Auf die Wunschliste')}<div class="menu">
+    <button data-w="photo" ${ai ? '' : 'disabled'}><span class="mi">📷</span><span><b>Cover fotografieren</b><small>${ai ? 'Z. B. im Laden – Angaben kommen aus dem Internet' : 'Erst in den Einstellungen eine KI auswählen'}</small></span></button>
+    <button data-w="manual"><span class="mi">✍️</span><span><b>Von Hand eintragen</b><small>Titel eintippen – Vorschläge erscheinen beim Tippen</small></span></button></div>`);
+  s.onclick = e => { const b = e.target.closest('[data-w]'); if (!b || b.disabled) return; closeSheet().then(() => b.dataset.w === 'photo' ? openPhoto({ target: 'wish' }) : openForm({ prefill: { wunsch: true, typ }, title: 'Neuer Wunsch' })); };
+}
+
+/* ---------- Vorhandene Medien: neues Foto mit Cover/Rücken in der Mediathek vergleichen ---------- */
+function knownTitles(typ) {
+  return live().filter(i => !typ || i.typ === typ).sort(SORTS.titel.fn).slice(0, 900).map(i => `${i.typ} | ${i.titel}${i.plattform ? ' (' + i.plattform + ')' : ''}`).join('\n');
+}
+function titleSim(a, b) {
+  a = normDup(a); b = normDup(b); if (!a || !b) return 0; if (a === b) return 1;
+  if (Math.min(a.length, b.length) >= 4 && (a.includes(b) || b.includes(a))) return .9;
+  const bg = t => { const m = new Map(); for (let i = 0; i < t.length - 1; i++) { const g = t.slice(i, i + 2); m.set(g, (m.get(g) || 0) + 1); } return m; };
+  const A = bg(a), B = bg(b); let n = 0; for (const [g, c] of A) n += Math.min(c, B.get(g) || 0);
+  return 2 * n / Math.max(1, a.length - 1 + b.length - 1);
+}
+function matchExisting(rec) {
+  return live().filter(i => !rec.typ || !TYPES[rec.typ] || i.typ === rec.typ).map(i => ({ it: i, s: titleSim(rec.titel, i.titel) + (rec.plattform && i.plattform === rec.plattform ? .05 : 0) + (rec.barcode && i.barcode === rec.barcode ? 1 : 0) }))
+    .sort((a, b) => b.s - a.s);
+}
+function openReplaceImages(found) {
+  const rows = found.filter(r => r._coverData).map((r, n) => {
+    const m = matchExisting(r); const best = m[0] && m[0].s >= .55 ? m[0].it : null;
+    const kind = r._coverSpine ? 'spine' : 'cover';
+    return { n, r, m, id: best?.id || '', kind, choice: best && !(kind === 'spine' ? hasSpine(best) : hasCover(best)) ? 'new' : null };
+  });
+  if (!rows.length) return toast('Auf dem Foto wurde kein Medium mit Bildausschnitt erkannt');
+  const s = openSheet(`${sheetHead('Bilder vergleichen')}
+    <p class="hint" style="margin-top:0">Links das bisherige Bild aus eurer Mediathek, rechts der Ausschnitt aus deinem Foto. Tippe an, welches bleiben soll. Passt der Titel nicht, wähle den richtigen aus.</p>
+    <div class="csbar"><span id="riProg" class="hint"></span><button class="btn ghost" id="riAllNew" style="height:32px">Alle: neues Bild</button></div>
+    <div id="riBody"></div>
+    <div class="formfoot"><button class="btn" data-close>Abbrechen</button><button class="btn primary" id="riApply" disabled>Übernehmen</button></div>`, { full: true });
+  const body = $('#riBody', s);
+  const imgBox = (it, kind) => {
+    if (!it) return '<div class="cmpimg empty">kein Titel</div>';
+    const c = colorFor(it.titel); const has = kind === 'spine' ? hasSpine(it) : hasCover(it);
+    if (!has) return `<div class="cmpimg empty" style="background:${c};color:${textOn(c)}">noch kein ${kind === 'spine' ? 'Rücken' : 'Cover'}</div>`;
+    return kind === 'spine' ? `<div class="cmpimg sp" data-spine="${it.id}" style="background-color:${c}"></div>` : `<div class="cmpimg" data-cover="${it.id}" style="background:${c};color:${textOn(c)}"><span class="ph">${esc(initials(it.titel))}</span></div>`;
+  };
+  const rowHTML3 = row => {
+    const it = row.id ? byId(row.id) : null;
+    const opts = row.m.slice(0, 12).filter(x => x.s > .2); const rest = live().filter(i => !opts.some(o => o.it.id === i.id) && (!row.r.typ || i.typ === row.r.typ)).sort(SORTS.titel.fn);
+    return `<div class="csrow rirow" data-ri="${row.n}"><div class="cst"><b>Erkannt: ${esc(row.r.titel || '?')}</b>
+      <select class="select" data-rsel="${row.n}" style="margin-top:6px;width:100%"><option value="">— Titel aus der Mediathek wählen —</option>${opts.map(o => `<option value="${o.it.id}" ${o.it.id === row.id ? 'selected' : ''}>${esc(o.it.titel)}${o.it.plattform ? ' (' + esc(o.it.plattform) + ')' : ''} · ${Math.round(Math.min(1, o.s) * 100)} %</option>`).join('')}${rest.length ? `<optgroup label="Alle weiteren">${rest.map(i => `<option value="${i.id}" ${i.id === row.id ? 'selected' : ''}>${esc(i.titel)}</option>`).join('')}</optgroup>` : ''}</select></div>
+      <div class="cmp"><button class="cmpopt" data-rc="old" data-n="${row.n}" aria-pressed="${row.choice === 'old'}" ${it ? '' : 'disabled'}><small>Bisher</small>${imgBox(it, row.kind)}</button>
+      <button class="cmpopt" data-rc="new" data-n="${row.n}" aria-pressed="${row.choice === 'new'}" ${it ? '' : 'disabled'}><small>Neu (Foto)</small><div class="cmpimg${row.kind === 'spine' ? ' sp' : ''}" style="background-image:url('${row.r._coverData}')"></div></button></div>
+      <div class="cmpk"><span class="hint">Verwenden als:</span> <button class="btn ghost" data-rk="${row.n}" style="height:30px">${row.kind === 'spine' ? '📚 Rücken / Seite' : '🖼 Cover'} ⇄</button></div></div>`;
+  };
+  const upd = () => { const n = rows.filter(r => r.id && r.choice === 'new').length, open = rows.filter(r => r.id && !r.choice).length; $('#riProg', s).textContent = `${rows.length} erkannt · ${n} neue Bilder · ${open} offen${rows.some(r => !r.id) ? ' · ' + rows.filter(r => !r.id).length + ' ohne Titel' : ''}`; const b = $('#riApply', s); b.disabled = !n; b.textContent = n ? `${n} Bild${n > 1 ? 'er' : ''} übernehmen` : 'Übernehmen'; };
+  const draw = () => { body.innerHTML = rows.map(rowHTML3).join(''); hydrateCovers(body); hydrateSpines(body); upd(); };
+  const redraw = row => { const el = body.querySelector(`[data-ri="${row.n}"]`); if (el) { el.outerHTML = rowHTML3(row); const nel = body.querySelector(`[data-ri="${row.n}"]`); hydrateCovers(nel); hydrateSpines(nel); } upd(); };
+  draw();
+  body.addEventListener('change', e => { const sel = e.target.closest('[data-rsel]'); if (!sel) return; const row = rows[+sel.dataset.rsel]; row.id = sel.value; const it = byId(row.id); row.choice = it && !(row.kind === 'spine' ? hasSpine(it) : hasCover(it)) ? 'new' : null; redraw(row); });
+  body.addEventListener('click', e => {
+    const c = e.target.closest('[data-rc]'); if (c && !c.disabled) { const row = rows[+c.dataset.n]; row.choice = c.dataset.rc; redraw(row); return; }
+    const k = e.target.closest('[data-rk]'); if (k) { const row = rows[+k.dataset.rk]; row.kind = row.kind === 'spine' ? 'cover' : 'spine'; const it = byId(row.id); row.choice = it && !(row.kind === 'spine' ? hasSpine(it) : hasCover(it)) ? 'new' : null; redraw(row); }
+  });
+  $('#riAllNew', s).onclick = () => { rows.forEach(r => { if (r.id) r.choice = 'new'; }); draw(); };
+  $('#riApply', s).onclick = async () => {
+    const todo = rows.filter(r => r.id && r.choice === 'new'); const b = $('#riApply', s); b.disabled = true; b.textContent = 'Speichere …';
+    // Pro Titel nur ein Bild je Art (falls zweimal derselbe gewählt wurde, gilt das letzte)
+    const by = new Map(); todo.forEach(r => by.set(r.id + r.kind, r));
+    for (const r of by.values()) {
+      const it = byId(r.id); if (!it) continue;
+      const rec = Object.assign({}, it, r.kind === 'spine' ? { _spineData: r.r._coverData, _spineAspect: r.r._coverAspect || (r.r._coverAspect = await imgAspect(r.r._coverData)) } : { _coverData: r.r._coverData }, { _noAuthorCheck: true });
+      await upsertItem(rec);
+    }
+    await persist(); await closeSheet(); render(); toast(`${by.size} Bild${by.size === 1 ? '' : 'er'} ersetzt`);
+  };
+}
+const imgAspect = d => new Promise(res => { const i = new Image(); i.onload = () => res(i.naturalWidth / i.naturalHeight); i.onerror = () => res(.2); i.src = d; });
+
 /* ---------- Foto-Erkennung (KI) ---------- */
 function aiKey() { return settings.provider === 'claude' ? settings.claudeKey : settings.provider === 'gemini' ? settings.geminiKey : ''; }
-function openPhoto() {
-  let mode = 'single', hint = '', orient = '';
-  const s = openSheet(`${sheetHead('Foto erkennen')}
+function openPhoto(opts = {}) {
+  let mode = 'single', hint = TYPES[opts.typ] ? opts.typ : '', orient = '', target = opts.target || 'new';
+  const tgtTip = { new: 'Neue Medien werden erkannt und – wie gewohnt – mit Angaben aus dem Internet ergänzt.', have: 'Die App sucht die erkannten Titel in eurer Mediathek und zeigt altes und neues Bild nebeneinander – du entscheidest, welches bleibt.', wish: 'Ideal im Laden: Cover fotografieren, die Angaben kommen aus dem Internet, und es landet auf der Wunschliste. Ihr seht sofort, falls ihr es schon habt.' };
+  const s = openSheet(`${sheetHead(target === 'wish' ? 'Wunsch fotografieren' : 'Foto erkennen')}
+    <div class="hint" style="margin-bottom:6px">Wofür?</div>
+    <div class="seg" id="pTgt" style="margin-bottom:6px"><button data-g="new" aria-pressed="${target === 'new'}">Neue Medien</button><button data-g="have" aria-pressed="${target === 'have'}">Schon vorhanden – Bild ersetzen</button><button data-g="wish" aria-pressed="${target === 'wish'}">★ Wunschliste</button></div>
+    <p class="hint" id="pTgtTip" style="margin:0 0 12px">${tgtTip[target]}</p>
     <div class="hint" style="margin-bottom:6px">Was ist auf dem Foto?</div>
     <div class="seg" id="pMode" style="margin-bottom:12px"><button data-m="single" aria-pressed="true">Ein Medium</button><button data-m="multi" aria-pressed="false">Mehrere (z. B. Buchrücken)</button></div>
     <div class="hint" style="margin-bottom:6px">Medienart</div>
-    <div class="seg" id="pType" style="margin-bottom:14px"><button data-t="" aria-pressed="true">Automatisch</button>${TYPE_KEYS.map(t => `<button data-t="${t}" aria-pressed="false">${TYPES[t].single.replace(' / Film', '')}</button>`).join('')}</div>
+    <div class="seg" id="pType" style="margin-bottom:14px"><button data-t="" aria-pressed="${!hint}">Automatisch</button>${TYPE_KEYS.map(t => `<button data-t="${t}" aria-pressed="${hint === t}">${TYPES[t].single.replace(' / Film', '')}</button>`).join('')}</div>
     <div id="pOrientWrap" hidden><div class="hint" style="margin-bottom:6px">Ausrichtung der Medien auf dem Foto</div>
     <div class="seg" id="pOrient" style="margin-bottom:14px"><button data-o="" aria-pressed="true">Automatisch</button><button data-o="seite" aria-pressed="false">Seite / Rücken</button><button data-o="cover" aria-pressed="false">Cover</button></div></div>
     <div class="note" id="pTip">Tipp: Cover oder Rückseite gerade und gut beleuchtet fotografieren.</div>
     <div id="pBusy"></div>
     <div class="formfoot"><label class="btn">🖼 Aus Galerie<input type="file" accept="image/*" hidden id="pGal"></label><label class="btn primary">📷 Foto aufnehmen<input type="file" accept="image/*" capture="environment" hidden id="pCam"></label></div>`);
   $('#pMode', s).onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; mode = b.dataset.m; $$('#pMode button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); $('#pOrientWrap', s).hidden = mode !== 'multi'; $('#pTip', s).textContent = mode === 'multi' ? 'Tipp: Regal frontal und scharf fotografieren, gutes Licht, lieber max. ca. 20 Medien pro Foto. Jeder Treffer wird dir danach einzeln zur Bestätigung gezeigt.' : 'Tipp: Cover oder Rückseite gerade und gut beleuchtet fotografieren.'; };
+  $('#pTgt', s).onclick = e => { const b = e.target.closest('[data-g]'); if (!b) return; target = b.dataset.g; $$('#pTgt button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); $('#pTgtTip', s).textContent = tgtTip[target]; };
   $('#pOrient', s).onclick = e => { const b = e.target.closest('[data-o]'); if (!b) return; orient = b.dataset.o; $$('#pOrient button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); };
   $('#pType', s).onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; hint = b.dataset.t; $$('#pType button', s).forEach(x => x.setAttribute('aria-pressed', x === b)); };
   const go = async e => {
@@ -2497,12 +2592,12 @@ function openPhoto() {
     try {
       const img = await resizeImage(file, 1568, .85);
       const ori = mode === 'multi' ? orient : '';
-      const found = await recognize(img, mode, hint, undefined, ori);
+      const found = await recognize(img, mode, hint, undefined, ori, target === 'have' ? knownTitles(hint) : '');
       if (!found.length) throw new Error('Auf dem Foto wurde kein Medium erkannt.');
       // Jedes erkannte Medium aus dem Foto ausschneiden und als Cover nutzen
       for (const r of found) {
         if (!r._box) continue;
-        const c = await cropImage(img, r._box); if (!c) continue;
+        const c = await cropImage(img, r._box, target === 'have' ? 900 : 420); if (!c) continue;
         // Automatisch: schmal = Rücken/Seite. „Seite“/„Cover“ legt es fest; liegend fotografierte Seiten werden aufgestellt.
         const spine = ori === 'seite' || (!ori && c.aspect < 0.45);
         if (spine) { const v = c.aspect > 1 ? await rotateDataURL(c.data, -90) : null; r._coverData = v ? v.data : c.data; r._coverSpine = true; r._coverAspect = v ? 1 / c.aspect : c.aspect; }
@@ -2510,6 +2605,8 @@ function openPhoto() {
       }
       if (mode === 'single' && found.length === 1 && !found[0]._coverData) found[0]._coverData = await resizeImage(file, 500, .78);
       await closeSheet();
+      if (target === 'have') return openReplaceImages(found);
+      if (target === 'wish') found.forEach(r => { r.wunsch = true; delete r.verliehenAn; });
       openReview(found);
     } catch (err) {
       busy.innerHTML = `<div class="note warn" style="margin-top:12px">${esc(err.message)}</div>`;
@@ -2519,11 +2616,11 @@ function openPhoto() {
   };
   $('#pCam', s).onchange = go; $('#pGal', s).onchange = go;
 }
-function aiPrompt(mode, hint, barcode, orient) {
+function aiPrompt(mode, hint, barcode, orient, known) {
   const schema = TYPE_KEYS.map(t => `- "${t}" (${TYPES[t].single}): ` + fieldsOf(t).filter(f => f.ai && !['titel', 'inhalt'].includes(f.k)).map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]` : f.k).join(', ')).join('\n');
   return `Du hilfst beim Katalogisieren einer privaten Mediensammlung (Blu-rays/DVDs, Bücher, Videospiele, Brettspiele).
 ${mode === 'multi' ? 'Auf dem Foto sind MEHRERE Medien, z. B. Buchrücken im Regal oder ein Stapel. Erkenne JEDES einzelne erkennbare Medium und liste alle in Lesereihenfolge (links nach rechts, oben nach unten). Lass keines aus, auch wenn nur der Rücken zu sehen ist.' : 'Auf dem Foto ist EIN Medium (Cover, Rückseite oder Rücken). Erkenne genau dieses.'}
-${hint ? `Alle Medien auf dem Foto sind vom Typ "${hint}".` : ''}${orient === 'seite' ? '\nVon allen Medien ist nur die SEITE bzw. der RÜCKEN zu sehen (schmale Kante der Hülle/Schachtel, stehend oder liegend). Die "box" umschließt genau diese eine Seite.' : orient === 'cover' ? '\nVon allen Medien ist das COVER (Vorderseite) zu sehen. Die "box" umschließt genau dieses eine Cover.' : ''}${barcode ? `\nDer Barcode/EAN des Mediums lautet ${barcode}.` : ''}
+${hint ? `Alle Medien auf dem Foto sind vom Typ "${hint}".` : ''}${known ? `\nDie Medien auf dem Foto gehören bereits zu dieser Sammlung. Verwende als "titel" GENAU die Schreibweise aus dieser Liste, wenn ein Eintrag passt (Format: typ | titel):\n${known}` : ''}${orient === 'seite' ? '\nVon allen Medien ist nur die SEITE bzw. der RÜCKEN zu sehen (schmale Kante der Hülle/Schachtel, stehend oder liegend). Die "box" umschließt genau diese eine Seite.' : orient === 'cover' ? '\nVon allen Medien ist das COVER (Vorderseite) zu sehen. Die "box" umschließt genau dieses eine Cover.' : ''}${barcode ? `\nDer Barcode/EAN des Mediums lautet ${barcode}.` : ''}
 
 Medientypen und ihre Felder (bei [..] genau einen dieser Werte verwenden):
 ${schema}
@@ -2569,8 +2666,8 @@ async function aiCall(prompt, b64, maxTokens = 2000) {
   }
   throw new Error('Keine KI ausgewählt.');
 }
-async function recognize(dataURL, mode, hint, barcode, orient) {
-  const text = await aiCall(aiPrompt(mode, hint, barcode, orient), dataURL.split(',')[1], mode === 'multi' ? 8000 : 2000);
+async function recognize(dataURL, mode, hint, barcode, orient, known) {
+  const text = await aiCall(aiPrompt(mode, hint, barcode, orient, known), dataURL.split(',')[1], mode === 'multi' ? 8000 : 2000);
   return parseAI(text, hint);
 }
 function parseAI(text, hint) {
@@ -3463,9 +3560,11 @@ async function searchCoverFor(id, btn) {
 // Nichts ist vorausgewählt. Jede Auswahl wird sofort als Entwurf gespeichert (auch über mehrere Sitzungen),
 // „Auswahl übernehmen“ setzt die gewählten Cover. Gefundene Vorschläge werden 30 Tage zwischengespeichert.
 async function searchCoversBulk(list) {
-  const pool = () => (list || allLive()).filter(i => !i.deleted && TYPES[i.typ] && i.titel && !hasCover(i) && !i.coverSkip);
+  let types = null;
+  const pool = () => (list || allLive()).filter(i => !i.deleted && TYPES[i.typ] && i.titel && !hasCover(i) && !i.coverSkip && (!types || types.has(i.typ)));
   let todo = pool();
   if (!todo.length) return toast('Alle Medien haben schon ein Cover');
+  if (!list) { types = await pickTypes('Cover suchen', 'Für welche Medien ohne Bild soll gesucht werden?', todo, 'covers'); if (!types) return; todo = pool(); }
   const cache = (await idb.get('coverCands2')) || {}; const draft = (await idb.get('coverDraft')) || {};
   const fresh = id => cache[id] && Date.now() - cache[id].at < 30 * 864e5;
   const saveDraft = () => idb.set('coverDraft', draft); const saveCache = () => idb.set('coverCands2', cache);
@@ -3557,10 +3656,36 @@ function applyProposal(p, only) {
   return ks.length;
 }
 // „Bei allen vorhandenen Medien ergänzen“: nur Angaben (keine Cover), wahlweise direkt oder einzeln geprüft
+// Auswahl, welche Medienarten bearbeitet werden (Mehrfachauswahl, wird pro Gerät gemerkt)
+function pickTypes(title, intro, pool, key) {
+  const counts = {}; for (const i of pool) if (TYPES[i.typ]) counts[i.typ] = (counts[i.typ] || 0) + 1;
+  const keys = TYPE_KEYS.filter(t => counts[t]);
+  if (keys.length < 2) return Promise.resolve(new Set(keys));
+  const last = lsGet('mt_pick_' + key, null); const sel = new Set(keys.filter(t => !last || last.includes(t))); if (!sel.size) keys.forEach(t => sel.add(t));
+  return new Promise(res => {
+    let done = null;
+    const s = openSheet(`${sheetHead(title)}<p class="hint" style="margin-top:0">${intro} Mehrere Medienarten möglich.</p>
+      <div class="typepick">${keys.map(t => `<button data-pt="${t}" aria-pressed="${sel.has(t)}"><span class="ck">✓</span>${esc(TYPES[t].label)}<span class="n">${counts[t]}</span></button>`).join('')}</div>
+      <div class="inrow" style="margin-top:8px"><button class="btn ghost" data-pa="all" style="flex:1">Alle</button><button class="btn ghost" data-pa="none" style="flex:1">Keine</button></div>
+      <div class="formfoot"><button class="btn" data-close>Abbrechen</button><button class="btn primary" id="ptGo"></button></div>`, { onClose: () => res(done) });
+    const upd = () => { $$('[data-pt]', s).forEach(b => b.setAttribute('aria-pressed', sel.has(b.dataset.pt))); const n = keys.filter(t => sel.has(t)).reduce((a, t) => a + counts[t], 0); const g = $('#ptGo', s); g.disabled = !n; g.textContent = n ? `Weiter (${n} Medien)` : 'Bitte auswählen'; };
+    s.addEventListener('click', e => {
+      const b = e.target.closest('[data-pt]'); if (b) { sel.has(b.dataset.pt) ? sel.delete(b.dataset.pt) : sel.add(b.dataset.pt); return upd(); }
+      const a = e.target.closest('[data-pa]'); if (a) { sel.clear(); if (a.dataset.pa === 'all') keys.forEach(t => sel.add(t)); return upd(); }
+      if (e.target.closest('#ptGo')) { lsSet('mt_pick_' + key, [...sel]); done = new Set(sel); closeSheet(); } // erst schließen, dann geht es weiter
+    });
+    upd();
+  });
+}
 async function completeAll(list) {
-  const todo = list ? list.filter(i => !i.deleted) : allLive().filter(i => (missingFields(i).length && (!i.autoAt || i.autoAt < (settings.sourcesAt || 0))) || (i.typ === 'brettspiel' && !i.bgg && !i.bggTried));
+  let todo = list ? list.filter(i => !i.deleted) : allLive().filter(i => (missingFields(i).length && (!i.autoAt || i.autoAt < (settings.sourcesAt || 0))) || (i.typ === 'brettspiel' && !i.bgg && !i.bggTried));
   const saved = (await idb.get('fillProps')) || [];
-  const pending = saved.filter(p => byId(p.id) && !byId(p.id).deleted);
+  let pending = saved.filter(p => byId(p.id) && !byId(p.id).deleted);
+  if (!list && (todo.length || pending.length)) {
+    const types = await pickTypes('Angaben ergänzen', 'Welche Medien sollen ergänzt werden? Die Zahl zeigt, wie viele noch leere Felder haben.', [...todo, ...pending.map(p => byId(p.id))], 'fill');
+    if (!types) return;
+    todo = todo.filter(i => types.has(i.typ)); pending = pending.filter(p => types.has(byId(p.id).typ));
+  }
   if (!todo.length && !pending.length) return toast('Bei allen Medien wurde schon ergänzt');
   if (list) todo.forEach(i => delete i.autoAt);
   const ai = settings.provider !== 'barcode' && aiKey();
@@ -3743,6 +3868,7 @@ function findWish(rec) { return wishes().find(i => (rec.barcode && i.barcode ===
 // Neues Medium speichern – steht es auf der Wunschliste, wird der Wunsch zum gekauften Medium
 async function saveFound(rec) {
   const w = findWish(rec);
+  if (rec.wunsch) { if (!w) return upsertItem(rec); const it = await upsertItem(Object.assign({}, w, Object.fromEntries(Object.entries(rec).filter(([k, v]) => isEmpty(w[k]) && !isEmpty(v))), { id: w.id })); toast(`„${w.titel}“ stand schon auf der Wunschliste – ergänzt`); return it; }
   if (!w) return upsertItem(rec);
   const merged = Object.assign({}, w, rec, { id: w.id }); delete merged.wunsch; delete merged.wunschVon; delete merged.wunschPrio; delete merged.preisCa;
   const it = await upsertItem(merged); it.createdAt = Date.now(); await persist(); toast(`„${w.titel}“ von der Wunschliste übernommen`); return it;
@@ -3762,7 +3888,7 @@ function openReview(queue) {
   let idx = 0, added = 0;
   const s = openSheet(`<div id="rv"></div>`, { full: true });
   async function show() {
-    if (idx >= queue.length) { closeSheet(); render(); toast(`${added} von ${queue.length} hinzugefügt`); return; }
+    if (idx >= queue.length) { closeSheet(); render(); toast(`${added} von ${queue.length} ${queue.some(r => r.wunsch) ? 'auf die Wunschliste gesetzt' : 'hinzugefügt'}`); return; }
     const rec = queue[idx];
     const box = $('#rv', s);
     const draw = () => {
@@ -3778,10 +3904,10 @@ function openReview(queue) {
           <div><span class="tb ${rec.typ}">${esc(t?.single || rec.typ)}</span> <span class="conf ${rec._conf}">Sicherheit: ${rec._conf}</span>
           <h3 style="margin-top:8px">${esc(rec.titel || '(Titel unbekannt)')}</h3><div class="hint">${esc(subtitle(rec))}</div></div></div>
           ${rec._hint ? `<div class="note warn" style="margin-bottom:10px">${esc(rec._hint)}</div>` : ''}
-          ${findWish(rec) ? `<div class="note" style="margin-bottom:10px">★ Steht auf eurer Wunschliste – wird beim Hinzufügen von dort übernommen.</div>` : ''}
-          ${dup ? `<div class="note warn" style="margin-bottom:10px">⚠ Scheint schon in eurer Sammlung zu sein: „${esc(dup.titel)}“${dup.plattform ? ' (' + esc(dup.plattform) + ')' : ''}</div>` : ''}
+          ${findWish(rec) ? `<div class="note" style="margin-bottom:10px">★ Steht ${rec.wunsch ? 'schon' : ''} auf eurer Wunschliste${rec.wunsch ? '' : ' – wird beim Hinzufügen von dort übernommen'}.</div>` : ''}
+          ${dup ? `<div class="note warn" style="margin-bottom:10px${rec.wunsch ? ';font-size:15px' : ''}">⚠ ${rec.wunsch ? '<b>Habt ihr schon!</b> ' : ''}Scheint schon in eurer Sammlung zu sein: „${esc(dup.titel)}“${dup.plattform ? ' (' + esc(dup.plattform) + ')' : ''}</div>` : ''}
           ${linksHTML(rec)}<dl class="facts">${facts || '<dt>Keine weiteren Angaben</dt><dd></dd>'}</dl>${!rec._checked && settings.autoFill ? '<p class="hint" id="rvEnr">🌐 Ergänze fehlende Angaben online …</p>' : ''}</div>
-        <div class="rv-actions"><button class="btn ok yes" id="rvYes" ${rec.titel ? '' : 'disabled'}>✓ Richtig – hinzufügen</button><button class="btn" id="rvFix">✎ Korrigieren</button><button class="btn danger" id="rvNo">✕ Verwerfen</button></div>
+        <div class="rv-actions"><button class="btn ok yes" id="rvYes" ${rec.titel ? '' : 'disabled'}>${rec.wunsch ? '★ Auf die Wunschliste' : '✓ Richtig – hinzufügen'}</button><button class="btn" id="rvFix">✎ Korrigieren</button><button class="btn danger" id="rvNo">✕ Verwerfen</button></div>
         ${queue.length - idx > 1 ? `<p style="text-align:center;margin-top:18px"><button class="btn ghost" id="rvAll" style="font-size:13px">Alle restlichen ${queue.length - idx} ungeprüft übernehmen</button></p>` : ''}</div>`;
       $('#rvYes', box).onclick = async () => { await saveFound(clean(rec)); added++; idx++; show(); };
       $('#rvYes', box).disabled = !rec.titel || (!rec._checked && settings.autoFill);
