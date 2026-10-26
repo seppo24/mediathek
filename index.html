@@ -597,7 +597,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.33';
+const APP_VERSION = '1.33.1';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2383,6 +2383,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.33.1', '26.10.2026', ['Rückseite fotografieren bei Büchern: Inhaltsangabe bleibt in der Sprache des Klappentexts (z. B. Englisch) statt übersetzt zu werden; die Buchsprache wird mit abgelesen']],
   ['1.33', '26.10.2026', ['Detailansicht: „📷 Rückseite fotografieren“ – die KI liest ab, was auf der Rückseite steht (Spieleranzahl, Dauer, Alter, Laufzeit, FSK, Format, Verlag, Barcode/ISBN, Klappentext …), danach Abgleich alt → neu je Feld', 'Von der Rückseite abgelesene Angaben gelten als gesichert (kein 🌐 mehr); neu gelesene Barcodes/ISBN werden anschließend auch online abgeglichen']],
   ['1.32', '26.10.2026', ['Neuer Bereich „Sicherung & Wiederherstellen“: automatische Dropbox-Sicherung wählbar täglich/wöchentlich/monatlich, Anzahl einstellbar, Hinweis wenn überfällig', 'Zusätzlich tägliche Sicherung auf jedem Gerät (die letzten 7) – auch ohne Internet', 'Wiederherstellen mit Vorschau: was gelöscht, geändert, neu ist – „Nur Gelöschtes zurückholen“, „Einzeln auswählen“ oder „Komplett zurücksetzen“', 'Vor jedem Wiederherstellen wird der jetzige Stand automatisch gesichert (🛟)', 'Sicherungen enthalten jetzt auch Abende, Stimmen und Anfragen; Bilder gelöschter Medien bleiben in Dropbox, damit sie mit zurückkommen', 'Komplette Sicherung als Datei inkl. Bildern']],
   ['1.31', '26.10.2026', ['Foto erkennen: neue Auswahl „Wofür?“ – Neue Medien, Schon vorhanden (Bild ersetzen) oder ★ Wunschliste', 'Schon vorhanden: Die KI bekommt eure Titelliste, die App ordnet jeden Ausschnitt dem passenden Titel zu und zeigt bisheriges und neues Cover bzw. Rücken nebeneinander – ihr wählt, welches bleibt (Titel änderbar, Cover/Rücken umschaltbar)', 'Wunschliste: „Cover fotografieren“ – Angaben werden wie gewohnt aus dem Internet ergänzt, mit Hinweis „Habt ihr schon!“, falls es schon in der Sammlung ist']],
@@ -2846,7 +2847,8 @@ Regeln:
 - Antworte NUR mit JSON: {"felder":{"feld":"wert"},"hinweis":"…"}
 - NUR Angaben, die auf dem Foto zu sehen oder eindeutig daraus ableitbar sind (z. B. Spieleranzahl-Symbol, Altersangabe, Spieldauer, Laufzeit, FSK-Logo, Barcode-/ISBN-Ziffern unter dem Strichcode, Verlag/Studio, Seitenzahl, Format-Logos wie „4K Ultra HD“/„Blu-ray“/„DVD“). Nichts raten, nichts aus Allgemeinwissen.
 - Zahlen als Zahl (Komma-Zahlen mit Punkt). Barcode/ISBN nur Ziffern (ISBN ggf. mit X).
-- "inhalt": Steht ein Klappen-/Rückseitentext da, fasse ihn in 2–4 Sätzen auf ${it.typ === 'buch' && it.sprache && !/deutsch/i.test(it.sprache) ? 'der Sprache des Textes' : 'Deutsch'} zusammen (ohne Spoiler).
+${it.typ === 'buch' ? `- "inhalt": Steht ein Klappen-/Rückseitentext da, fasse ihn in 2–4 Sätzen zusammen – IN DERSELBEN SPRACHE, in der der Text auf dem Foto steht (englischer Klappentext → englische Inhaltsangabe usw.). NIEMALS ins Deutsche übersetzen. Ohne Spoiler.
+- "sprache": Sprache des Buches, wie auf dem Foto erkennbar, als deutsches Wort (z. B. "Englisch", "Deutsch").` : `- "inhalt": Steht ein Klappen-/Rückseitentext da, fasse ihn in 2–4 Sätzen auf Deutsch zusammen (ohne Spoiler).`}
 - "titel" nur angeben, wenn er deutlich anders geschrieben ist als „${it.titel}“.
 - Passt die Rückseite offensichtlich NICHT zu „${it.titel}“, gib "felder":{} zurück und erkläre es in "hinweis".`;
     const text = await aiCall(prompt, img.split(',')[1], 2500);
@@ -2859,6 +2861,8 @@ Regeln:
       else rec[k] = ['barcode', 'isbn'].includes(k) ? String(v).replace(/[^0-9Xx]/g, '') : String(v).trim();
     }
     if (j.hinweis) rec._hint = String(j.hinweis).slice(0, 300);
+    // Sicherheitsnetz: Buch-Inhaltsangabe muss in der Sprache des Buches stehen (nicht übersetzt)
+    if (it.typ === 'buch' && rec.inhalt) { const got = textLang(rec.inhalt), want = bookLang(Object.assign({}, it, rec.sprache ? { sprache: rec.sprache } : {})); if (got && want && got !== want) rec._hint = (rec._hint ? rec._hint + ' ' : '') + 'Achtung: Die Inhaltsangabe scheint übersetzt zu sein – ggf. „alt“ behalten oder neu fotografieren.'; }
     if (Object.keys(rec).length <= 1 + (rec._hint ? 1 : 0)) { if (rec._hint) alert(rec._hint); else toast('Auf dem Foto waren keine verwertbaren Angaben zu lesen', 3500); return; }
     openFieldCompare(id, rec, { mode: 'back' });
   } catch (e) { alert('Rückseite lesen hat nicht geklappt: ' + e.message); }
