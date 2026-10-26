@@ -271,6 +271,9 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .ytbox .lbl{position:absolute;left:10px;bottom:8px;color:#fff;font-weight:600;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .mini{font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;background:#ff5100;color:#fff;text-decoration:none;letter-spacing:.02em}
 .mini.yt{background:#ff0000}
+.kxb{font-size:11px;font-weight:800;border-radius:6px;padding:1px 6px;background:var(--surface2);border:1px solid var(--line);color:var(--ink)}
+.kxgrid{display:grid;gap:8px;margin:10px 0}.kxgrid>div{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.kxgrid input{width:76px;height:36px;border:1px solid var(--line);border-radius:8px;padding:0 6px;background:var(--surface)}
+.vkx{font-size:12px;font-weight:700;color:var(--ink2)}
 .vlinks{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
 .vlink{flex:1 1 auto;text-align:center;font-size:12px;font-weight:800;border-radius:8px;padding:7px 8px;text-decoration:none;color:#fff;background:#3f3a74}
 .vlink.bgg{background:#ff5100}.vlink.yt{background:#d40000}
@@ -581,7 +584,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.28';
+const APP_VERSION = '1.29';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -709,7 +712,9 @@ const TYPES = {
       { k: 'boxH', l: 'Schachtel Höhe (cm)', t: 'number', step: '0.1', web: 'bgg', ph: 'z. B. 29,6' },
       { k: 'boxT', l: 'Schachtel Tiefe (cm)', t: 'number', step: '0.1', web: 'bgg', ph: 'z. B. 7,2' },
       { k: 'alterAb', l: 'Alter ab', t: 'number', ai: 1 },
-      { k: 'komplexitaet', l: 'Komplexität', t: 'select', o: ['Leicht', 'Mittel', 'Schwer'], f: 1, ai: 1 },
+      { k: 'gewicht', l: 'Komplexität (BGG, 1–5)', t: 'number', step: '0.01', web: 'bgg', ph: 'z. B. 2,35' },
+      { k: 'komplexitaet', l: 'Komplexitätsstufe', t: 'select', o: () => KX_STUFEN, f: 1, ai: 1 },
+      { k: 'mechanik', l: 'Mechanismen', t: 'text', wide: 1, multi: 1, f: 1, web: 'bgg', ph: 'z. B. Worker Placement, Deck-/Beutelbau' },
       { k: 'digital', l: 'Digital', t: 'bool', f: 1, lab: 'Digital vorhanden (z. B. App oder Board Game Arena)' },
       { k: 'sprache', l: 'Sprache', t: 'text', f: 1, ai: 1 },
       { k: 'vollstaendig', l: 'Vollständig', t: 'select', o: ['Ja', 'Teile fehlen'], f: 1 },
@@ -740,6 +745,25 @@ const TYPES = {
 const TYPE_KEYS = Object.keys(TYPES);
 const fieldsOf = typ => [...TYPES[typ].fields, ...COMMON];
 const fieldDef = (typ, k) => fieldsOf(typ).find(f => f.k === k);
+/* ----- Brettspiel-Komplexität: BGG-Wert (1–5) → Stufe; Grenzen in den Einstellungen, Stufe auch manuell ----- */
+const KX_STUFEN = ['Familien- & Einstiegsspiel', 'Kennerspiel', 'Gehobenes Kennerspiel', 'Expertenspiel'];
+const KX_OLD = { Leicht: 0, Mittel: 1, Schwer: 2 };
+const kxBounds = () => { const b = shared.kxBounds; return Array.isArray(b) && b.length === 3 ? b.map(Number) : [2, 3, 4]; };
+const kxStufe = w => { w = +w; if (!w) return ''; const b = kxBounds(); return KX_STUFEN[w <= b[0] ? 0 : w <= b[1] ? 1 : w <= b[2] ? 2 : 3]; };
+const kxNum = w => (+w).toFixed(1).replace('.', ',');
+function kxFix(it) {
+  if (it.typ !== 'brettspiel') return false;
+  const before = it.komplexitaet;
+  if (it.komplexitaet in KX_OLD) it.komplexitaet = KX_STUFEN[KX_OLD[it.komplexitaet]];
+  if (+it.gewicht && !(it.kxManual && it.komplexitaet)) { it.komplexitaet = kxStufe(it.gewicht); delete it.kxManual; }
+  if (!+it.gewicht && it.kxManual) delete it.kxManual;
+  if (before !== it.komplexitaet) { it.updatedAt = Date.now(); return true; }
+  return false;
+}
+const multiVals = v => String(v ?? '').split(/\s*[,;]\s*/).filter(Boolean);
+// BGG-Mechanismen auf Deutsch (häufige; seltene bleiben englisch)
+const MECH_DE = { 'Worker Placement': 'Worker Placement', 'Deck, Bag, and Pool Building': 'Deck-/Beutelbau', 'Hand Management': 'Kartenhand-Management', 'Set Collection': 'Sets sammeln', 'Tile Placement': 'Plättchen legen', 'Dice Rolling': 'Würfeln', 'Area Majority / Influence': 'Mehrheiten', 'Cooperative Game': 'Kooperativ', 'Card Drafting': 'Karten-Drafting', 'Open Drafting': 'Offenes Drafting', 'Closed Drafting': 'Verdecktes Drafting', 'Engine Building': 'Engine-Building', 'Variable Player Powers': 'Unterschiedliche Fähigkeiten', 'Variable Set-up': 'Variabler Aufbau', 'Pattern Building': 'Muster bilden', 'Pattern Recognition': 'Muster erkennen', 'Network and Route Building': 'Netzwerk-/Streckenbau', 'Push Your Luck': 'Push your Luck', 'Roll / Spin and Move': 'Würfeln & Ziehen', 'Trading': 'Handeln', 'Negotiation': 'Verhandeln', 'Auction / Bidding': 'Versteigern', 'Auction/Bidding': 'Versteigern', 'Bluffing': 'Bluffen', 'Hidden Roles': 'Geheime Rollen', 'Deduction': 'Deduktion', 'Memory': 'Gedächtnis', 'Simultaneous Action Selection': 'Gleichzeitige Aktionswahl', 'Action Points': 'Aktionspunkte', 'Action Drafting': 'Aktionswahl', 'Action Queue': 'Aktionsplanung', 'Take That': 'Ärgern (Take That)', 'Player Elimination': 'Ausscheiden', 'Team-Based Game': 'Teamspiel', 'Solo / Solitaire Game': 'Solo spielbar', 'Grid Movement': 'Rasterbewegung', 'Point to Point Movement': 'Punkt-zu-Punkt-Bewegung', 'Modular Board': 'Modularer Spielplan', 'Hexagon Grid': 'Hexfelder', 'Square Grid': 'Quadratraster', 'Grid Coverage': 'Flächen abdecken', 'Paper-and-Pencil': 'Papier & Stift', 'Roll and Write': 'Roll & Write', 'Flip and Write': 'Flip & Write', 'Trick-taking': 'Stiche', 'Ladder Climbing': 'Überbieten', 'Real-Time': 'Echtzeit', 'Storytelling': 'Geschichten erzählen', 'Voting': 'Abstimmen', 'Communication Limits': 'Eingeschränkte Kommunikation', 'Legacy Game': 'Legacy', 'Scenario / Mission / Campaign Game': 'Szenarien / Kampagne', 'Market': 'Markt', 'Income': 'Einkommen', 'End Game Bonuses': 'Endwertung', 'Victory Points as a Resource': 'Siegpunkte als Ressource', 'Tableau Building': 'Auslage bauen', 'Turn Order: Progressive': 'Wechselnder Startspieler', 'Turn Order: Claim Action': 'Zugreihenfolge wählen', 'Track Movement': 'Leisten-Bewegung', 'Rondel': 'Rondell', 'Dice Placement': 'Würfel einsetzen', 'Contracts': 'Aufträge', 'Enclosure': 'Einkreisen', 'Line Drawing': 'Linien zeichnen', 'Stacking and Balancing': 'Stapeln & Balancieren', 'Dexterity': 'Geschicklichkeit', 'Matching': 'Zuordnen', 'Programmed Movement': 'Programmierte Bewegung', 'Area Movement': 'Gebietsbewegung', 'Movement Points': 'Bewegungspunkte', 'Events': 'Ereignisse', 'Narrative Choice / Paragraph': 'Erzählerische Entscheidungen', 'Role Playing': 'Rollenspiel', 'Race': 'Rennen', 'Card Play Conflict Resolution': 'Konflikte mit Karten', 'Dice Rolling Conflict Resolution': 'Konflikte mit Würfeln', 'Hidden Movement': 'Verdeckte Bewegung', 'Traitor Game': 'Verräter', 'Sudden Death Ending': 'Sofortiges Spielende', 'Command Cards': 'Befehlskarten', 'Re-rolling and Locking': 'Neu würfeln & festlegen', 'Pick-up and Deliver': 'Abholen & Liefern', 'Action Retrieval': 'Aktionen zurückholen', 'Time Track': 'Zeitleiste', 'Investment': 'Investieren', 'Loans': 'Kredite', 'Hidden Victory Points': 'Verdeckte Siegpunkte', 'Deck Construction': 'Deck zusammenstellen', 'I Cut, You Choose': 'Ich teile, du wählst', 'Rock-Paper-Scissors': 'Schere-Stein-Papier', 'Questions and Answers': 'Fragen & Antworten', 'Acting': 'Darstellen', 'Drawing': 'Zeichnen', 'Singing': 'Singen', 'Spelling': 'Buchstabieren', 'Alliances': 'Allianzen', 'Catch the Leader': 'Führenden bremsen', 'Once-Per-Game Abilities': 'Einmalige Fähigkeiten', 'Variable Phase Order': 'Variable Phasen', 'Turn Order: Pass Order': 'Reihenfolge nach Passen', 'Increase Value of Unchosen Resources': 'Wertzuwachs liegengebliebener Ressourcen', 'Worker Placement, Different Worker Types': 'Worker Placement (verschiedene Arbeiter)', 'Worker Placement with Dice Workers': 'Worker Placement mit Würfeln', 'Melding and Splaying': 'Auslegen', 'Chaining': 'Verketten', 'Mancala': 'Mancala', 'Bingo': 'Bingo', 'Elapsed Real Time Ending': 'Zeitlimit', 'Speed Matching': 'Schnell zuordnen', 'Hot Potato': 'Heiße Kartoffel', 'Lose a Turn': 'Aussetzen', 'Player Judge': 'Spieler entscheidet', 'Predictive Bid': 'Vorhersage', 'Line of Sight': 'Sichtlinie', 'Zone of Control': 'Kontrollzonen', 'Critical Hits and Failures': 'Kritische Treffer', 'Map Addition': 'Karte erweitern', 'Secret Unit Deployment': 'Geheime Einheiten', 'Moving Multiple Units': 'Mehrere Einheiten bewegen', 'Stat Check Resolution': 'Wertprobe', 'Commodity Speculation': 'Spekulation', 'Stock Holding': 'Aktien', 'Ownership': 'Besitz', 'Tug of War': 'Tauziehen', 'King of the Hill': 'King of the Hill', 'Single Loser Game': 'Ein Verlierer', 'Physical Removal': 'Entfernen', 'Slide/Push': 'Schieben', 'Turn Order: Random': 'Zufällige Reihenfolge', 'Turn Order: Auction': 'Reihenfolge ersteigern', 'Turn Order: Stat-Based': 'Reihenfolge nach Werten', 'Turn Order: Role Order': 'Reihenfolge nach Rollen', 'Score-and-Reset Game': 'Wertung & Neustart', 'Automatic Resource Growth': 'Automatisches Wachstum', 'Targeted Clues': 'Gezielte Hinweise', 'Multiple Maps': 'Mehrere Spielpläne', 'Sequential Cooperation': 'Aufeinander aufbauend', 'Relative Movement': 'Relative Bewegung', 'Three Dimensional Movement': '3D-Bewegung', 'Measurement Movement': 'Bewegung mit Maßband', 'Delayed Purchase': 'Verzögerter Kauf', 'Different Dice Movement': 'Unterschiedliche Würfel', 'Closed Economy Auction': 'Geschlossene Ökonomie', 'Constrained Bidding': 'Eingeschränktes Bieten', 'Multiple-Lot Auction': 'Mehrfach-Auktion', 'Selection Order Bid': 'Reihenfolge ersteigern', 'Advantage Token': 'Vorteilsmarker', 'Interrupts': 'Unterbrechungen', 'Follow': 'Nachziehen', 'Layering': 'Schichten', 'Chit-Pull System': 'Chit-Pull', 'Impulse Movement': 'Impulsbewegung', 'Neighbor Scope': 'Nachbarn', 'Order Counters': 'Befehlsmarker', 'Action Timer': 'Aktions-Timer', 'Resource to Move': 'Ressourcen zum Bewegen', 'Kill Steal': 'Kill Steal', 'Prisoner\'s Dilemma': 'Gefangenendilemma', 'Static Capture': 'Schlagen', 'Ratio / Combat Results Table': 'Kampftabelle', 'Minimap Resolution': 'Minikarte', 'Highest-Lowest Scoring': 'Höchster-niedrigster Wert', 'Bias': 'Tendenz', 'Campaign / Battle Card Driven': 'Kampagne (Karten)', 'Turn Order: Time Track': 'Zeitleiste' };
+const mechDe = list => [...new Set((list || []).map(m => MECH_DE[m] || m))].join(', ');
 const optsOf = f => (typeof f.o === 'function' ? f.o() : (f.o || [])).slice();
 const isRequired = (typ, k) => k === 'titel' || (shared.required?.[typ] || []).includes(k);
 
@@ -766,6 +790,7 @@ let idIndex = null;
 const byId = id => (idIndex || (idIndex = new Map(items.map(i => [i.id, i])))).get(id) || ((idIndex = null), items.find(i => i.id === id));
 
 async function persist() {
+  items.forEach(kxFix);
   idIndex = null; meta.seq++;
   await idb.set('items', items);
   await idb.set('meta', meta);
@@ -834,6 +859,7 @@ async function upsertItem(data) {
     it = Object.assign({ createdAt: now }, clean, { id: uid(), updatedAt: now });
     items.push(it);
   }
+  kxFix(it);
   // Früher lag ein Buchrücken-Foto im Cover-Platz (coverSpine) – bei Änderungen in den eigenen Rücken-Platz umziehen
   if ((coverData || removeCover || spineData || removeSpine) && it.coverLocal && it.coverSpine) await migrateLegacySpine(it, !!coverData);
   if (coverData) {
@@ -1056,6 +1082,7 @@ function matchesFilters(it, filters) {
     if (k === '_players') { const n = +v, a = +it.spielerMin || +it.spielerMax || 0, b = +it.spielerMax || +it.spielerMin || 0; if (!(a && n >= a && n <= b)) return false; continue; }
     if (k === 'bewertung') { if ((+it.bewertung || 0) < +v) return false; continue; }
     if (k === 'digital') { if ((v === 'Ja') !== (it.digital === 'Ja')) return false; continue; }
+    if (k === 'mechanik') { if (!multiVals(it.mechanik).includes(String(v))) return false; continue; }
     if (String(it[k] ?? '') !== String(v)) return false;
   }
   return true;
@@ -1239,7 +1266,7 @@ function hydrateSpines(root) {
 }
 function rowHTML(it) {
   return `<button class="row" data-open="${it.id}">${thumbHTML(it)}<div class="ri"><div class="rt">${esc(it.titel || '(ohne Titel)')}</div><div class="rs">${esc(subtitle(it)) || '&nbsp;'}</div>
-  <div class="rb"><span class="tb ${it.typ}">${esc(TYPES[it.typ]?.single || it.typ)}</span>${it.digital === 'Ja' ? '<span class="tb dig">💾 Digital</span>' : ''}${it.bewertung ? `<span class="stars-s">${'★'.repeat(+it.bewertung)}</span>` : ''}${it.verliehenAn ? `<span class="lent">${esc(lentText(it, true))}</span>` : ''}${it.bgg ? '<span class="mini" title="BoardGameGeek-Link">BGG</span>' : ''}${it.youtube ? '<span class="mini yt" title="YouTube-Link">▶</span>' : ''}${it.geliehen ? `<span class="borrow${isOverdue(it) ? ' late' : ''}">↙ von ${esc(it.geliehenVon || '?')}${it.rueckgabeBis ? ' · bis ' + esc(deDate(it.rueckgabeBis)) : ''}${isOverdue(it) ? ' · überfällig' : ''}</span>` : ''}${it.weg ? `<span class="wegb">🏷 ${esc(it.weg.art)}${it.weg.preis ? ' · ' + esc(String(it.weg.preis).replace('.', ',')) + ' €' : ''}</span>` : ''}${it.wunsch ? `<span class="wish">★ Wunsch${it.wunschVon ? ' von ' + esc(it.wunschVon) : ''}${it.wunschPrio === 'Hoch' ? ' · hohe Priorität' : ''}</span>` : ''}</div></div></button>`;
+  <div class="rb"><span class="tb ${it.typ}">${esc(TYPES[it.typ]?.single || it.typ)}</span>${it.digital === 'Ja' ? '<span class="tb dig">💾 Digital</span>' : ''}${it.bewertung ? `<span class="stars-s">${'★'.repeat(+it.bewertung)}</span>` : ''}${it.verliehenAn ? `<span class="lent">${esc(lentText(it, true))}</span>` : ''}${+it.gewicht ? `<span class="kxb" title="Komplexität ${kxNum(it.gewicht)} / 5 · ${esc(it.komplexitaet || '')}">⚖ ${kxNum(it.gewicht)}</span>` : ''}${it.bgg ? '<span class="mini" title="BoardGameGeek-Link">BGG</span>' : ''}${it.youtube ? '<span class="mini yt" title="YouTube-Link">▶</span>' : ''}${it.geliehen ? `<span class="borrow${isOverdue(it) ? ' late' : ''}">↙ von ${esc(it.geliehenVon || '?')}${it.rueckgabeBis ? ' · bis ' + esc(deDate(it.rueckgabeBis)) : ''}${isOverdue(it) ? ' · überfällig' : ''}</span>` : ''}${it.weg ? `<span class="wegb">🏷 ${esc(it.weg.art)}${it.weg.preis ? ' · ' + esc(String(it.weg.preis).replace('.', ',')) + ' €' : ''}</span>` : ''}${it.wunsch ? `<span class="wish">★ Wunsch${it.wunschVon ? ' von ' + esc(it.wunschVon) : ''}${it.wunschPrio === 'Hoch' ? ' · hohe Priorität' : ''}</span>` : ''}</div></div></button>`;
 }
 const contentWidth = () => { const el = $('#content'), cs = getComputedStyle(el); return Math.max(260, el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
 function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
@@ -1888,8 +1915,8 @@ const MEEPLE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a3.2 
 function boxDims(it) {
   if (it.kategorie === 'Kartenspiel') return [84, 110];
   if (it.erweiterungVon) return [96, 96];
-  if (it.komplexitaet === 'Schwer') return [128, 128];
-  if (it.komplexitaet === 'Leicht' || it.kategorie === 'Kinderspiel') return [104, 104];
+  if (['Gehobenes Kennerspiel', 'Expertenspiel', 'Schwer'].includes(it.komplexitaet)) return [128, 128];
+  if (['Familien- & Einstiegsspiel', 'Leicht'].includes(it.komplexitaet) || it.kategorie === 'Kinderspiel') return [104, 104];
   return [116, 116];
 }
 function renderGameStore(list) {
@@ -1965,7 +1992,7 @@ function toast(msg, ms = 2600) { const t = document.createElement('div'); t.clas
 function openDetail(id) {
   const it = items.find(i => i.id === id); if (!it) return;
   const facts = fieldsOf(it.typ).filter(f => !['titel', 'verliehenAn', 'verliehenAm', 'inhalt'].includes(f.k) && f.t !== 'url' && it[f.k] != null && it[f.k] !== '')
-    .map(f => `<dt>${esc(f.l)}</dt><dd>${f.k === 'autor' && it.typ === 'buch' ? authorNames(it.autor).map(n => `<button class="alink" data-author="${esc(n)}" title="Autorenseite öffnen">${esc(n)}</button>`).join(', ') : esc(fmt(f, it[f.k]))}${(it.auto || []).includes(f.k) ? ' <span class="autotag" title="Online ergänzt – bitte bei Bedarf prüfen">🌐</span>' : ''}</dd>`).join('');
+    .map(f => `<dt>${esc(f.l)}</dt><dd>${f.k === 'autor' && it.typ === 'buch' ? authorNames(it.autor).map(n => `<button class="alink" data-author="${esc(n)}" title="Autorenseite öffnen">${esc(n)}</button>`).join(', ') : (f.k === 'gewicht' ? `${(+it.gewicht).toFixed(2).replace('.', ',')} / 5` : f.k === 'komplexitaet' ? esc(it.komplexitaet) + (it.kxManual ? ' <span class="hint">(manuell; BGG-Wert ergäbe „' + esc(kxStufe(it.gewicht)) + '“)</span>' : '') : esc(fmt(f, it[f.k])))}${(it.auto || []).includes(f.k) ? ' <span class="autotag" title="Online ergänzt – bitte bei Bedarf prüfen">🌐</span>' : ''}</dd>`).join('');
   const canFill = !VIEW && missingFields(it).length > 0;
   const s = openSheet(`${sheetHead(TYPES[it.typ]?.single || 'Medium')}
     <div class="detail-top">${thumbHTML(it)}<div><h3>${esc(it.titel)}</h3><div class="hint">${esc(subtitle(it))}</div>
@@ -2076,7 +2103,7 @@ function inputHTML(typ, f, val) {
   const req = isRequired(typ, f.k); const v = val ?? '';
   let inp;
   switch (f.t) {
-    case 'select': { const o = optsOf(f); if (v !== '' && !o.includes(String(v))) o.push(String(v)); inp = `<select name="${f.k}"><option value="">—</option>${o.map(x => `<option ${String(v) === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`; break; }
+    case 'select': { const o = optsOf(f); if (v !== '' && !o.includes(String(v))) o.push(String(v)); inp = `<select name="${f.k}"><option value="">${f.k === 'komplexitaet' ? 'Automatisch (aus BGG-Wert)' : '—'}</option>${o.map(x => `<option ${String(v) === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`; break; }
     case 'textarea': inp = `<textarea name="${f.k}" rows="3">${esc(v)}</textarea>`; break;
     case 'rating': inp = `<div class="starsin" data-rating="${f.k}">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-star="${n}" class="${+v >= n ? 'on' : ''}">★</button>`).join('')}<input type="hidden" name="${f.k}" value="${esc(v)}"></div>`; break;
     case 'number': inp = `<input type="number" inputmode="decimal" step="${f.step || 1}" min="0" ${f.ph ? `placeholder="${esc(f.ph)}"` : ''} name="${f.k}" value="${esc(v)}">`; break;
@@ -2233,6 +2260,7 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     if (!coverData && !removeCover && data.cover) rec.cover = data.cover;
     if (item?.cover && !coverData && !removeCover) rec.cover = item.cover;
     const oldIsbn = item ? String(item.isbn || '') : '', oldBc = item ? String(item.barcode || '') : ''; // vor dem Speichern merken (item wird überschrieben)
+    if (rec.typ === 'brettspiel') { const d = kxStufe(rec.gewicht); if (d && rec.komplexitaet && rec.komplexitaet !== d) rec.kxManual = true; else { delete rec.kxManual; if (d) rec.komplexitaet = d; } }
     const saved = await upsertItem(rec);
     const newCode = !item ? null : saved.isbn && String(saved.isbn) !== oldIsbn ? saved.isbn : saved.barcode && String(saved.barcode) !== oldBc ? saved.barcode : null;
     if (item?.cover && !rec.cover) delete saved.cover;
@@ -2339,6 +2367,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.29', '26.10.2026', ['Brettspiele: Komplexität von BGG (Skala 1–5) wird übernommen und in der Liste als Zahl (⚖ 2,4) gezeigt', 'Daraus die Komplexitätsstufe: Familien- & Einstiegsspiel, Kennerspiel, Gehobenes Kennerspiel, Expertenspiel – Grenzen unter Einstellungen → Brettspiel-Komplexität', 'Stufe im Spiel weiterhin von Hand änderbar (bleibt dann manuell)', 'Neues Feld „Mechanismen“ (mehrere, von BGG, auf Deutsch übersetzt) – auch als Filter', 'Abstimmungsseite zeigt den Gästen Komplexität und Stufe']],
   ['1.28', '25.10.2026', ['Abstimmungsseite: auch eure selbst fotografierten/hochgeladenen Cover sind für die Gäste sichtbar (kleine Datei über Dropbox)', 'BGG- und YouTube-Links als gut sichtbare Knöpfe „ℹ️ Infos (BGG)“ und „▶ YouTube“ an jedem Titel']],
   ['1.27', '25.10.2026', ['Abendplaner: Uhrzeit (von/bis) und Ort angeben', '„📅 In den Kalender“ für euch und eure Gäste (Google Kalender oder .ics-Datei für jede Kalender-App); Ort öffnet Google Maps', 'Gäste sehen Datum, Uhrzeit und Ort oben auf der Abstimmungsseite', 'Eure Nachricht an die Gäste steht jetzt groß und farbig ganz oben', 'Gäste können ihrer Stimme eine Nachricht mitgeben – erscheint im Postfach und beim Abend']],
   ['1.26', '25.10.2026', ['Abendplaner: Gäste senden ihre Top 3 mit „Abstimmen & senden“ direkt in die App (über den Briefkasten) – kein Antwort-Link mehr nötig', 'Neue Stimmen erscheinen im „📬 Postfach“ (früher „Anfragen“), sind gleich dem richtigen Abend zugeordnet und lösen eine Benachrichtigung aus', 'Ohne eingerichteten Briefkasten oder bei Verbindungsproblemen bleibt der Weg per Nachricht als Ersatz']],
@@ -2856,7 +2885,7 @@ async function bggLookup(rec) {
   const t = (await bggThings(ids.slice(0, 1)))[0]; if (!t) return null;
   const box = isEmpty(rec.boxB) || isEmpty(rec.boxH) || isEmpty(rec.boxT) ? await bggBox(t.id) : {};
   return Object.assign({ bgg: 'https://boardgamegeek.com/boardgame/' + t.id, jahr: t.jahr, spielerMin: t.spielerMin, spielerMax: t.spielerMax, dauer: t.dauer, alterAb: t.alterAb, autor: t.autor,
-    komplexitaet: t.weight ? (t.weight < 2 ? 'Leicht' : t.weight < 3.2 ? 'Mittel' : 'Schwer') : undefined, cover: t.image || t.thumb }, box);
+    gewicht: t.weight ? Math.round(t.weight * 100) / 100 : undefined, mechanik: mechDe(t.mechs) || undefined, cover: t.image || t.thumb }, box);
 }
 async function bggCoverCands(it) {
   if (!settings.bggToken) return [];
@@ -2916,7 +2945,7 @@ async function bggSuggest(q) {
 function bggRecord(h) {
   const t = h.t;
   return { titel: h.name, jahr: t.jahr, spielerMin: t.spielerMin, spielerMax: t.spielerMax, dauer: t.dauer, alterAb: t.alterAb, autor: t.autor, verlag: t.verlag,
-    komplexitaet: t.weight ? (t.weight < 2 ? 'Leicht' : t.weight < 3.2 ? 'Mittel' : 'Schwer') : undefined, kategorie: bggKategorie(t), erweiterungVon: t.base,
+    gewicht: t.weight ? Math.round(t.weight * 100) / 100 : undefined, komplexitaet: kxStufe(t.weight) || undefined, mechanik: mechDe(t.mechs) || undefined, kategorie: bggKategorie(t), erweiterungVon: t.base,
     bgg: 'https://boardgamegeek.com/boardgame' + (h.exp ? 'expansion' : '') + '/' + t.id, cover: t.image || t.thumb };
 }
 // --- Vorschläge beim Tippen des Titels für alle Medienarten ---
@@ -3586,7 +3615,7 @@ async function completeAll(list) {
     if (p) { props.push(p); await saveProps(); if (s.isConnected) body.insertAdjacentHTML('beforeend', card(p)); }
     if (s.isConnected) upd();
   }
-  await idb.set('items', items); if (s.isConnected) upd();
+  items.forEach(kxFix); await idb.set('items', items); if (s.isConnected) upd();
 }
 
 /* ---------- Barcode-Scanner ---------- */
@@ -3779,7 +3808,7 @@ function openFilters() {
     if (f.f === 'lent') { if (ui.type !== 'verliehen') html += sel('_lent', 'Verliehen', [['ja', 'Nur verliehene'], ['nein', 'Nur vorhandene']]); continue; }
     if (f.t === 'rating') { html += sel('bewertung', 'Bewertung', [1, 2, 3, 4, 5].map(n => [n, 'mindestens ' + '★'.repeat(n)])); continue; }
     if (f.t === 'bool') { if (pool.some(i => i[f.k] === 'Ja')) html += sel(f.k, f.l, [['Ja', 'Nur digitale'], ['Nein', 'Nur physische']]); continue; }
-    let vals = [...new Set(pool.map(i => i[f.k]).filter(v => v != null && v !== '').map(String))];
+    let vals = [...new Set(f.multi ? pool.flatMap(i => multiVals(i[f.k])) : pool.map(i => i[f.k]).filter(v => v != null && v !== '').map(String))];
     if (f.t === 'select') { const o = optsOf(f); vals.sort((a, b) => (o.indexOf(a) + 1 || 999) - (o.indexOf(b) + 1 || 999) || a.localeCompare(b, 'de')); }
     else if (f.t === 'year') vals.sort((a, b) => b - a); else vals.sort((a, b) => a.localeCompare(b, 'de'));
     if (!vals.length) continue;
@@ -4073,7 +4102,7 @@ async function sync() {
         if (rx.changed && !res.changed) render();
         if (remote.shared && (remote.shared.updatedAt || 0) > (shared.updatedAt || 0)) { const hadMbox = JSON.stringify(shared.mbox || null); shared = remote.shared; await idb.set('shared', shared); if (JSON.stringify(shared.mbox || null) !== hadMbox) mbxSyncSW(); }
         else if ((shared.updatedAt || 0) > (remote.shared?.updatedAt || 0)) res.localAhead = true;
-        if (res.changed) { await idb.set('items', items); render(); }
+        if (res.changed) { items.forEach(kxFix); await idb.set('items', items); render(); }
         localAhead = localAhead || res.localAhead;
         meta.remoteRev = m.rev;
       }
@@ -4155,6 +4184,11 @@ function openSettings() {
 
     <h3>Dropbox-Synchronisierung</h3>
     <div class="card" id="dbxCard"></div>
+
+    <h3>Brettspiel-Komplexität</h3>
+    <div class="card"><p class="hint" style="margin:0">Aus dem BGG-Wert (1–5) wird die Stufe berechnet. Die Grenzen gelten für euch beide. Im einzelnen Spiel lässt sich die Stufe trotzdem von Hand setzen.</p>
+      <div class="kxgrid">${KX_STUFEN.map((n, i) => `<div><b>${esc(n)}</b><span class="hint">${i === 0 ? '1,0' : 'über ' + kxNum(kxBounds()[i - 1])} bis ${i < 3 ? `<input type="number" step="0.01" min="1" max="5" data-kxb="${i}" value="${kxBounds()[i]}" inputmode="decimal">` : '5,0'}</span></div>`).join('')}</div>
+      <button class="btn" id="sKxReset">Standard (2 / 3 / 4)</button></div>
 
     <h3>Pflichtfelder</h3>
     <div class="card"><p class="hint" style="margin:0">Antippen, um ein Feld zur Pflicht zu machen. Der Titel ist immer Pflicht. Gilt beim manuellen Eintragen und Korrigieren.</p>
@@ -4257,6 +4291,9 @@ function openSettings() {
     const [ok, msg] = await keyTest(b.dataset.ktest); b.disabled = false; b.textContent = label;
     ok ? toast('✓ ' + msg, 4500) : alert(msg);
   });
+  const kxSave = async b => { if (!(b[0] < b[1] && b[1] < b[2] && b[0] >= 1 && b[2] <= 5)) return toast('Die Grenzen müssen aufsteigend zwischen 1 und 5 liegen'); shared.kxBounds = b; await saveShared(); let n = 0; items.forEach(i => { if (kxFix(i)) n++; }); if (n) await persist(); render(); toast(`Grenzen gespeichert${n ? ' – ' + n + ' Spiele neu eingestuft' : ''}`); };
+  $$('[data-kxb]', s).forEach(inp => inp.onchange = () => { const b = kxBounds(); b[+inp.dataset.kxb] = Math.round(parseFloat(String(inp.value).replace(',', '.')) * 100) / 100; kxSave(b); });
+  $('#sKxReset', s).onclick = async () => { await kxSave([2, 3, 4]); $$('[data-kxb]', s).forEach(inp => inp.value = kxBounds()[+inp.dataset.kxb]); };
   $('#sBgg', s).oninput = e => { settings.bggToken = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
   $('#sBggTest', s).onclick = async e => { const b = e.currentTarget; if (!settings.bggToken) return toast('Bitte zuerst den Token einfügen'); b.disabled = true; b.textContent = 'Teste … (BGG erlaubt nur langsame Abfragen)'; const [ok, msg] = await bggTest(); b.disabled = false; b.textContent = 'BGG-Verbindung testen'; ok ? toast('✓ ' + msg, 4000) : alert(msg); };
   $('#sBkNow', s).onclick = async e => { const b = e.target; b.disabled = true; b.textContent = 'Lege an …'; try { const n = await maybeBackup(true); toast('Backup angelegt: ' + n); } catch (err) { alert('Backup fehlgeschlagen: ' + err.message); } b.disabled = false; b.textContent = 'Jetzt Backup anlegen'; };
@@ -4751,7 +4788,7 @@ function openAbendEditor(ab) {
     let html = st.typ === 'brettspiel' ? sel('_players', 'Spieleranzahl', [2, 3, 4, 5, 6, 7, 8].map(n => [n, n + ' Spieler'])) : '';
     for (const f of fields) {
       if (f.t === 'rating') { html += sel('bewertung', 'Bewertung', [3, 4, 5].map(n => [n, 'mind. ' + '★'.repeat(n)])); continue; }
-      const vals = [...new Set(base.map(i => i[f.k]).filter(v => !isEmpty(v)).map(String))].sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
+      const vals = [...new Set(f.multi ? base.flatMap(i => multiVals(i[f.k])) : base.map(i => i[f.k]).filter(v => !isEmpty(v)).map(String))].sort((a, b) => f.t === 'select' ? (optsOf(f).indexOf(a) + 1 || 999) - (optsOf(f).indexOf(b) + 1 || 999) : a.localeCompare(b, 'de', { numeric: true }));
       html += sel(f.k, f.l, vals.map(v => [v, v]));
     }
     $('#aeF', s).innerHTML = html || '<p class="hint">Keine Filter für diese Auswahl.</p>';
@@ -4821,7 +4858,7 @@ async function abendLink(ab) {
   const tips = new Set(ab.tips || []);
   const its = ab.itemIds.map(id => byId(id)).filter(Boolean).sort((a, b) => (tips.has(b.id) ? 1 : 0) - (tips.has(a.id) ? 1 : 0)).slice(0, 80);
   const rows = [...(ab.customs || []).map(c => [c.id, c.titel, 'eigen', c.info || 'Nicht aus unserer Sammlung', '', 1]),
-    ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, it.bgg || '', it.youtube || ''])];
+    ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, it.bgg || '', it.youtube || '', +it.gewicht || 0, it.komplexitaet || ''])];
   const mb = shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined; // Gäste dürfen nur einwerfen
   const cv = await abendCoverFile(ab, its);
   const code = await packObj({ c: cv || undefined, k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', z: ab.zeit || '', b: ab.bis || '', l: ab.ort || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb });
@@ -4876,10 +4913,10 @@ async function initVote(code) {
   const vc = $('#vCal', el); if (vc) vc.onclick = () => openCalendar(ev);
   if (/^https:\/\/[a-z0-9.-]*dropbox(usercontent)?\.com\//.test(d.c || '')) fetch(d.c, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (!j?.c) return; let n = 0; for (const x of d.i) if (!x[4] && /^data:image\/jpeg;base64,/.test(j.c[x[0]] || '')) { x[4] = j.c[x[0]]; n++; } if (n) draw(); }).catch(() => { });
   const draw = () => {
-    const card = ([id, t, typ, sub, cov, tip, bgg, yt]) => {
+    const card = ([id, t, typ, sub, cov, tip, bgg, yt, kw, ks]) => {
       const r = picks.indexOf(id) + 1; const c = colorFor(t);
       const lk = `${/^https:\/\/([\w-]+\.)?boardgamegeek\.com\//.test(bgg || '') ? `<a class="vlink bgg" href="${esc(bgg)}" target="_blank" rel="noopener">ℹ️ Infos (BGG)</a>` : ''}${/^https:\/\/([\w-]+\.)?(youtube\.com|youtu\.be)\//.test(yt || '') ? `<a class="vlink yt" href="${esc(yt)}" target="_blank" rel="noopener">▶ YouTube</a>` : ''}`;
-      return `<div role="button" tabindex="0" class="vcard${r ? ' r' + r : ''}${tip ? ' tip' : ''}" data-v="${esc(id)}">${r ? `<span class="rk r${r}">${r}</span>` : ''}${tip ? '<span class="tipb">⭐ Vorschlag</span>' : ''}<div class="cv" style="background:${c};color:${textOn(c)}">${cov ? `<img src="${esc(cov)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.replaceWith(document.createTextNode(this.dataset.i))" data-i="${esc(initials(t))}">` : esc(initials(t))}</div><div class="t">${esc(t)}</div><div class="s">${esc(sub || '')}</div>${lk ? `<div class="vlinks">${lk}</div>` : ''}</div>`;
+      return `<div role="button" tabindex="0" class="vcard${r ? ' r' + r : ''}${tip ? ' tip' : ''}" data-v="${esc(id)}">${r ? `<span class="rk r${r}">${r}</span>` : ''}${tip ? '<span class="tipb">⭐ Vorschlag</span>' : ''}<div class="cv" style="background:${c};color:${textOn(c)}">${cov ? `<img src="${esc(cov)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.replaceWith(document.createTextNode(this.dataset.i))" data-i="${esc(initials(t))}">` : esc(initials(t))}</div><div class="t">${esc(t)}</div><div class="s">${esc(sub || '')}</div>${kw || ks ? `<div class="vkx">⚖ ${kw ? kxNum(kw) + ' / 5' : ''}${kw && ks ? ' · ' : ''}${esc(ks || '')}</div>` : ''}${lk ? `<div class="vlinks">${lk}</div>` : ''}</div>`;
     };
     const tipsL = d.i.filter(x => x[5]), rest = d.i.filter(x => !x[5]);
     $('#vg', el).innerHTML = hasTips
@@ -5272,7 +5309,7 @@ function openWegPicker() {
     let html = '';
     for (const f of fields) {
       if (f.t === 'rating') continue;
-      const vals = [...new Set(base.map(i => i[f.k]).filter(v => !isEmpty(v)).map(String))].sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
+      const vals = [...new Set(f.multi ? base.flatMap(i => multiVals(i[f.k])) : base.map(i => i[f.k]).filter(v => !isEmpty(v)).map(String))].sort((a, b) => f.t === 'select' ? (optsOf(f).indexOf(a) + 1 || 999) - (optsOf(f).indexOf(b) + 1 || 999) : a.localeCompare(b, 'de', { numeric: true }));
       if (vals.length) html += `<label class="fld"><span>${esc(f.l)}</span><select name="${f.k}"><option value="">Alle</option>${vals.map(v => `<option ${String(st.filters[f.k] ?? '') === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`;
     }
     $('#wpF', s).innerHTML = html;
@@ -5525,6 +5562,9 @@ addEventListener('hashchange', () => {
   meta = Object.assign(meta, (await idb.get('meta')) || {});
   shared = Object.assign(shared, (await idb.get('shared')) || {});
   extra = (await idb.get('extra')) || [];
+  if (items.filter(kxFix).length) await idb.set('items', items); // alte Stufen (Leicht/Mittel/Schwer) umstellen
+  // 1.29: neue BGG-Felder (Komplexität, Mechanismen) – „Bei allen ergänzen“ darf alle Brettspiele noch einmal anfassen
+  if (!settings.kxMig) { settings.sourcesAt = Date.now(); settings.kxMig = 1; saveSettings(); }
   if (new URLSearchParams(location.search).has('demo') && !items.length) await loadDemo();
   // 1.15: neues Feld „Inhaltsangabe“ – „Bei allen vorhandenen Medien ergänzen“ darf alle Medien noch einmal anfassen
   if (!settings.inhaltMig) { settings.sourcesAt = Date.now(); settings.inhaltMig = 1; saveSettings(); }
