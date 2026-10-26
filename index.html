@@ -597,7 +597,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.32';
+const APP_VERSION = '1.33';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2020,6 +2020,7 @@ function openDetail(id) {
     ${it.inhalt ? `<div class="inhalt"><h4>Inhalt${(it.auto || []).includes('inhalt') ? ' <span class="autotag" title="Online ergänzt">🌐</span>' : ''}</h4><p class="clamp" id="dInh">${esc(it.inhalt)}</p>${it.inhalt.length > 260 ? '<button class="btn ghost" id="dInhMore" style="height:30px;padding:0 8px">mehr anzeigen</button>' : ''}${!VIEW && inhaltWrongLang(it) ? `<button class="btn" id="dInhLang" style="width:100%;margin-top:6px">🌐 Inhaltsangabe auf ${esc(LANG_NAME[bookLang(it)] || bookLang(it))} holen</button>` : ''}</div>` : ''}
     ${!VIEW && TYPES[it.typ] && (isEmpty(it.barcode) || (it.typ === 'buch' && isEmpty(it.isbn))) ? `<button class="btn" id="dScan" style="width:100%;margin-bottom:8px">▥ ${it.typ === 'buch' ? 'ISBN' : 'Barcode'} scannen und speichern</button>` : ''}
     ${!VIEW && !hasCover(it) ? `<button class="btn" id="dCover" style="width:100%;margin-bottom:8px">🔍 Cover im Internet suchen</button>` : ''}
+    ${!VIEW && TYPES[it.typ] && settings.provider !== 'barcode' && aiKey() ? `<button class="btn" id="dBack" style="width:100%;margin-bottom:8px">📷 Rückseite fotografieren – Angaben ergänzen/prüfen</button>` : ''}
     ${canFill ? `<button class="btn" id="dFill" style="width:100%">🌐 Fehlende Angaben online ergänzen (${missingFields(it).length} leer)</button>` : ''}
     ${it.geliehen ? `<div class="note${isOverdue(it) ? ' warn' : ''}" style="margin-bottom:10px">↙ Geliehen von <b>${esc(it.geliehenVon || '?')}</b>${it.geliehenAm ? ' am ' + esc(deDate(it.geliehenAm)) : ''}${it.rueckgabeBis ? ` · zurückgeben bis <b>${esc(deDate(it.rueckgabeBis))}</b>${isOverdue(it) ? ' – überfällig!' : ''}` : ''}</div>` : ''}
     ${it.weg ? `<div class="note" style="margin-bottom:10px">🏷 <b>${esc(it.weg.art)}</b>${it.weg.preis ? ' für ' + esc(String(it.weg.preis).replace('.', ',')) + ' €' : ''}${it.weg.notiz ? ' · ' + esc(it.weg.notiz) : ''}</div>` : ''}
@@ -2040,6 +2041,7 @@ function openDetail(id) {
     checkAfterCode(it.id, code);
   };
   const dc = $('#dCover', s); if (dc) dc.onclick = () => searchCoverFor(it.id, dc);
+  const dbk = $('#dBack', s); if (dbk) dbk.onclick = () => readBackside(it.id, dbk);
   const dr = $('#dRules', s); if (dr) dr.onclick = () => openRules(it.id);
   if (VIEW) {
     if (!it.wunsch && it.digital === 'Ja') { s.insertAdjacentHTML('beforeend', '<p class="hint" style="text-align:center">💾 Digital – kann nicht verliehen werden</p>'); return; }
@@ -2381,6 +2383,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.33', '26.10.2026', ['Detailansicht: „📷 Rückseite fotografieren“ – die KI liest ab, was auf der Rückseite steht (Spieleranzahl, Dauer, Alter, Laufzeit, FSK, Format, Verlag, Barcode/ISBN, Klappentext …), danach Abgleich alt → neu je Feld', 'Von der Rückseite abgelesene Angaben gelten als gesichert (kein 🌐 mehr); neu gelesene Barcodes/ISBN werden anschließend auch online abgeglichen']],
   ['1.32', '26.10.2026', ['Neuer Bereich „Sicherung & Wiederherstellen“: automatische Dropbox-Sicherung wählbar täglich/wöchentlich/monatlich, Anzahl einstellbar, Hinweis wenn überfällig', 'Zusätzlich tägliche Sicherung auf jedem Gerät (die letzten 7) – auch ohne Internet', 'Wiederherstellen mit Vorschau: was gelöscht, geändert, neu ist – „Nur Gelöschtes zurückholen“, „Einzeln auswählen“ oder „Komplett zurücksetzen“', 'Vor jedem Wiederherstellen wird der jetzige Stand automatisch gesichert (🛟)', 'Sicherungen enthalten jetzt auch Abende, Stimmen und Anfragen; Bilder gelöschter Medien bleiben in Dropbox, damit sie mit zurückkommen', 'Komplette Sicherung als Datei inkl. Bildern']],
   ['1.31', '26.10.2026', ['Foto erkennen: neue Auswahl „Wofür?“ – Neue Medien, Schon vorhanden (Bild ersetzen) oder ★ Wunschliste', 'Schon vorhanden: Die KI bekommt eure Titelliste, die App ordnet jeden Ausschnitt dem passenden Titel zu und zeigt bisheriges und neues Cover bzw. Rücken nebeneinander – ihr wählt, welches bleibt (Titel änderbar, Cover/Rücken umschaltbar)', 'Wunschliste: „Cover fotografieren“ – Angaben werden wie gewohnt aus dem Internet ergänzt, mit Hinweis „Habt ihr schon!“, falls es schon in der Sammlung ist']],
   ['1.30', '26.10.2026', ['„Bei allen vorhandenen Medien ergänzen“ und „Cover für Medien ohne Bild suchen“: vorher auswählen, welche Medienarten (mehrere möglich) – mit Anzahl je Art, die Auswahl wird gemerkt']],
@@ -2778,24 +2781,31 @@ async function checkAfterCode(id, code) {
   if (!r) return toast('Zur Nummer wurden online keine Daten gefunden – die Angaben bleiben, wie sie sind', 3500);
   const rec = Object.assign({}, r, { typ: it.typ }); delete rec.cover;
   if (rec.titel) await completeRecord(rec, { useAI: false }).catch(() => []);
+  openFieldCompare(id, rec, { mode: 'code', code });
+}
+// Abgleich alt → neu je Feld. mode 'code': nur leere oder online ergänzte Felder; mode 'back': alles, was auf der Rückseite abweicht
+function openFieldCompare(id, rec, { mode, code } = {}) {
   const cur = byId(id); if (!cur) return;
   const rows = [];
+  const skip = mode === 'back' ? ['notizen', 'youtube', 'bgg'] : ['barcode', 'isbn', 'notizen', 'youtube'];
   for (const f of fieldsOf(cur.typ)) {
-    const k = f.k; if (['barcode', 'isbn', 'notizen', 'youtube'].includes(k) || f.own || f.wish || f.borrow || f.t === 'lend' || f.t === 'bool') continue;
+    const k = f.k; if (skip.includes(k) || f.own || f.wish || f.borrow || f.t === 'lend' || f.t === 'bool' || f.t === 'url') continue;
     const nv = rec[k]; if (isEmpty(nv)) continue;
     if (f.t === 'select' && !optsOf(f).includes(String(nv))) continue;
     const ov = cur[k];
     if (isEmpty(ov)) rows.push({ k, f, ov, nv, def: 'neu' });
+    else if (mode === 'back') { if (k === 'titel' ? normDup(ov) !== normDup(nv) : !sameVal(ov, nv)) rows.push({ k, f, ov, nv, def: (cur.auto || []).includes(k) && k !== 'titel' ? 'neu' : 'alt' }); }
     else if (k === 'titel' ? normDup(ov) !== normDup(nv) : ((cur.auto || []).includes(k) && !sameVal(ov, nv))) rows.push({ k, f, ov, nv, def: 'alt' });
   }
-  if (!rows.length) return toast('✓ Die Angaben passen zur Nummer', 3000);
+  if (!rows.length) return toast(mode === 'back' ? '✓ Alles passt – auf der Rückseite steht nichts Neues' : '✓ Die Angaben passen zur Nummer', 3000);
   const choice = Object.fromEntries(rows.map(x => [x.k, x.def]));
   const show = (f, v) => isEmpty(v) ? '<i class="hint">leer</i>' : esc(fmt(f, v)).slice(0, 300);
-  const s = openSheet(`${sheetHead('Neue Angaben zur Nummer')}
-    <p class="hint" style="margin-top:0">Zur Nummer <b>${esc(code)}</b> wurden Angaben gefunden, die von den bisherigen abweichen. Wähle je Feld, was gelten soll. Vorausgewählt: Leere Felder werden gefüllt, Vorhandenes bleibt.</p>
+  const s = openSheet(`${sheetHead(mode === 'back' ? 'Angaben von der Rückseite' : 'Neue Angaben zur Nummer')}
+    <p class="hint" style="margin-top:0">${mode === 'back' ? `Auf der Rückseite von <b>${esc(cur.titel)}</b> stehen diese Angaben, die fehlen oder abweichen. Wähle je Feld, was gelten soll. Vorausgewählt: Leeres wird gefüllt, online Ergänztes durch die Rückseite ersetzt, eure eigenen Eingaben bleiben.` : `Zur Nummer <b>${esc(code)}</b> wurden Angaben gefunden, die von den bisherigen abweichen. Wähle je Feld, was gelten soll. Vorausgewählt: Leere Felder werden gefüllt, Vorhandenes bleibt.`}</p>
+    ${rec._hint ? `<div class="note" style="margin-bottom:10px">💡 ${esc(rec._hint)}</div>` : ''}
     <div class="inrow" style="margin-bottom:10px"><button class="btn" id="ccAllNew" style="flex:1">Alle neu</button><button class="btn" id="ccAllOld" style="flex:1">Alle alt</button></div>
     <div class="cclist">${rows.map(x => `<div class="ccrow" data-k="${x.k}"><div class="cck">${esc(x.f.l)}</div>
-      <div class="ccv"><button class="ccopt" data-pick="alt"><small>alt</small><span>${show(x.f, x.ov)}</span></button><span class="ccarr">→</span><button class="ccopt" data-pick="neu"><small>neu</small><span>${show(x.f, x.nv)}</span></button></div></div>`).join('')}</div>
+      <div class="ccv"><button class="ccopt" data-pick="alt"><small>alt</small><span>${show(x.f, x.ov)}</span></button><span class="ccarr">→</span><button class="ccopt" data-pick="neu"><small>${mode === 'back' ? 'Rückseite' : 'neu'}</small><span>${show(x.f, x.nv)}</span></button></div></div>`).join('')}</div>
     <div class="formfoot"><button class="btn" data-close>Alles lassen</button><button class="btn primary" id="ccOk">Auswahl übernehmen</button></div>`);
   const paint = () => $$('.ccrow', s).forEach(row => $$('.ccopt', row).forEach(b => b.setAttribute('aria-pressed', choice[row.dataset.k] === b.dataset.pick)));
   paint();
@@ -2806,10 +2816,53 @@ async function checkAfterCode(id, code) {
     const c = byId(id); if (!c) return closeSheet();
     const take = rows.filter(x => choice[x.k] === 'neu');
     for (const x of take) c[x.k] = ['number', 'year'].includes(x.f.t) ? +x.nv : x.nv;
-    if (take.length) { c.auto = [...new Set([...(c.auto || []), ...take.map(x => x.k).filter(k => k !== 'titel')])]; c.updatedAt = Date.now(); await persist(); }
+    if (take.length) {
+      // Von der Rückseite abgelesen = gesichert → nicht als „online ergänzt“ markieren
+      c.auto = mode === 'back' ? (c.auto || []).filter(k => !take.some(x => x.k === k)) : [...new Set([...(c.auto || []), ...take.map(x => x.k).filter(k => k !== 'titel')])];
+      if (mode === 'back' && take.some(x => x.k === 'komplexitaet')) c.kxManual = true;
+      c.updatedAt = Date.now(); await persist();
+    }
     await closeSheet(); render(); if (sheets.length === 0) openDetail(id);
     toast(take.length ? `${take.length} Angabe(n) aktualisiert` : 'Alles bleibt, wie es war');
+    if (mode === 'back' && take.some(x => x.k === 'barcode' || x.k === 'isbn')) { const nc = take.find(x => x.k === 'isbn')?.nv || take.find(x => x.k === 'barcode')?.nv; if (nc) setTimeout(() => checkAfterCode(id, String(nc)), 600); }
   };
+}
+// Rückseite fotografieren → KI liest die Angaben ab → Abgleich alt → neu
+async function readBackside(id, btn) {
+  const it = byId(id); if (!it) return;
+  if (settings.provider === 'barcode' || !aiKey()) return toast('Dafür in den Einstellungen eine KI (Claude oder Gemini) einrichten', 4000);
+  const file = await new Promise(res => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment'; inp.onchange = () => res(inp.files[0] || null); inp.oncancel = () => res(null); inp.click(); });
+  if (!file) return;
+  const label = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = '⏳ Lese die Rückseite …'; }
+  try {
+    const img = await resizeImage(file, 1800, .88);
+    const fields = fieldsOf(it.typ).filter(f => !f.own && !f.wish && !f.borrow && !['lend', 'bool', 'url', 'rating', 'date'].includes(f.t) && !['notizen', 'gespielt', 'vollstaendig', 'besitzer', 'standort'].includes(f.k));
+    const known = fields.filter(f => !isEmpty(it[f.k])).map(f => `${f.k}: ${fmt(f, it[f.k])}`).join('; ');
+    const prompt = `Das Foto zeigt die RÜCKSEITE (oder Unterseite/Innenklappe) eines Mediums aus einer privaten Sammlung: ${TYPES[it.typ].single} „${it.titel}“.
+Bisher gespeichert: ${known || '–'}
+Lies ab, was auf dem Foto steht, und gib die Angaben in diesen Feldern zurück (bei [..] genau einen dieser Werte):
+${fields.map(f => `- ${f.k} (${f.l})${f.t === 'select' ? ' [' + optsOf(f).join(' | ') + ']' : ''}`).join('\n')}
+Regeln:
+- Antworte NUR mit JSON: {"felder":{"feld":"wert"},"hinweis":"…"}
+- NUR Angaben, die auf dem Foto zu sehen oder eindeutig daraus ableitbar sind (z. B. Spieleranzahl-Symbol, Altersangabe, Spieldauer, Laufzeit, FSK-Logo, Barcode-/ISBN-Ziffern unter dem Strichcode, Verlag/Studio, Seitenzahl, Format-Logos wie „4K Ultra HD“/„Blu-ray“/„DVD“). Nichts raten, nichts aus Allgemeinwissen.
+- Zahlen als Zahl (Komma-Zahlen mit Punkt). Barcode/ISBN nur Ziffern (ISBN ggf. mit X).
+- "inhalt": Steht ein Klappen-/Rückseitentext da, fasse ihn in 2–4 Sätzen auf ${it.typ === 'buch' && it.sprache && !/deutsch/i.test(it.sprache) ? 'der Sprache des Textes' : 'Deutsch'} zusammen (ohne Spoiler).
+- "titel" nur angeben, wenn er deutlich anders geschrieben ist als „${it.titel}“.
+- Passt die Rückseite offensichtlich NICHT zu „${it.titel}“, gib "felder":{} zurück und erkläre es in "hinweis".`;
+    const text = await aiCall(prompt, img.split(',')[1], 2500);
+    const a = text.indexOf('{'), b = text.lastIndexOf('}'); if (a < 0) throw new Error('Die KI hat keine verwertbare Antwort geliefert.');
+    const j = JSON.parse(text.slice(a, b + 1));
+    const rec = { typ: it.typ };
+    for (const [k, v] of Object.entries(j.felder || {})) {
+      const f = fieldDef(it.typ, k); if (!f || v == null || v === '') continue;
+      if (['number', 'year'].includes(f.t)) { const n = parseFloat(String(v).replace(',', '.')); if (!isNaN(n)) rec[k] = f.t === 'year' ? Math.round(n) : n; }
+      else rec[k] = ['barcode', 'isbn'].includes(k) ? String(v).replace(/[^0-9Xx]/g, '') : String(v).trim();
+    }
+    if (j.hinweis) rec._hint = String(j.hinweis).slice(0, 300);
+    if (Object.keys(rec).length <= 1 + (rec._hint ? 1 : 0)) { if (rec._hint) alert(rec._hint); else toast('Auf dem Foto waren keine verwertbaren Angaben zu lesen', 3500); return; }
+    openFieldCompare(id, rec, { mode: 'back' });
+  } catch (e) { alert('Rückseite lesen hat nicht geklappt: ' + e.message); }
+  finally { if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = label; } }
 }
 
 /* ---------- Fehlende Angaben online ergänzen ----------
