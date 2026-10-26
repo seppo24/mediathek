@@ -597,7 +597,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.31';
+const APP_VERSION = '1.32';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -897,8 +897,9 @@ async function deleteItem(id) {
   const wasLocal = it.coverLocal, wasSpine = it.spineLocal;
   for (const k of Object.keys(it)) if (!['id', 'createdAt'].includes(k)) delete it[k];
   Object.assign(it, { deleted: true, updatedAt: Date.now() });
-  if (wasLocal) { await idb.del('cover:' + id); coverCache.delete('cover:' + id); imgQueueDel(id, 'cover'); }
-  if (wasSpine) { await idb.del('spine:' + id); coverCache.delete('spine:' + id); imgQueueDel(id, 'spine'); }
+  // Bilder in Dropbox bleiben liegen, damit ein Wiederherstellen sie zurückbringt (nur lokal entfernen)
+  if (wasLocal) { await idb.del('cover:' + id); coverCache.delete('cover:' + id); }
+  if (wasSpine) { await idb.del('spine:' + id); coverCache.delete('spine:' + id); }
   await persist();
 }
 
@@ -2380,6 +2381,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.32', '26.10.2026', ['Neuer Bereich „Sicherung & Wiederherstellen“: automatische Dropbox-Sicherung wählbar täglich/wöchentlich/monatlich, Anzahl einstellbar, Hinweis wenn überfällig', 'Zusätzlich tägliche Sicherung auf jedem Gerät (die letzten 7) – auch ohne Internet', 'Wiederherstellen mit Vorschau: was gelöscht, geändert, neu ist – „Nur Gelöschtes zurückholen“, „Einzeln auswählen“ oder „Komplett zurücksetzen“', 'Vor jedem Wiederherstellen wird der jetzige Stand automatisch gesichert (🛟)', 'Sicherungen enthalten jetzt auch Abende, Stimmen und Anfragen; Bilder gelöschter Medien bleiben in Dropbox, damit sie mit zurückkommen', 'Komplette Sicherung als Datei inkl. Bildern']],
   ['1.31', '26.10.2026', ['Foto erkennen: neue Auswahl „Wofür?“ – Neue Medien, Schon vorhanden (Bild ersetzen) oder ★ Wunschliste', 'Schon vorhanden: Die KI bekommt eure Titelliste, die App ordnet jeden Ausschnitt dem passenden Titel zu und zeigt bisheriges und neues Cover bzw. Rücken nebeneinander – ihr wählt, welches bleibt (Titel änderbar, Cover/Rücken umschaltbar)', 'Wunschliste: „Cover fotografieren“ – Angaben werden wie gewohnt aus dem Internet ergänzt, mit Hinweis „Habt ihr schon!“, falls es schon in der Sammlung ist']],
   ['1.30', '26.10.2026', ['„Bei allen vorhandenen Medien ergänzen“ und „Cover für Medien ohne Bild suchen“: vorher auswählen, welche Medienarten (mehrere möglich) – mit Anzahl je Art, die Auswahl wird gemerkt']],
   ['1.29', '26.10.2026', ['Brettspiele: Komplexität von BGG (Skala 1–5) wird übernommen und in der Liste als Zahl (⚖ 2,4) gezeigt', 'Daraus die Komplexitätsstufe: Familien- & Einstiegsspiel, Kennerspiel, Gehobenes Kennerspiel, Expertenspiel – Grenzen unter Einstellungen → Brettspiel-Komplexität', 'Stufe im Spiel weiterhin von Hand änderbar (bleibt dann manuell)', 'Neues Feld „Mechanismen“ (mehrere, von BGG, auf Deutsch übersetzt) – auch als Filter', 'Abstimmungsseite zeigt den Gästen Komplexität und Stufe']],
@@ -3700,6 +3702,7 @@ async function completeAll(list) {
   });
   if (!mode) return;
   if (mode === 'direct') {
+    await localSnap('vor „Direkt übernehmen“');
     const s = openSheet(`${sheetHead('Ergänze Angaben')}<div class="spinner"></div><p class="hint" style="text-align:center" id="caProg"></p><div class="formfoot"><button class="btn" data-close>Abbrechen</button></div>`);
     let n = 0, stop = false; s.parentElement._onClose = () => stop = true;
     for (let i = 0; i < todo.length && !stop; i++) {
@@ -4327,13 +4330,10 @@ function openSettings() {
       <button class="btn" id="sValue">💶 Was ist die Sammlung wert?</button>
       <button class="btn" id="sCovers">🖼 Cover für Medien ohne Bild suchen (${allLive().filter(i => TYPES[i.typ] && !hasCover(i) && !i.coverSkip).length})</button>
       <button class="btn" id="sClean">🧹 Aufräum-Assistent</button>
-      <div class="inrow"><button class="btn" id="sBackup" style="flex:1">Sicherung (.json) speichern</button><label class="btn" style="flex:1">Sicherung laden<input type="file" accept=".json,application/json" hidden id="sRestore"></label></div>
     </div>
 
-    <h3>Automatische Backups</h3>
-    <div class="card"><p class="hint" style="margin:0">Einmal im Monat legt die App automatisch eine datierte Kopie in eurem Dropbox-Ordner unter <code>backups/</code> ab. Die letzten 12 bleiben erhalten.${meta.lastBackup ? ` Letztes Backup: <b>${esc(deDate(meta.lastBackup))}</b>.` : ''}</p>
-      <div class="inrow"><button class="btn" id="sBkNow" style="flex:1" ${dbxReady() ? '' : 'disabled'}>Jetzt Backup anlegen</button><button class="btn" id="sBkRestore" style="flex:1" ${dbxReady() ? '' : 'disabled'}>Wiederherstellen …</button></div>
-      ${dbxReady() ? '' : '<p class="hint" style="margin:0">Erst Dropbox verbinden.</p>'}</div>
+    <h3>Sicherung & Wiederherstellen</h3>
+    <div class="card" id="bkCard"></div>
 
     <h3>Sammlung teilen (nur ansehen)</h3>
     <div class="card" id="shareCard"></div>
@@ -4422,8 +4422,8 @@ function openSettings() {
   $('#sKxReset', s).onclick = async () => { await kxSave([2, 3, 4]); $$('[data-kxb]', s).forEach(inp => inp.value = kxBounds()[+inp.dataset.kxb]); };
   $('#sBgg', s).oninput = e => { settings.bggToken = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
   $('#sBggTest', s).onclick = async e => { const b = e.currentTarget; if (!settings.bggToken) return toast('Bitte zuerst den Token einfügen'); b.disabled = true; b.textContent = 'Teste … (BGG erlaubt nur langsame Abfragen)'; const [ok, msg] = await bggTest(); b.disabled = false; b.textContent = 'BGG-Verbindung testen'; ok ? toast('✓ ' + msg, 4000) : alert(msg); };
-  $('#sBkNow', s).onclick = async e => { const b = e.target; b.disabled = true; b.textContent = 'Lege an …'; try { const n = await maybeBackup(true); toast('Backup angelegt: ' + n); } catch (err) { alert('Backup fehlgeschlagen: ' + err.message); } b.disabled = false; b.textContent = 'Jetzt Backup anlegen'; };
-  $('#sBkRestore', s).onclick = () => openBackupRestore();
+  drawBackupCard($('#bkCard', s));
+
   $('#sClean', s).onclick = () => closeSheet().then(openCleanup);
   $('#sCovers', s).onclick = () => closeSheet().then(() => searchCoversBulk());
   $('#sValue', s).onclick = () => closeSheet().then(openValue);
@@ -4433,7 +4433,7 @@ function openSettings() {
   drawShare($('#shareCard', s)); drawMailbox($('#mboxCard', s));
   fillDeviceInfo($('#inDev', s)); $('#inUpd', s).onclick = e => checkForUpdate(e.currentTarget);
   // Abschnitte aufklappbar machen (übersichtlicher)
-  const ICONS = { 'Info': 'ℹ️', 'Anfragen direkt empfangen': '📬', 'Wir zwei': '👫', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Automatische Backups': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
+  const ICONS = { 'Info': 'ℹ️', 'Anfragen direkt empfangen': '📬', 'Wir zwei': '👫', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Sicherung & Wiederherstellen': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
   const openKey = lsGet('mt_setopen', '');
   $$('.set > h3', s).forEach(h => {
     const card = h.nextElementSibling; const d = document.createElement('details'); d.className = 'setsec';
@@ -4454,21 +4454,6 @@ function openSettings() {
     await idb.set('shared', shared); meta.seq++; await saveMeta(); scheduleSync();
   });
   $('#sExcel', s).onclick = async e => { const b = e.target; b.disabled = true; b.textContent = 'Erstelle …'; try { await exportExcel(); } catch (err) { alert(err.message); } b.disabled = false; b.textContent = 'Excel-Liste herunterladen'; };
-  $('#sBackup', s).onclick = async () => {
-    const covers = {}; for (const it of allLive()) { if (it.coverLocal) { const d = await idb.get('cover:' + it.id); if (d) covers[it.id] = d; } if (it.spineLocal) { const d = await idb.get('spine:' + it.id); if (d) covers[it.id + '#ruecken'] = d; } }
-    const blob = new Blob([JSON.stringify({ app: 'mediathek', version: 1, shared, items, covers })], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Mediathek-Sicherung_${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  };
-  $('#sRestore', s).onchange = async e => {
-    const f = e.target.files[0]; if (!f) return;
-    try {
-      const j = JSON.parse(await f.text()); if (!Array.isArray(j.items)) throw new Error('Keine Mediathek-Sicherung');
-      if (!confirm(`${j.items.filter(i => !i.deleted).length} Medien aus der Sicherung übernehmen? Bestehende Einträge bleiben erhalten, neuere Stände gewinnen.`)) return;
-      for (const [k, d] of Object.entries(j.covers || {})) { const sp = k.endsWith('#ruecken'); const id = k.replace('#ruecken', ''); await idb.set((sp ? 'spine:' : 'cover:') + id, d); imgQueue(id, sp ? 'spine' : 'cover'); }
-      mergeRemote(j.items); if (j.shared && (j.shared.updatedAt || 0) > (shared.updatedAt || 0)) { shared = j.shared; await idb.set('shared', shared); }
-      await persist(); render(); toast('Sicherung geladen');
-    } catch (err) { alert('Fehler: ' + err.message); }
-  };
   $('#sCodeOut', s).onclick = async () => {
     const payload = { provider: settings.provider, claudeKey: settings.claudeKey, claudeModel: settings.claudeModel, geminiKey: settings.geminiKey, geminiModel: settings.geminiModel, tmdbKey: settings.tmdbKey, rawgKey: settings.rawgKey, bggToken: settings.bggToken, discogsToken: settings.discogsToken, autoFill: settings.autoFill, dbxAppKey: settings.dbxAppKey };
     if (dbxConnected() && confirm('Deine Dropbox-Anmeldung mitgeben?\n\nOK = das andere Gerät nutzt DEIN Dropbox-Konto (z. B. dein Laptop).\nAbbrechen = das Gerät meldet sich mit einem EIGENEN Konto an (z. B. das Handy deiner Frau) und wählt dann euren geteilten Ordner.')) { payload.dbxRefresh = settings.dbxRefresh; payload.dbxFolder = settings.dbxFolder; }
@@ -4638,44 +4623,149 @@ function openStats() {
 }
 
 /* =========================================================
-   Automatische Backups im Dropbox-Ordner (monatlich, 12 behalten)
+   Sicherung & Wiederherstellen (Dropbox + Gerät)
    ========================================================= */
+// Einstellungen (für euch beide): wie oft, wie viele behalten
+const bkCfg = () => Object.assign({ every: 7, keep: 12 }, shared.backup);
+const BK_RE = /^mediathek_(\d{4}-\d{2}-\d{2})(?:_(\d{4}))?(?:_([\w-]+))?\.json$/;
+const bkSnapshot = () => ({ app: 'mediathek', version: 2, backupAt: Date.now(), shared, items: items.filter(i => !i.deleted), extra: extra.filter(r => !r.deleted) });
 async function listBackups() {
-  try { return (await dbxListFolders(P('/backups'))).filter(e => e['.tag'] === 'file' && /^mediathek_\d{4}-\d{2}-\d{2}\.json$/.test(e.name)).sort((a, b) => b.name.localeCompare(a.name)); }
+  try { return (await dbxListFolders(P('/backups'))).filter(e => e['.tag'] === 'file' && BK_RE.test(e.name)).sort((a, b) => b.name.localeCompare(a.name)); }
   catch (e) { if (/not_found/.test(e.summary || e.message)) return []; throw e; }
 }
-async function maybeBackup(force) {
+const bkLabel = name => { const m = name.match(BK_RE); if (!m) return name; return deDate(m[1]) + (m[2] ? ', ' + m[2].slice(0, 2) + ':' + m[2].slice(2) + ' Uhr' : '') + (m[3] ? ' · ' + m[3].replace(/-/g, ' ') : ''); };
+async function maybeBackup(force, reason) {
   if (VIEW || !dbxReady()) return;
-  if (!force && Date.now() - (meta.backupCheckedAt || 0) < 864e5) return; // höchstens 1× pro Tag prüfen
+  if (!force && Date.now() - (meta.backupCheckedAt || 0) < 6 * 3600e3) return; // höchstens alle 6 Std. prüfen
   meta.backupCheckedAt = Date.now(); await saveMeta();
-  const list = await listBackups();
-  const last = list[0]?.name.slice(10, 20);
-  if (!force && last && Date.now() - new Date(last) < 30 * 864e5) { meta.lastBackup = last; await saveMeta(); return; }
-  if (!allLive().length) { if (force) throw new Error('Noch keine Medien vorhanden.'); return; }
-  const name = `mediathek_${todayISO()}.json`;
-  await dbxUpload(P('/backups/' + name), JSON.stringify({ app: 'mediathek', version: 1, backupAt: Date.now(), shared, items: allLive(), extra: extra.filter(r => !r.deleted) }), { '.tag': 'overwrite' });
-  for (const old of list.filter(f => f.name !== name).slice(11)) { try { await dbxRpc('files/delete_v2', { path: old.path_display }); } catch { } }
-  meta.lastBackup = todayISO(); await saveMeta();
+  const list = await listBackups(); const cfg = bkCfg();
+  const regular = list.filter(f => !f.name.match(BK_RE)[3]);
+  const last = regular[0]?.name.match(BK_RE)[1];
+  if (!force && last && Date.now() - new Date(last) < (cfg.every - .25) * 864e5) { meta.lastBackup = last; await saveMeta(); return; }
+  if (!items.some(i => !i.deleted)) { if (force) throw new Error('Noch keine Medien vorhanden.'); return; }
+  const d = new Date(); const hm = String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+  const name = reason ? `mediathek_${todayISO()}_${hm}_${reason}.json` : `mediathek_${todayISO()}.json`;
+  await dbxUpload(P('/backups/' + name), JSON.stringify(bkSnapshot()), { '.tag': 'overwrite' });
+  // Aufräumen: regelmäßige auf „keep“ begrenzen, Sondersicherungen (vor Wiederherstellung …) max. 5
+  const reg2 = [name, ...regular.map(f => f.name)].filter((n, i, a) => a.indexOf(n) === i && !n.match(BK_RE)[3]);
+  const spec = list.filter(f => f.name.match(BK_RE)[3]).map(f => f.name);
+  for (const old of [...reg2.slice(cfg.keep), ...spec.slice(reason ? 4 : 5)]) { try { await dbxRpc('files/delete_v2', { path: P('/backups/' + old) }); } catch { } }
+  if (!reason) { meta.lastBackup = todayISO(); await saveMeta(); }
   return name;
 }
-async function openBackupRestore() {
-  const s = openSheet(`${sheetHead('Aus Backup wiederherstellen')}<div id="brList"><div class="spinner"></div></div>`);
-  let list; try { list = await listBackups(); } catch (e) { $('#brList', s).innerHTML = `<div class="note warn">${esc(e.message)}</div>`; return; }
-  $('#brList', s).innerHTML = list.length ? `<p class="hint" style="margin-top:0">Stellt die Sammlung genau so her, wie sie am gewählten Tag war. Später Hinzugefügtes wird entfernt – auf allen Geräten.</p><div class="menu">${list.map(f => `<button data-bk="${esc(f.path_display)}"><span class="mi">🗂</span><span><b>${esc(deDate(f.name.slice(10, 20)))}</b><small>${Math.round(f.size / 1024)} KB</small></span></button>`).join('')}</div>` : '<p class="hint">Noch keine Backups vorhanden.</p>';
-  s.onclick = async e => {
-    const b = e.target.closest('[data-bk]'); if (!b) return;
-    if (!confirm(`Sammlung auf den Stand vom ${b.querySelector('b').textContent} zurücksetzen?\n\nTipp: Vorher „Jetzt Backup anlegen“, falls ihr den aktuellen Stand behalten wollt.`)) return;
-    try {
-      const j = JSON.parse(await (await dbxDownload(b.dataset.bk)).text());
-      const now = Date.now(); const keep = new Set(j.items.map(i => i.id));
-      const restored = j.items.map(i => Object.assign({}, i, { updatedAt: now }));
-      const gone = items.filter(i => !keep.has(i.id) && !i.deleted).map(i => ({ id: i.id, createdAt: i.createdAt, deleted: true, updatedAt: now }));
-      const old = items.filter(i => !keep.has(i.id) && i.deleted);
-      items = [...restored, ...gone, ...old];
-      if (j.shared) { shared = Object.assign({}, j.shared, { updatedAt: now }); await idb.set('shared', shared); }
-      await persist(); await closeSheet(); render(); toast('Wiederhergestellt');
-    } catch (err) { alert('Wiederherstellen fehlgeschlagen: ' + err.message); }
+// Zusätzlich: Sicherheitsnetz auf dem Gerät (auch ohne Internet/Dropbox) – täglich + vor großen Aktionen, 7 behalten
+async function localSnap(reason = 'täglich') {
+  if (VIEW) return;
+  try {
+    const list = (await idb.get('snaps')) || [];
+    if (reason === 'täglich' && list.some(x => x.reason === 'täglich' && Date.now() - x.at < 20 * 3600e3)) return;
+    if (!items.some(i => !i.deleted)) return;
+    const at = Date.now(); await idb.set('snap:' + at, bkSnapshot());
+    const next = [{ at, reason, n: items.filter(i => !i.deleted).length }, ...list];
+    for (const old of next.slice(7)) await idb.del('snap:' + old.at);
+    await idb.set('snaps', next.slice(0, 7));
+  } catch (e) { console.warn('Gerätesicherung', e); }
+}
+// Vor jeder Wiederherstellung den jetzigen Stand sichern (Dropbox, wenn möglich, und immer auf dem Gerät)
+async function safetyBackup() {
+  await localSnap('vor Wiederherstellung');
+  try { await maybeBackup(true, 'vor-Wiederherstellung'); } catch (e) { console.warn(e); }
+}
+function drawBackupCard(c) {
+  if (!c) return;
+  const cfg = bkCfg(); const old = meta.lastBackup ? (Date.now() - new Date(meta.lastBackup)) / 864e5 : 999;
+  const warn = dbxReady() && old > cfg.every * 2 + 1;
+  c.innerHTML = `<p class="hint" style="margin:0">Die App sichert automatisch alles (Medien, Wunschliste, Abende, Regal-Aufstellung, Einstellungen für euch beide) in eurem Dropbox-Ordner unter <code>backups/</code>. Zusätzlich hält jedes Gerät täglich eine eigene Sicherung (die letzten 7) – die hilft auch ohne Internet.</p>
+    <div class="note${warn ? ' warn' : ''}" style="margin:0">${dbxReady() ? (meta.lastBackup ? `Letzte Dropbox-Sicherung: <b>${esc(deDate(meta.lastBackup))}</b>${warn ? ' – überfällig, bitte „Jetzt sichern“' : ' ✓'}` : 'Noch keine Dropbox-Sicherung.') : 'Dropbox nicht verbunden – nur Sicherungen auf diesem Gerät.'}</div>
+    <div class="inrow" style="gap:8px"><label class="fld" style="flex:1"><span>Automatisch sichern</span><select id="bkEvery">${[[1, 'täglich'], [7, 'wöchentlich'], [30, 'monatlich']].map(([v, l]) => `<option value="${v}" ${cfg.every === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="fld" style="flex:1"><span>Behalten</span><select id="bkKeep">${[6, 12, 24, 52].map(v => `<option value="${v}" ${cfg.keep === v ? 'selected' : ''}>die letzten ${v}</option>`).join('')}</select></label></div>
+    <div class="inrow"><button class="btn primary" id="bkNow" style="flex:1" ${dbxReady() ? '' : 'disabled'}>💾 Jetzt sichern</button><button class="btn" id="bkRestore" style="flex:1">↺ Wiederherstellen</button></div>
+    <button class="btn" id="bkFile">⬇ Als Datei sichern (mit Bildern)</button>`;
+  const saveCfg = async () => { shared.backup = { every: +$('#bkEvery', c).value, keep: +$('#bkKeep', c).value }; await saveShared(); toast('Gespeichert'); };
+  $('#bkEvery', c).onchange = saveCfg; $('#bkKeep', c).onchange = saveCfg;
+  $('#bkNow', c).onclick = async e => { const b = e.currentTarget; b.disabled = true; b.textContent = 'Sichere …'; try { await localSnap('von Hand'); const n = await maybeBackup(true); toast('✓ Gesichert: ' + bkLabel(n)); } catch (err) { alert('Sichern fehlgeschlagen: ' + err.message); } drawBackupCard(c); };
+  $('#bkRestore', c).onclick = () => closeSheet().then(openBackupRestore);
+  $('#bkFile', c).onclick = async e => {
+    const b = e.currentTarget; b.disabled = true; b.textContent = 'Packe Bilder ein …';
+    const covers = {}; for (const it of items.filter(i => !i.deleted)) { if (it.coverLocal) { const d = await localImg('cover', it.id).catch(() => null); if (d) covers[it.id] = d; } if (it.spineLocal) { const d = await localImg('spine', it.id).catch(() => null); if (d) covers[it.id + '#ruecken'] = d; } }
+    const blob = new Blob([JSON.stringify(Object.assign(bkSnapshot(), { covers }))], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Mediathek-Sicherung_${todayISO()}.json`; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    b.disabled = false; b.textContent = '⬇ Als Datei sichern (mit Bildern)';
   };
+}
+async function openBackupRestore() {
+  const s = openSheet(`${sheetHead('Wiederherstellen')}<p class="hint" style="margin-top:0">Wähle eine Sicherung. Du siehst danach genau, was sich seitdem geändert hat, und entscheidest, was zurückkommt.</p><div id="brList"><div class="spinner"></div></div>
+    <label class="btn" style="width:100%;margin-top:10px">📄 Sicherungsdatei (.json) öffnen …<input type="file" accept=".json,application/json" hidden id="brFile"></label>`);
+  const snaps = (await idb.get('snaps')) || [];
+  let list = [], err = '';
+  if (dbxReady()) { try { list = await listBackups(); } catch (e) { err = e.message; } }
+  const rowB = (attr, icon, title, sub) => `<button ${attr}><span class="mi">${icon}</span><span><b>${esc(title)}</b><small>${esc(sub)}</small></span></button>`;
+  $('#brList', s).innerHTML = `${dbxReady() ? `<div class="menusep">In eurer Dropbox (für beide Geräte)</div>${err ? `<div class="note warn">${esc(err)}</div>` : list.length ? `<div class="menu">${list.map(f => rowB(`data-bk="${esc(f.path_display)}" data-l="${esc(bkLabel(f.name))}"`, f.name.match(BK_RE)[3] ? '🛟' : '🗂', bkLabel(f.name), Math.round(f.size / 1024) + ' KB')).join('')}</div>` : '<p class="hint">Noch keine Sicherungen in Dropbox.</p>'}` : '<p class="hint">Dropbox ist nicht verbunden – nur Sicherungen auf diesem Gerät.</p>'}
+    <div class="menusep">Auf diesem Gerät</div>${snaps.length ? `<div class="menu">${snaps.map(x => rowB(`data-sn="${x.at}" data-l="${esc(new Date(x.at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }))}"`, '📱', new Date(x.at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }), x.reason + ' · ' + x.n + ' Medien')).join('')}</div>` : '<p class="hint">Noch keine.</p>'}`;
+  const go = async (j, label) => { if (!Array.isArray(j?.items)) return alert('Das ist keine Mediathek-Sicherung.'); await closeSheet(); openRestorePreview(j, label); };
+  s.addEventListener('click', async e => {
+    const b = e.target.closest('[data-bk],[data-sn]'); if (!b) return;
+    b.disabled = true; b.querySelector('small').textContent = 'Lade …';
+    try { const j = b.dataset.bk ? JSON.parse(await (await dbxDownload(b.dataset.bk)).text()) : await idb.get('snap:' + b.dataset.sn); await go(j, b.dataset.l); }
+    catch (err) { alert('Konnte die Sicherung nicht laden: ' + err.message); b.disabled = false; }
+  });
+  $('#brFile', s).onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const j = JSON.parse(await f.text()); await go(j, f.name); } catch (err) { alert('Fehler: ' + err.message); } };
+}
+// Vergleich Sicherung ↔ jetzt; drei Wege: Gelöschtes zurückholen, einzeln auswählen, komplett zurücksetzen
+function openRestorePreview(j, label) {
+  const strip = o => { const c = Object.assign({}, o); ['updatedAt', 'autoAt', 'auto', 'createdAt'].forEach(k => delete c[k]); return JSON.stringify(Object.keys(c).sort().map(k => [k, c[k]])); };
+  const cur = new Map(items.map(i => [i.id, i]));
+  const bItems = j.items.filter(i => !i.deleted && i.id);
+  const bIds = new Set(bItems.map(i => i.id));
+  const gone = bItems.filter(b => !cur.get(b.id) || cur.get(b.id).deleted);
+  const changed = bItems.filter(b => { const c = cur.get(b.id); return c && !c.deleted && strip(c) !== strip(b); });
+  const added = items.filter(i => !i.deleted && !bIds.has(i.id));
+  const bExtra = (j.extra || []).filter(x => !x.deleted && x.id);
+  const curX = new Map(extra.map(x => [x.id, x]));
+  const goneX = bExtra.filter(x => !curX.get(x.id) || curX.get(x.id).deleted);
+  const typeL = it => it.wunsch ? '★ Wunsch' : it.geliehen ? '↙ geliehen' : (TYPES[it.typ]?.single || it.typ || '');
+  const xL = x => x.kind === 'abend' ? '🎲 Abend „' + (x.titel || '') + '“' : x.kind === 'vote' ? '🗳 Stimme von ' + (x.n || '?') : x.kind === 'anfrage' ? '📬 Anfrage von ' + (x.n || '?') : x.kind;
+  const s = openSheet(`${sheetHead('Sicherung vom ' + label)}
+    <div class="note" style="margin-bottom:10px">Die Sicherung enthält <b>${bItems.length} Medien</b>${bExtra.length ? ` und ${bExtra.length} Einträge im Abendplaner/Postfach` : ''}.<br>Seitdem: <b>${gone.length}</b> gelöscht · <b>${changed.length}</b> geändert · <b>${added.length}</b> neu hinzugekommen${goneX.length ? ` · ${goneX.length} Abende/Stimmen/Anfragen gelöscht` : ''}.</div>
+    <div class="menu">
+      <button data-rm="undelete" ${gone.length + goneX.length ? '' : 'disabled'}><span class="mi">♻️</span><span><b>Nur Gelöschtes zurückholen (${gone.length + goneX.length})</b><small>Alles andere bleibt, wie es jetzt ist. Die sicherste Wahl.</small></span></button>
+      <button data-rm="pick" ${gone.length + changed.length ? '' : 'disabled'}><span class="mi">☑️</span><span><b>Einzeln auswählen …</b><small>Gelöschte und geänderte Medien ansehen und gezielt den alten Stand zurückholen</small></span></button>
+      <button data-rm="full"><span class="mi">⏪</span><span><b>Komplett auf diesen Stand zurücksetzen</b><small>Auch Änderungen werden zurückgedreht, ${added.length} seitdem hinzugekommene Medien entfernt – auf allen Geräten</small></span></button></div>
+    <p class="hint">Vor jedem Zurückholen wird der jetzige Stand automatisch gesichert (🛟) – du kannst es also jederzeit rückgängig machen. Bilder: Eigene Cover und Rücken liegen in Dropbox und kommen mit zurück.</p>
+    <div id="rpPick"></div>`);
+  const restoreItems = async list => { const now = Date.now(); for (const b of list) { const r = Object.assign({}, b, { updatedAt: now }); const i = items.findIndex(x => x.id === b.id); if (i >= 0) items[i] = r; else items.push(r); } };
+  const restoreExtra = async list => { const now = Date.now(); for (const b of list) { const r = Object.assign({}, b, { updatedAt: now }); const i = extra.findIndex(x => x.id === b.id); if (i >= 0) extra[i] = r; else extra.push(r); } await persistExtra(); };
+  const putCovers = async ids => { for (const [k, d] of Object.entries(j.covers || {})) { const sp = k.endsWith('#ruecken'); const id = k.replace('#ruecken', ''); if (!ids.has(id)) continue; await idb.set((sp ? 'spine:' : 'cover:') + id, d); imgQueue(id, sp ? 'spine' : 'cover'); } };
+  const finish = async (msg) => { await putCovers(new Set(items.filter(i => !i.deleted).map(i => i.id))); coverCache.clear(); await persist(); await closeSheet(); render(); toast(msg, 4000); };
+  s.addEventListener('click', async e => {
+    const b = e.target.closest('[data-rm]'); if (!b || b.disabled) return;
+    const m = b.dataset.rm;
+    if (m === 'undelete') { await safetyBackup(); await restoreItems(gone); await restoreExtra(goneX); return finish(`♻️ ${gone.length + goneX.length} Einträge zurückgeholt`); }
+    if (m === 'full') {
+      if (!confirm(`Wirklich alles auf den Stand vom ${label} zurücksetzen?\n\n${added.length} neuere Medien werden entfernt, ${changed.length} Änderungen zurückgedreht. Der jetzige Stand wird vorher gesichert.`)) return;
+      await safetyBackup(); const now = Date.now();
+      const restored = bItems.map(i => Object.assign({}, i, { updatedAt: now }));
+      const tomb = items.filter(i => !bIds.has(i.id)).map(i => i.deleted ? i : { id: i.id, createdAt: i.createdAt, deleted: true, updatedAt: now });
+      items = [...restored, ...tomb];
+      if (j.extra) { const bx = new Set(bExtra.map(x => x.id)); extra = [...bExtra.map(x => Object.assign({}, x, { updatedAt: now })), ...extra.filter(x => !bx.has(x.id)).map(x => x.deleted ? x : Object.assign({}, x, { deleted: true, updatedAt: now }))]; await persistExtra(); }
+      if (j.shared) { shared = Object.assign({}, j.shared, { updatedAt: now }); await idb.set('shared', shared); }
+      return finish('⏪ Auf den Stand vom ' + label + ' zurückgesetzt');
+    }
+    if (m === 'pick') {
+      const sel = new Set(gone.map(x => x.id));
+      const line = (b, kind) => { const c = cur.get(b.id); const diff = kind === 'chg' ? Object.keys(Object.assign({}, b, c)).filter(k => !['updatedAt', 'autoAt', 'auto', 'createdAt', 'imgAt', 'spineAt'].includes(k) && JSON.stringify(b[k] ?? '') !== JSON.stringify(c[k] ?? '')).map(k => fieldDef(b.typ, k)?.l || k).slice(0, 4).join(', ') : '';
+        return `<label class="pick"><span class="pl"><input type="checkbox" data-rp="${b.id}" ${sel.has(b.id) ? 'checked' : ''}><span><div class="t">${esc(b.titel || '(ohne Titel)')}</div><div class="s">${esc(typeL(b))} · ${kind === 'del' ? 'gelöscht' : 'geändert: ' + esc(diff) + (c?.updatedAt ? ' (am ' + new Date(c.updatedAt).toLocaleDateString('de-DE') + ')' : '')}</div></span></span></label>`; };
+      const P2 = $('#rpPick', s);
+      P2.innerHTML = `<h3 style="font:800 17px Fraunces,serif;margin:16px 0 6px">Auswählen</h3><div class="search" style="margin-bottom:8px"><input type="search" id="rpQ" placeholder="Suchen …"></div>
+        <div class="picklist" id="rpList">${gone.map(b => line(b, 'del')).join('')}${changed.map(b => line(b, 'chg')).join('')}</div>
+        <div class="formfoot"><button class="btn" data-close>Abbrechen</button><button class="btn primary" id="rpGo"></button></div>`;
+      const upd = () => { const g = $('#rpGo', s); g.disabled = !sel.size; g.textContent = sel.size ? `${sel.size} zurückholen` : 'Nichts ausgewählt'; };
+      upd(); P2.scrollIntoView({ behavior: 'smooth' });
+      $('#rpList', s).onchange = e2 => { const c = e2.target.closest('[data-rp]'); if (!c) return; c.checked ? sel.add(c.dataset.rp) : sel.delete(c.dataset.rp); upd(); };
+      $('#rpQ', s).oninput = e2 => { const q = e2.target.value.toLowerCase(); $$('#rpList .pick', s).forEach(l => l.hidden = q && !l.textContent.toLowerCase().includes(q)); };
+      $('#rpGo', s).onclick = async () => { await safetyBackup(); await restoreItems(bItems.filter(b => sel.has(b.id))); finish(`${sel.size} Medien auf den alten Stand gebracht`); };
+    }
+  });
 }
 
 /* =========================================================
@@ -5689,6 +5779,7 @@ addEventListener('hashchange', () => {
   shared = Object.assign(shared, (await idb.get('shared')) || {});
   extra = (await idb.get('extra')) || [];
   if (items.filter(kxFix).length) await idb.set('items', items); // alte Stufen (Leicht/Mittel/Schwer) umstellen
+  setTimeout(() => localSnap('täglich'), 4000);
   // 1.29: neue BGG-Felder (Komplexität, Mechanismen) – „Bei allen ergänzen“ darf alle Brettspiele noch einmal anfassen
   if (!settings.kxMig) { settings.sourcesAt = Date.now(); settings.kxMig = 1; saveSettings(); }
   if (new URLSearchParams(location.search).has('demo') && !items.length) await loadDemo();
