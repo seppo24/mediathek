@@ -271,6 +271,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .ytbox .lbl{position:absolute;left:10px;bottom:8px;color:#fff;font-weight:600;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .mini{font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;background:#ff5100;color:#fff;text-decoration:none;letter-spacing:.02em}
 .mini.yt{background:#ff0000}
+.nfev{display:grid;gap:4px}.nfrow{align-items:flex-start!important;margin:0!important;padding:6px 0;border-bottom:1px solid var(--line)}.nfrow span{display:flex;flex-direction:column}.nfrow small{color:var(--ink2);font-size:12px}
 .rirow .cst{width:100%}.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
 .cmpopt{display:flex;flex-direction:column;gap:4px;align-items:stretch;border:2px solid var(--line);border-radius:12px;background:var(--surface);padding:6px;color:var(--ink)}
 .cmpopt small{font-weight:700;font-size:12px;text-align:center}
@@ -597,7 +598,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.33.1';
+const APP_VERSION = '1.34';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2383,6 +2384,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.34', '27.10.2026', ['Benachrichtigungen über ntfy (optional): kommen aufs Handy, auch wenn die App geschlossen ist', 'Einzeln ein-/ausschaltbar: neue Ausleih-Anfrage, neue Stimme (beides sofort, direkt vom Gast), Erinnerung am Vortag eines Abends, Verliehenes lange weg (Zeit einstellbar), Geliehenes bald/überfällig zurückgeben, Sicherung überfällig', 'Jedes Ereignis wird nur einmal gemeldet – auch wenn beide Handys die App offen haben']],
   ['1.33.1', '26.10.2026', ['Rückseite fotografieren bei Büchern: Inhaltsangabe bleibt in der Sprache des Klappentexts (z. B. Englisch) statt übersetzt zu werden; die Buchsprache wird mit abgelesen']],
   ['1.33', '26.10.2026', ['Detailansicht: „📷 Rückseite fotografieren“ – die KI liest ab, was auf der Rückseite steht (Spieleranzahl, Dauer, Alter, Laufzeit, FSK, Format, Verlag, Barcode/ISBN, Klappentext …), danach Abgleich alt → neu je Feld', 'Von der Rückseite abgelesene Angaben gelten als gesichert (kein 🌐 mehr); neu gelesene Barcodes/ISBN werden anschließend auch online abgeglichen']],
   ['1.32', '26.10.2026', ['Neuer Bereich „Sicherung & Wiederherstellen“: automatische Dropbox-Sicherung wählbar täglich/wöchentlich/monatlich, Anzahl einstellbar, Hinweis wenn überfällig', 'Zusätzlich tägliche Sicherung auf jedem Gerät (die letzten 7) – auch ohne Internet', 'Wiederherstellen mit Vorschau: was gelöscht, geändert, neu ist – „Nur Gelöschtes zurückholen“, „Einzeln auswählen“ oder „Komplett zurücksetzen“', 'Vor jedem Wiederherstellen wird der jetzige Stand automatisch gesichert (🛟)', 'Sicherungen enthalten jetzt auch Abende, Stimmen und Anfragen; Bilder gelöschter Medien bleiben in Dropbox, damit sie mit zurückkommen', 'Komplette Sicherung als Datei inkl. Bildern']],
@@ -2499,6 +2501,95 @@ function openWishMenu() {
     <button data-w="photo" ${ai ? '' : 'disabled'}><span class="mi">📷</span><span><b>Cover fotografieren</b><small>${ai ? 'Z. B. im Laden – Angaben kommen aus dem Internet' : 'Erst in den Einstellungen eine KI auswählen'}</small></span></button>
     <button data-w="manual"><span class="mi">✍️</span><span><b>Von Hand eintragen</b><small>Titel eintippen – Vorschläge erscheinen beim Tippen</small></span></button></div>`);
   s.onclick = e => { const b = e.target.closest('[data-w]'); if (!b || b.disabled) return; closeSheet().then(() => b.dataset.w === 'photo' ? openPhoto({ target: 'wish' }) : openForm({ prefill: { wunsch: true, typ }, title: 'Neuer Wunsch' })); };
+}
+
+/* =========================================================
+   Benachrichtigungen über ntfy (optional) – kommen aufs Handy, auch wenn die App zu ist.
+   Gäste senden direkt (Anfrage, Stimme); eure App schickt Erinnerungen, wenn sie läuft.
+   ========================================================= */
+const NTFY_EV = [
+  ['anfrage', '📬 Neue Ausleih-Anfrage', 'Sofort, wenn ein Freund über euren Teilen-Link etwas ausleihen möchte', true],
+  ['stimme', '🗳 Neue Stimme im Abendplaner', 'Sofort, wenn ein Gast abgestimmt hat (mit seiner Top 3)', true],
+  ['abend', '🎲 Erinnerung an geplante Abende', 'Am Tag vorher um 18 Uhr – mit aktuellem Abstimmungs-Stand', true],
+  ['verliehen', '↗ Verliehenes ist lange weg', 'Wenn etwas länger als die eingestellte Zeit verliehen ist', true],
+  ['geliehen', '↙ Geliehenes zurückgeben', '2 Tage vor dem Rückgabedatum und wenn es überfällig ist', true],
+  ['backup', '💾 Sicherung überfällig', 'Wenn die automatische Dropbox-Sicherung schon länger nicht geklappt hat', false],
+];
+const ntfyCfg = () => { const c = Object.assign({ on: false, server: 'https://ntfy.sh', topic: '', ev: {}, lendWeeks: 6 }, shared.ntfy); NTFY_EV.forEach(([k, , , d]) => { if (!(k in c.ev)) c.ev[k] = d; }); return c; };
+const ntfyOn = k => { const c = ntfyCfg(); return c.on && c.topic && c.ev[k]; };
+// Für Gäste-Seiten: nur Server + Thema, und nur wenn das Ereignis eingeschaltet ist
+const ntfyGuest = k => ntfyOn(k) ? { s: ntfyCfg().server, t: ntfyCfg().topic } : undefined;
+async function ntfyPost(target, msg) {
+  if (!target?.s || !target?.t || !/^https:\/\//.test(target.s)) return false;
+  try {
+    const r = await fetch(target.s.replace(/\/+$/, ''), { method: 'POST', body: JSON.stringify(Object.assign({ topic: target.t }, msg)) });
+    return r.ok;
+  } catch { return false; }
+}
+async function ntfySend(k, msg, key) {
+  if (!ntfyOn(k)) return false;
+  if (key) { const sent = shared.ntfySent || {}; if (sent[key]) return false; } // schon gemeldet (auch vom anderen Handy)
+  const c = ntfyCfg();
+  const ok = await ntfyPost({ s: c.server, t: c.topic }, Object.assign({ click: baseURL() }, msg));
+  if (ok && key) { const now = Date.now(); const sent = Object.fromEntries(Object.entries(shared.ntfySent || {}).filter(([, t]) => now - t < 90 * 864e5)); sent[key] = now; shared.ntfySent = sent; await saveShared(); }
+  return ok;
+}
+// Prüfungen, die eure App beim Öffnen/Synchronisieren macht (jedes Ereignis wird nur einmal gemeldet)
+let ntfyChecking = false;
+async function ntfyChecks() {
+  if (VIEW || ntfyChecking || !ntfyCfg().on || !navigator.onLine) return;
+  ntfyChecking = true;
+  try {
+    const today = todayISO(), c = ntfyCfg();
+    // Abende: Erinnerung am Vortag 18 Uhr (ntfy stellt zeitversetzt zu, max. 3 Tage im Voraus)
+    for (const ab of xLive('abend').filter(a => a.datum && a.datum >= today)) {
+      const at = new Date(ab.datum + 'T18:00'); at.setDate(at.getDate() - 1);
+      const delay = Math.round(at.getTime() / 1000); const inS = at.getTime() - Date.now();
+      if (inS > 2.9 * 864e5) continue;
+      const rank = abendRanking(ab).slice(0, 3), nv = abendVotes(ab.id).length;
+      await ntfySend('abend', { title: `🎲 ${inS > 60e3 || ab.datum > today ? 'Morgen' : 'Heute'}: ${ab.titel}`, message: [abWhen(ab), ab.ort ? '📍 ' + ab.ort : '', nv ? `${nv} Stimme(n) – vorn: ${rank.map((r, i) => `${i + 1}. ${r.t}`).join(', ')}` : 'Noch keine Stimmen'].filter(Boolean).join('\n'), tags: ['game_die'], ...(inS > 60e3 ? { delay: String(delay) } : {}) }, `abend:${ab.id}:${ab.datum}`);
+    }
+    // Verliehenes lange weg
+    for (const it of live().filter(i => i.verliehenAn && i.verliehenAm)) {
+      const days = Math.floor((Date.now() - new Date(it.verliehenAm)) / 864e5);
+      if (days >= c.lendWeeks * 7) await ntfySend('verliehen', { title: `↗ „${it.titel}“ ist seit ${Math.round(days / 7)} Wochen bei ${it.verliehenAn}`, message: `Verliehen am ${deDate(it.verliehenAm)}. Vielleicht mal nachfragen?`, tags: ['hourglass'] }, `verl:${it.id}:${it.verliehenAm}`);
+    }
+    // Geliehenes zurückgeben
+    for (const it of borrowed().filter(i => i.rueckgabeBis)) {
+      const d = Math.round((new Date(it.rueckgabeBis) - new Date(today)) / 864e5);
+      if (d < 0) await ntfySend('geliehen', { title: `↙ Überfällig: „${it.titel}“`, message: `Sollte am ${deDate(it.rueckgabeBis)} an ${it.geliehenVon || 'den Besitzer'} zurück.`, tags: ['warning'], priority: 4 }, `gel-over:${it.id}:${it.rueckgabeBis}`);
+      else if (d <= 2) await ntfySend('geliehen', { title: `↙ Bald zurückgeben: „${it.titel}“`, message: `${d === 0 ? 'Heute' : d === 1 ? 'Morgen' : 'Übermorgen'} an ${it.geliehenVon || 'den Besitzer'}.`, tags: ['calendar'] }, `gel-soon:${it.id}:${it.rueckgabeBis}`);
+    }
+    // Sicherung überfällig
+    if (dbxReady() && meta.lastBackup) { const age = (Date.now() - new Date(meta.lastBackup)) / 864e5; if (age > bkCfg().every * 2 + 1) await ntfySend('backup', { title: '💾 Sicherung überfällig', message: `Letzte Dropbox-Sicherung: ${deDate(meta.lastBackup)}. Bitte die Mediathek öffnen und unter Einstellungen „Jetzt sichern“ tippen.`, tags: ['floppy_disk'] }, `bk:${meta.lastBackup}`); }
+  } catch (e) { console.warn('ntfy', e); }
+  finally { ntfyChecking = false; }
+}
+function drawNtfy(c) {
+  if (!c) return;
+  const cfg = ntfyCfg();
+  const subURL = cfg.topic ? cfg.server.replace(/\/+$/, '') + '/' + cfg.topic : '';
+  c.innerHTML = `<p class="hint" style="margin:0">Mit der kostenlosen App <b>ntfy</b> bekommt ihr Benachrichtigungen aufs Handy – auch wenn die Mediathek geschlossen ist. Kein Konto nötig. Ihr beide abonniert dasselbe geheime Thema.</p>
+    <label class="chk" style="margin:0"><input type="checkbox" id="nfOn" ${cfg.on ? 'checked' : ''}> <b>Benachrichtigungen über ntfy</b></label>
+    ${cfg.on ? `<ol class="hint" style="margin:0;padding-left:20px"><li>App <b>ntfy</b> aus dem <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Play Store</a> installieren (beide Handys).</li><li>In ntfy auf <b>＋</b> tippen, Thema einfügen ${cfg.server !== 'https://ntfy.sh' ? '(und „Anderen Server verwenden“: <code>' + esc(cfg.server) + '</code>)' : ''} → Abonnieren.</li><li>Unten „Test senden“.</li></ol>
+      <label class="fld"><span>Euer geheimes Thema</span><div class="inrow"><input id="nfTopic" value="${esc(cfg.topic)}" readonly style="flex:1;font-family:monospace"><button class="btn" id="nfCopy">📋</button></div></label>
+      <div class="inrow"><a class="btn" style="flex:1;text-decoration:none;color:inherit" href="${esc(subURL)}" target="_blank" rel="noopener">In ntfy öffnen ↗</a><button class="btn primary" id="nfTest" style="flex:1">🔔 Test senden</button></div>
+      <div class="hint" style="margin:6px 0 0"><b>Worüber benachrichtigen?</b></div>
+      <div class="nfev">${NTFY_EV.map(([k, l, d]) => `<label class="chk nfrow"><input type="checkbox" data-nfev="${k}" ${cfg.ev[k] ? 'checked' : ''}><span><b>${l}</b><small>${d}</small></span></label>`).join('')}</div>
+      <label class="fld"><span>„Verliehenes ist lange weg“ nach</span><select id="nfWeeks">${[2, 4, 6, 8, 12].map(w => `<option value="${w}" ${cfg.lendWeeks === w ? 'selected' : ''}>${w} Wochen</option>`).join('')}</select></label>
+      <details><summary class="hint">Erweitert</summary>
+        <label class="fld" style="margin-top:8px"><span>ntfy-Server</span><input id="nfServer" value="${esc(cfg.server)}" placeholder="https://ntfy.sh"></label>
+        <button class="btn" id="nfNew">🔄 Neues geheimes Thema erzeugen</button>
+        <p class="hint" style="margin:6px 0 0">Das Thema ist wie ein Passwort: Wer es kennt, kann Nachrichten lesen und senden. Es steckt (nur wenn Anfrage/Stimme eingeschaltet ist) in eurem Teilen- und Abstimmungs-Link, damit Freunde euch direkt benachrichtigen können. Nachrichten enthalten Namen und Titel. Wer das nicht über den öffentlichen Server ntfy.sh schicken möchte, kann einen eigenen ntfy-Server eintragen.</p></details>` : ''}`;
+  const save = async () => { shared.ntfy = cfg; await saveShared(); if (shared.share?.enabled) updateShareFile(true).catch(() => { }); };
+  $('#nfOn', c).onchange = async e => { cfg.on = e.target.checked; if (cfg.on && !cfg.topic) cfg.topic = 'mediathek-' + b64url(crypto.getRandomValues(new Uint8Array(15))).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 18); await save(); drawNtfy(c); };
+  if (!cfg.on) return;
+  $('#nfCopy', c).onclick = async () => { try { await navigator.clipboard.writeText(cfg.topic); toast('Thema kopiert – in ntfy einfügen'); } catch { prompt('Thema kopieren:', cfg.topic); } };
+  $('#nfTest', c).onclick = async e => { const b = e.currentTarget; b.disabled = true; const ok = await ntfyPost({ s: cfg.server, t: cfg.topic }, { title: '🔔 Mediathek: Test', message: 'Benachrichtigungen funktionieren. 👍', tags: ['books'], click: baseURL() }); b.disabled = false; ok ? toast('Gesendet – kommt sie in ntfy an?', 4000) : alert('Senden hat nicht geklappt. Internetverbindung und Server-Adresse prüfen.'); };
+  $$('[data-nfev]', c).forEach(cb => cb.onchange = async () => { cfg.ev[cb.dataset.nfev] = cb.checked; await save(); });
+  $('#nfWeeks', c).onchange = async e => { cfg.lendWeeks = +e.target.value; await save(); };
+  $('#nfServer', c).onchange = async e => { const v = e.target.value.trim().replace(/\/+$/, ''); if (!/^https:\/\/[^/]+/.test(v)) { toast('Bitte eine https-Adresse eingeben'); e.target.value = cfg.server; return; } cfg.server = v; await save(); drawNtfy(c); };
+  $('#nfNew', c).onclick = async () => { if (!confirm('Neues Thema erzeugen? Ihr müsst es dann in ntfy neu abonnieren, und bereits verschickte Abstimmungs-Links benachrichtigen nicht mehr.')) return; cfg.topic = 'mediathek-' + b64url(crypto.getRandomValues(new Uint8Array(15))).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 18); await save(); drawNtfy(c); };
 }
 
 /* ---------- Vorhandene Medien: neues Foto mit Cover/Rücken in der Mediathek vergleichen ---------- */
@@ -4320,6 +4411,7 @@ async function sync() {
     meta.lastSync = Date.now(); lastSyncErr = null; await saveMeta();
     syncLabel();
     maybeBackup().catch(e => console.warn('Backup', e));
+    ntfyChecks();
     updateShareFile().catch(e => console.warn('Freigabe', e));
   } catch (e) {
     console.error(e); lastSyncErr = e; setSync('err', navigator.onLine ? 'Sync-Fehler' : 'Offline'); $('#syncBtn').title = e.message;
@@ -4397,6 +4489,9 @@ function openSettings() {
 
     <h3>Anfragen direkt empfangen</h3>
     <div class="card" id="mboxCard"></div>
+
+    <h3>Benachrichtigungen (ntfy)</h3>
+    <div class="card" id="ntfyCard"></div>
 
     <h3>Weiteres Gerät einrichten</h3>
     <div class="card"><p class="hint" style="margin:0">Überträgt KI-Schlüssel, Dropbox-App-Key und Einstellungen auf ein weiteres Gerät. Die Dropbox-Anmeldung wird nur mitgegeben, wenn das Gerät dasselbe Dropbox-Konto nutzt. Den Code nur privat weitergeben (er enthält Zugangsschlüssel).</p>
@@ -4487,10 +4582,10 @@ function openSettings() {
   $('#sHelp', s).onclick = () => closeSheet().then(openHelp);
   $('#sTabs', s).onclick = () => closeSheet().then(openTabSettings);
   const dg = $('#sDiscogs', s); if (dg) dg.oninput = e => { settings.discogsToken = e.target.value.trim(); saveSettings(); };
-  drawShare($('#shareCard', s)); drawMailbox($('#mboxCard', s));
+  drawShare($('#shareCard', s)); drawMailbox($('#mboxCard', s)); drawNtfy($('#ntfyCard', s));
   fillDeviceInfo($('#inDev', s)); $('#inUpd', s).onclick = e => checkForUpdate(e.currentTarget);
   // Abschnitte aufklappbar machen (übersichtlicher)
-  const ICONS = { 'Info': 'ℹ️', 'Anfragen direkt empfangen': '📬', 'Wir zwei': '👫', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Sicherung & Wiederherstellen': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
+  const ICONS = { 'Info': 'ℹ️', 'Anfragen direkt empfangen': '📬', 'Benachrichtigungen (ntfy)': '🔔', 'Wir zwei': '👫', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Sicherung & Wiederherstellen': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
   const openKey = lsGet('mt_setopen', '');
   $$('.set > h3', s).forEach(h => {
     const card = h.nextElementSibling; const d = document.createElement('details'); d.className = 'setsec';
@@ -4850,6 +4945,7 @@ function publicData() {
     title: [shared.person1, shared.person2].filter(Boolean).join(' & '),
     person1: shared.person1, person2: shared.person2,
     mbox: shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined,
+    ntfy: ntfyGuest('anfrage'),
     items: allLive().filter(i => !i.geliehen).map(i => { const o = {}; for (const [k, v] of Object.entries(i)) if (!PRIVATE.includes(k)) o[k] = v; if (i.verliehenAn) o.verliehenAn = true; if (!i.cover) delete o.cover; return o; }),
   };
 }
@@ -4903,7 +4999,7 @@ async function initView(code) {
   let data = null;
   try { if (/^https:\/\/[a-z0-9.-]*dropbox(usercontent)?\.com\//.test(raw)) { const r = await fetch(raw, { cache: 'no-store' }); if (r.ok) data = await r.json(); } } catch { }
   if (!data?.items) { $('#content').innerHTML = '<div class="empty"><div class="big">Link nicht verfügbar</div>Die Freigabe wurde beendet oder der Link ist unvollständig.</div>'; return; }
-  VIEW = { title: data.title, mbox: data.mbox?.k && data.mbox?.r ? data.mbox : null };
+  VIEW = { title: data.title, mbox: data.mbox?.k && data.mbox?.r ? data.mbox : null, ntfy: data.ntfy?.s && data.ntfy?.t ? data.ntfy : null };
   items = data.items; shared = Object.assign(shared, { person1: data.person1 || '', person2: data.person2 || '' });
   $('.brand').firstChild.textContent = data.title ? `Sammlung von ${data.title} ` : 'Mediathek ';
   document.title = data.title ? `Sammlung von ${data.title}` : 'Mediathek';
@@ -5134,7 +5230,7 @@ async function abendLink(ab) {
     ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, it.bgg || '', it.youtube || '', +it.gewicht || 0, it.komplexitaet || ''])];
   const mb = shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined; // Gäste dürfen nur einwerfen
   const cv = await abendCoverFile(ab, its);
-  const code = await packObj({ c: cv || undefined, k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', z: ab.zeit || '', b: ab.bis || '', l: ab.ort || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb });
+  const code = await packObj({ c: cv || undefined, k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', z: ab.zeit || '', b: ab.bis || '', l: ab.ort || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb, y: ntfyGuest('stimme') });
   return baseURL() + '#abend=' + code;
 }
 async function shareAbend(ab) {
@@ -5211,6 +5307,7 @@ async function initVote(code) {
       const b = $('#vSend', el); b.disabled = true; b.textContent = 'Sende …';
       try {
         await mbxSend(d.m, vote);
+        ntfyPost(d.y, { title: `🗳 ${name} hat abgestimmt: ${d.t}`, message: picks.map((id, k) => `${k + 1}. ${nm(id)}`).join('\n') + (msg ? '\n\n💬 „' + msg + '“' : ''), tags: ['ballot_box'], click: baseURL() + '?aktion=anfragen' });
         openSheet(`${sheetHead('Stimme gesendet')}<p style="font-size:40px;text-align:center;margin:8px 0">🗳</p><p style="text-align:center">Deine Top ${picks.length} ist bei ${esc(d.o || 'den Gastgebern')} angekommen:</p><ol style="max-width:320px;margin:8px auto">${picks.map(id => `<li>${esc(nm(id))}</li>`).join('')}</ol>${msg ? `<p class="note" style="max-width:320px;margin:8px auto">💬 „${esc(msg)}“</p>` : ''}<p class="hint" style="text-align:center">Du kannst jederzeit neu abstimmen – die neue Stimme ersetzt die alte.</p><div class="formfoot"><button class="btn primary" data-close>Fertig</button></div>`);
         b.textContent = 'Erneut abstimmen & senden'; b.disabled = false; return;
       } catch (e) { b.textContent = 'Abstimmen & senden'; b.disabled = false; toast('Direkt senden hat nicht geklappt – du kannst die Stimme stattdessen per Nachricht schicken', 4500); }
@@ -5438,7 +5535,7 @@ function openBasket() {
     const req = { k: 'a', id: uid(), n: name, m: msg, i: basket, at: Date.now() };
     if (VIEW?.mbox) { // direkt in die App der beiden
       const b = $('#bkSend', s); b.disabled = true; b.textContent = 'Sende …';
-      try { await mbxSend(VIEW.mbox, req); await closeSheet(); basket = []; lsSet('mt_basket', basket); updateBasketBar(); openSheet(`${sheetHead('Anfrage gesendet')}<p style="font-size:40px;text-align:center;margin:8px 0">📬</p><p style="text-align:center">Deine Anfrage ist bei ${esc(VIEW.title || 'den beiden')} angekommen. Sie melden sich bei dir.</p><div class="formfoot"><button class="btn primary" data-close>Fertig</button></div>`); return; }
+      try { await mbxSend(VIEW.mbox, req); ntfyPost(VIEW.ntfy, { title: `📬 Ausleih-Anfrage von ${req.n || 'Gast'}`, message: req.i.map(x => '• ' + x[1]).join('\n') + (req.m ? '\n\n„' + req.m + '“' : ''), tags: ['inbox_tray'], priority: 4, click: baseURL() + '?aktion=anfragen' }); await closeSheet(); basket = []; lsSet('mt_basket', basket); updateBasketBar(); openSheet(`${sheetHead('Anfrage gesendet')}<p style="font-size:40px;text-align:center;margin:8px 0">📬</p><p style="text-align:center">Deine Anfrage ist bei ${esc(VIEW.title || 'den beiden')} angekommen. Sie melden sich bei dir.</p><div class="formfoot"><button class="btn primary" data-close>Fertig</button></div>`); return; }
       catch (e) { b.disabled = false; b.textContent = 'Anfrage senden'; toast('Direkt senden hat nicht geklappt – du kannst sie stattdessen per Nachricht schicken', 4500); }
     }
     const url = baseURL() + '#anfrage=' + await packObj(req);
@@ -5837,6 +5934,7 @@ addEventListener('hashchange', () => {
   extra = (await idb.get('extra')) || [];
   if (items.filter(kxFix).length) await idb.set('items', items); // alte Stufen (Leicht/Mittel/Schwer) umstellen
   setTimeout(() => localSnap('täglich'), 4000);
+  setTimeout(() => ntfyChecks(), 9000);
   // 1.29: neue BGG-Felder (Komplexität, Mechanismen) – „Bei allen ergänzen“ darf alle Brettspiele noch einmal anfassen
   if (!settings.kxMig) { settings.sourcesAt = Date.now(); settings.kxMig = 1; saveSettings(); }
   if (new URLSearchParams(location.search).has('demo') && !items.length) await loadDemo();
