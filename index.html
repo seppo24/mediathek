@@ -598,7 +598,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.34';
+const APP_VERSION = '1.34.1';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2384,6 +2384,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.34.1', '27.10.2026', ['ntfy: Benachrichtigungen kommen jetzt mit hoher Priorität, damit Android sie als Pop-up oben am Bildschirm zeigt (einstellbar: Pop-up / nur Leiste / lautlos) – mit Hilfe, falls trotzdem kein Pop-up erscheint']],
   ['1.34', '27.10.2026', ['Benachrichtigungen über ntfy (optional): kommen aufs Handy, auch wenn die App geschlossen ist', 'Einzeln ein-/ausschaltbar: neue Ausleih-Anfrage, neue Stimme (beides sofort, direkt vom Gast), Erinnerung am Vortag eines Abends, Verliehenes lange weg (Zeit einstellbar), Geliehenes bald/überfällig zurückgeben, Sicherung überfällig', 'Jedes Ereignis wird nur einmal gemeldet – auch wenn beide Handys die App offen haben']],
   ['1.33.1', '26.10.2026', ['Rückseite fotografieren bei Büchern: Inhaltsangabe bleibt in der Sprache des Klappentexts (z. B. Englisch) statt übersetzt zu werden; die Buchsprache wird mit abgelesen']],
   ['1.33', '26.10.2026', ['Detailansicht: „📷 Rückseite fotografieren“ – die KI liest ab, was auf der Rückseite steht (Spieleranzahl, Dauer, Alter, Laufzeit, FSK, Format, Verlag, Barcode/ISBN, Klappentext …), danach Abgleich alt → neu je Feld', 'Von der Rückseite abgelesene Angaben gelten als gesichert (kein 🌐 mehr); neu gelesene Barcodes/ISBN werden anschließend auch online abgeglichen']],
@@ -2515,14 +2516,15 @@ const NTFY_EV = [
   ['geliehen', '↙ Geliehenes zurückgeben', '2 Tage vor dem Rückgabedatum und wenn es überfällig ist', true],
   ['backup', '💾 Sicherung überfällig', 'Wenn die automatische Dropbox-Sicherung schon länger nicht geklappt hat', false],
 ];
-const ntfyCfg = () => { const c = Object.assign({ on: false, server: 'https://ntfy.sh', topic: '', ev: {}, lendWeeks: 6 }, shared.ntfy); NTFY_EV.forEach(([k, , , d]) => { if (!(k in c.ev)) c.ev[k] = d; }); return c; };
+const ntfyCfg = () => { const c = Object.assign({ on: false, server: 'https://ntfy.sh', topic: '', ev: {}, lendWeeks: 6, prio: 4 }, shared.ntfy); NTFY_EV.forEach(([k, , , d]) => { if (!(k in c.ev)) c.ev[k] = d; }); return c; };
 const ntfyOn = k => { const c = ntfyCfg(); return c.on && c.topic && c.ev[k]; };
 // Für Gäste-Seiten: nur Server + Thema, und nur wenn das Ereignis eingeschaltet ist
-const ntfyGuest = k => ntfyOn(k) ? { s: ntfyCfg().server, t: ntfyCfg().topic } : undefined;
+const ntfyGuest = k => ntfyOn(k) ? { s: ntfyCfg().server, t: ntfyCfg().topic, p: ntfyCfg().prio } : undefined;
 async function ntfyPost(target, msg) {
   if (!target?.s || !target?.t || !/^https:\/\//.test(target.s)) return false;
   try {
-    const r = await fetch(target.s.replace(/\/+$/, ''), { method: 'POST', body: JSON.stringify(Object.assign({ topic: target.t }, msg)) });
+    const prio = Math.max(+target.p || 3, +msg.priority || 0); // 4 = „hoch“: Android zeigt es als Pop-up oben an
+    const r = await fetch(target.s.replace(/\/+$/, ''), { method: 'POST', body: JSON.stringify(Object.assign({ topic: target.t }, msg, { priority: prio })) });
     return r.ok;
   } catch { return false; }
 }
@@ -2530,7 +2532,7 @@ async function ntfySend(k, msg, key) {
   if (!ntfyOn(k)) return false;
   if (key) { const sent = shared.ntfySent || {}; if (sent[key]) return false; } // schon gemeldet (auch vom anderen Handy)
   const c = ntfyCfg();
-  const ok = await ntfyPost({ s: c.server, t: c.topic }, Object.assign({ click: baseURL() }, msg));
+  const ok = await ntfyPost({ s: c.server, t: c.topic, p: c.prio }, Object.assign({ click: baseURL() }, msg));
   if (ok && key) { const now = Date.now(); const sent = Object.fromEntries(Object.entries(shared.ntfySent || {}).filter(([, t]) => now - t < 90 * 864e5)); sent[key] = now; shared.ntfySent = sent; await saveShared(); }
   return ok;
 }
@@ -2576,6 +2578,8 @@ function drawNtfy(c) {
       <div class="inrow"><a class="btn" style="flex:1;text-decoration:none;color:inherit" href="${esc(subURL)}" target="_blank" rel="noopener">In ntfy öffnen ↗</a><button class="btn primary" id="nfTest" style="flex:1">🔔 Test senden</button></div>
       <div class="hint" style="margin:6px 0 0"><b>Worüber benachrichtigen?</b></div>
       <div class="nfev">${NTFY_EV.map(([k, l, d]) => `<label class="chk nfrow"><input type="checkbox" data-nfev="${k}" ${cfg.ev[k] ? 'checked' : ''}><span><b>${l}</b><small>${d}</small></span></label>`).join('')}</div>
+      <label class="fld"><span>Anzeige auf dem Handy</span><select id="nfPrio"><option value="4" ${cfg.prio >= 4 ? 'selected' : ''}>Pop-up oben am Bildschirm (hohe Priorität)</option><option value="3" ${cfg.prio === 3 ? 'selected' : ''}>Nur in der Benachrichtigungsleiste</option><option value="2" ${cfg.prio <= 2 ? 'selected' : ''}>Lautlos</option></select></label>
+      <details><summary class="hint">Kein Pop-up trotz „hoher Priorität“?</summary><ol class="hint" style="margin:6px 0 0;padding-left:20px"><li>Android-Einstellungen → Apps → <b>ntfy</b> → Benachrichtigungen: erlaubt? Kategorie <b>„Hohe Priorität“</b> (bzw. „High priority“) öffnen → <b>„Pop-up“ / „Auf Bildschirm einblenden“</b> einschalten.</li><li>In ntfy das Thema antippen → ⋮ → Einstellungen: „Mindestpriorität“ auf „Beliebig“ lassen.</li><li>„Nicht stören“ am Handy aus?</li><li>Samsung: Einstellungen → Benachrichtigungen → Stil des Pop-ups „Kurz“ oder „Detailliert“.</li></ol></details>
       <label class="fld"><span>„Verliehenes ist lange weg“ nach</span><select id="nfWeeks">${[2, 4, 6, 8, 12].map(w => `<option value="${w}" ${cfg.lendWeeks === w ? 'selected' : ''}>${w} Wochen</option>`).join('')}</select></label>
       <details><summary class="hint">Erweitert</summary>
         <label class="fld" style="margin-top:8px"><span>ntfy-Server</span><input id="nfServer" value="${esc(cfg.server)}" placeholder="https://ntfy.sh"></label>
@@ -2585,9 +2589,10 @@ function drawNtfy(c) {
   $('#nfOn', c).onchange = async e => { cfg.on = e.target.checked; if (cfg.on && !cfg.topic) cfg.topic = 'mediathek-' + b64url(crypto.getRandomValues(new Uint8Array(15))).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 18); await save(); drawNtfy(c); };
   if (!cfg.on) return;
   $('#nfCopy', c).onclick = async () => { try { await navigator.clipboard.writeText(cfg.topic); toast('Thema kopiert – in ntfy einfügen'); } catch { prompt('Thema kopieren:', cfg.topic); } };
-  $('#nfTest', c).onclick = async e => { const b = e.currentTarget; b.disabled = true; const ok = await ntfyPost({ s: cfg.server, t: cfg.topic }, { title: '🔔 Mediathek: Test', message: 'Benachrichtigungen funktionieren. 👍', tags: ['books'], click: baseURL() }); b.disabled = false; ok ? toast('Gesendet – kommt sie in ntfy an?', 4000) : alert('Senden hat nicht geklappt. Internetverbindung und Server-Adresse prüfen.'); };
+  $('#nfTest', c).onclick = async e => { const b = e.currentTarget; b.disabled = true; const ok = await ntfyPost({ s: cfg.server, t: cfg.topic, p: cfg.prio }, { title: '🔔 Mediathek: Test', message: 'Benachrichtigungen funktionieren. 👍', tags: ['books'], click: baseURL() }); b.disabled = false; ok ? toast('Gesendet – kommt sie in ntfy an?', 4000) : alert('Senden hat nicht geklappt. Internetverbindung und Server-Adresse prüfen.'); };
   $$('[data-nfev]', c).forEach(cb => cb.onchange = async () => { cfg.ev[cb.dataset.nfev] = cb.checked; await save(); });
   $('#nfWeeks', c).onchange = async e => { cfg.lendWeeks = +e.target.value; await save(); };
+  $('#nfPrio', c).onchange = async e => { cfg.prio = +e.target.value; await save(); toast('Gespeichert – „Test senden“ zum Ausprobieren'); };
   $('#nfServer', c).onchange = async e => { const v = e.target.value.trim().replace(/\/+$/, ''); if (!/^https:\/\/[^/]+/.test(v)) { toast('Bitte eine https-Adresse eingeben'); e.target.value = cfg.server; return; } cfg.server = v; await save(); drawNtfy(c); };
   $('#nfNew', c).onclick = async () => { if (!confirm('Neues Thema erzeugen? Ihr müsst es dann in ntfy neu abonnieren, und bereits verschickte Abstimmungs-Links benachrichtigen nicht mehr.')) return; cfg.topic = 'mediathek-' + b64url(crypto.getRandomValues(new Uint8Array(15))).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 18); await save(); drawNtfy(c); };
 }
