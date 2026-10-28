@@ -598,7 +598,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.34.1';
+const APP_VERSION = '1.34.2';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2384,6 +2384,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.34.2', '28.10.2026', ['Fehler behoben: BGG-Komplexität und Schachtelmaße wurden beim Ergänzen auf ganze Zahlen abgeschnitten (2,91 → 2). Jetzt mit Nachkommastellen; bereits ergänzte Spiele werden automatisch korrigiert']],
   ['1.34.1', '27.10.2026', ['ntfy: Benachrichtigungen kommen jetzt mit hoher Priorität, damit Android sie als Pop-up oben am Bildschirm zeigt (einstellbar: Pop-up / nur Leiste / lautlos) – mit Hilfe, falls trotzdem kein Pop-up erscheint']],
   ['1.34', '27.10.2026', ['Benachrichtigungen über ntfy (optional): kommen aufs Handy, auch wenn die App geschlossen ist', 'Einzeln ein-/ausschaltbar: neue Ausleih-Anfrage, neue Stimme (beides sofort, direkt vom Gast), Erinnerung am Vortag eines Abends, Verliehenes lange weg (Zeit einstellbar), Geliehenes bald/überfällig zurückgeben, Sicherung überfällig', 'Jedes Ereignis wird nur einmal gemeldet – auch wenn beide Handys die App offen haben']],
   ['1.33.1', '26.10.2026', ['Rückseite fotografieren bei Büchern: Inhaltsangabe bleibt in der Sprache des Klappentexts (z. B. Englisch) statt übersetzt zu werden; die Buchsprache wird mit abgelesen']],
@@ -2781,7 +2782,7 @@ function parseAI(text, hint) {
     const rec = { typ, titel: String(x.titel || '').trim() };
     for (const [k, v] of Object.entries(x.felder || {})) {
       const f = fieldDef(typ, k); if (!f || v == null || v === '') continue;
-      rec[k] = ['number', 'year'].includes(f.t) ? (parseInt(v, 10) || undefined) : String(v);
+      rec[k] = f.t === 'year' ? (parseInt(v, 10) || undefined) : f.t === 'number' ? ((n => f.step ? n : Math.round(n))(parseFloat(String(v).replace(',', '.'))) || undefined) : String(v);
       if (rec[k] === undefined) delete rec[k];
     }
     rec._conf = ['hoch', 'mittel', 'niedrig'].includes(x.sicherheit) ? x.sicherheit : 'mittel';
@@ -2992,7 +2993,8 @@ function fillMissing(rec, src, filled) {
     if (k === 'cover') { if (!rec.cover && ((!rec.coverLocal && !rec._coverData) || rec._coverSpine || rec.coverSpine)) rec.cover = v; continue; }
     const f = fieldDef(rec.typ, k); if (!f || COPY_FIELDS.has(k)) continue;
     let val = v;
-    if (['number', 'year'].includes(f.t)) { val = parseInt(v, 10); if (!val) continue; }
+    if (f.t === 'year') { val = parseInt(v, 10); if (!val) continue; }
+    else if (f.t === 'number') { val = parseFloat(String(v).replace(',', '.')); if (!val) continue; if (!f.step || f.step === 1) val = Math.round(val); } // Kommazahlen (z. B. BGG-Komplexität 2,91) behalten
     else val = String(v).trim();
     if (f.t === 'select' && !optsOf(f).includes(String(val))) continue;
     if (f.t === 'url' && !validLink(f, val)) continue;
@@ -3138,6 +3140,21 @@ async function bggLookup(rec) {
   const box = isEmpty(rec.boxB) || isEmpty(rec.boxH) || isEmpty(rec.boxT) ? await bggBox(t.id) : {};
   return Object.assign({ bgg: 'https://boardgamegeek.com/boardgame/' + t.id, jahr: t.jahr, spielerMin: t.spielerMin, spielerMax: t.spielerMax, dauer: t.dauer, alterAb: t.alterAb, autor: t.autor,
     gewicht: t.weight ? Math.round(t.weight * 100) / 100 : undefined, mechanik: mechDe(t.mechs) || undefined, cover: t.image || t.thumb }, box);
+}
+// 1.34.2: Bis dahin wurden Kommazahlen beim Ergänzen abgeschnitten (2,91 → 2). Aus dem BGG-Zwischenspeicher reparieren.
+async function repairBggDecimals() {
+  if (settings.decFix || !settings.bggToken) return;
+  const bad = live().filter(i => i.typ === 'brettspiel' && bggIdFromUrl(i.bgg) && ['gewicht', 'boxB', 'boxH', 'boxT'].some(k => Number.isInteger(+i[k]) && +i[k] > 0));
+  let n = 0;
+  try {
+    for (const it of bad) {
+      const id = bggIdFromUrl(it.bgg); const cur = byId(it.id); if (!cur) continue;
+      if (Number.isInteger(+cur.gewicht) && +cur.gewicht > 0) { const t = (await bggThings([id]))[0]; if (t?.weight && Math.floor(t.weight) === +cur.gewicht) { cur.gewicht = Math.round(t.weight * 100) / 100; n++; cur.updatedAt = Date.now(); } }
+      if (['boxB', 'boxH', 'boxT'].some(k => Number.isInteger(+cur[k]) && +cur[k] > 0)) { const b = await bggBox(id); for (const k of ['boxB', 'boxH', 'boxT']) if (b[k] && Number.isInteger(+cur[k]) && Math.floor(b[k]) === +cur[k] && b[k] !== +cur[k]) { cur[k] = b[k]; n++; cur.updatedAt = Date.now(); } }
+    }
+    settings.decFix = 1; saveSettings();
+    if (n) { await persist(); render(); toast(`BGG-Werte mit Nachkommastellen korrigiert (${n})`, 4000); }
+  } catch (e) { console.warn('Reparatur', e); }
 }
 async function bggCoverCands(it) {
   if (!settings.bggToken) return [];
@@ -5940,6 +5957,7 @@ addEventListener('hashchange', () => {
   if (items.filter(kxFix).length) await idb.set('items', items); // alte Stufen (Leicht/Mittel/Schwer) umstellen
   setTimeout(() => localSnap('täglich'), 4000);
   setTimeout(() => ntfyChecks(), 9000);
+  setTimeout(() => repairBggDecimals(), 12000);
   // 1.29: neue BGG-Felder (Komplexität, Mechanismen) – „Bei allen ergänzen“ darf alle Brettspiele noch einmal anfassen
   if (!settings.kxMig) { settings.sourcesAt = Date.now(); settings.kxMig = 1; saveSettings(); }
   if (new URLSearchParams(location.search).has('demo') && !items.length) await loadDemo();
