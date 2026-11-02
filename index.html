@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#c2410c">
 <title>Mediathek</title>
+<script>/* Farbschema sofort anwenden (kein Aufblitzen) */try{var _s=JSON.parse(localStorage.getItem('mt_settings')||'{}');if(_s.theme)document.documentElement.dataset.theme=_s.theme;if(_s.mode)document.documentElement.dataset.mode=_s.mode;}catch(e){}</script>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -19,10 +20,33 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark){
-  :root{ --bg:#15130f; --surface:#1f1c17; --surface2:#2a261f; --ink:#f3ede2; --ink2:#a89f92; --line:#3a342b;
+  :root:not([data-mode=light]){ --bg:#15130f; --surface:#1f1c17; --surface2:#2a261f; --ink:#f3ede2; --ink2:#a89f92; --line:#3a342b;
     --accent:#f97316; --accent-ink:#1b0d03; --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35);
     --t-bluray:#60a5fa; --t-buch:#fbbf24; --t-game:#a78bfa; --t-brettspiel:#34d399; --t-vinyl:#f472b6; color-scheme: dark; }
 }
+:root[data-mode=dark]{ --bg:#15130f; --surface:#1f1c17; --surface2:#2a261f; --ink:#f3ede2; --ink2:#a89f92; --line:#3a342b;
+    --accent:#f97316; --accent-ink:#1b0d03; --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35);
+    --t-bluray:#60a5fa; --t-buch:#fbbf24; --t-game:#a78bfa; --t-brettspiel:#34d399; --t-vinyl:#f472b6; color-scheme: dark; }
+:root[data-mode=light]{color-scheme:light}
+/* Farbschemata (Einstellungen → Darstellung) */
+:root[data-theme=rosa]{--bg:#fdf0f3;--surface:#fffafb;--surface2:#f8e1e7;--ink:#3b2a30;--ink2:#8a6b75;--line:#efd2da;--accent:#d65f7e;--accent-ink:#fff}
+:root[data-theme=rosa][data-mode=dark]{--bg:#1b1316;--surface:#251b1f;--surface2:#32242a;--ink:#f7e9ee;--ink2:#c2a3ae;--line:#47333b;--accent:#f29bb1;--accent-ink:#2a0f17}
+@media (prefers-color-scheme: dark){:root[data-theme=rosa]:not([data-mode=light]){--bg:#1b1316;--surface:#251b1f;--surface2:#32242a;--ink:#f7e9ee;--ink2:#c2a3ae;--line:#47333b;--accent:#f29bb1;--accent-ink:#2a0f17}}
+:root[data-theme=salbei]{--bg:#eef2ea;--surface:#fbfdf9;--surface2:#e0e8d9;--ink:#1d2419;--ink2:#5f6b58;--line:#d2dcc9;--accent:#4d7c55;--accent-ink:#fff}
+:root[data-theme=salbei][data-mode=dark]{--bg:#121612;--surface:#1b211b;--surface2:#252d24;--ink:#e9f0e4;--ink2:#a3b19b;--line:#333d31;--accent:#8fc79a;--accent-ink:#0e1f12}
+@media (prefers-color-scheme: dark){:root[data-theme=salbei]:not([data-mode=light]){--bg:#121612;--surface:#1b211b;--surface2:#252d24;--ink:#e9f0e4;--ink2:#a3b19b;--line:#333d31;--accent:#8fc79a;--accent-ink:#0e1f12}}
+:root[data-theme=ozean]{--bg:#edf3f8;--surface:#fafdff;--surface2:#dce7f0;--ink:#142230;--ink2:#576a7c;--line:#cedde9;--accent:#1d6fa8;--accent-ink:#fff}
+:root[data-theme=ozean][data-mode=dark]{--bg:#0f151b;--surface:#18212a;--surface2:#212d38;--ink:#e6eef5;--ink2:#98aabb;--line:#2f3d4a;--accent:#5fb3ea;--accent-ink:#06192a}
+@media (prefers-color-scheme: dark){:root[data-theme=ozean]:not([data-mode=light]){--bg:#0f151b;--surface:#18212a;--surface2:#212d38;--ink:#e6eef5;--ink2:#98aabb;--line:#2f3d4a;--accent:#5fb3ea;--accent-ink:#06192a}}
+:root[data-theme=lavendel]{--bg:#f3f0f9;--surface:#fdfcff;--surface2:#e6e0f3;--ink:#231c33;--ink2:#6c6380;--line:#dbd2ec;--accent:#7c5cc4;--accent-ink:#fff}
+:root[data-theme=lavendel][data-mode=dark]{--bg:#15121c;--surface:#1e1a28;--surface2:#282236;--ink:#eeeaf7;--ink2:#aaa0c0;--line:#372f48;--accent:#b39ce8;--accent-ink:#1a1030}
+@media (prefers-color-scheme: dark){:root[data-theme=lavendel]:not([data-mode=light]){--bg:#15121c;--surface:#1e1a28;--surface2:#282236;--ink:#eeeaf7;--ink2:#aaa0c0;--line:#372f48;--accent:#b39ce8;--accent-ink:#1a1030}}
+:root[data-theme=sonne]{--bg:#fbf6e6;--surface:#fffdf5;--surface2:#f3eacb;--ink:#2b2410;--ink2:#776c4c;--line:#e8dcb4;--accent:#b7860b;--accent-ink:#fff}
+:root[data-theme=sonne][data-mode=dark]{--bg:#17140b;--surface:#211d11;--surface2:#2c2717;--ink:#f6efd9;--ink2:#b8ad8a;--line:#3e3722;--accent:#f2c14e;--accent-ink:#2a1f00}
+@media (prefers-color-scheme: dark){:root[data-theme=sonne]:not([data-mode=light]){--bg:#17140b;--surface:#211d11;--surface2:#2c2717;--ink:#f6efd9;--ink2:#b8ad8a;--line:#3e3722;--accent:#f2c14e;--accent-ink:#2a1f00}}
+:root[data-theme=graphit]{--bg:#f2f2f1;--surface:#ffffff;--surface2:#e5e5e3;--ink:#18181b;--ink2:#5f5f66;--line:#d9d9d6;--accent:#3f3f46;--accent-ink:#fff}
+:root[data-theme=graphit][data-mode=dark]{--bg:#101012;--surface:#18181b;--surface2:#232327;--ink:#ededee;--ink2:#a1a1aa;--line:#323238;--accent:#d4d4d8;--accent-ink:#18181b}
+@media (prefers-color-scheme: dark){:root[data-theme=graphit]:not([data-mode=light]){--bg:#101012;--surface:#18181b;--surface2:#232327;--ink:#ededee;--ink2:#a1a1aa;--line:#323238;--accent:#d4d4d8;--accent-ink:#18181b}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
@@ -271,6 +295,11 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .ytbox .lbl{position:absolute;left:10px;bottom:8px;color:#fff;font-weight:600;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .mini{font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;background:#ff5100;color:#fff;text-decoration:none;letter-spacing:.02em}
 .mini.yt{background:#ff0000}
+.mchips{display:flex;flex-wrap:wrap;gap:6px}.mchips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
+.mchips button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.mchips button[aria-pressed=true]::before{content:'✓ '}
+.themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}.themes button{border:2px solid var(--line);border-radius:12px;padding:8px;background:var(--surface);display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:700}
+.themes button[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+.themes .sw{display:flex;width:100%;height:28px;border-radius:7px;overflow:hidden;border:1px solid rgba(0,0,0,.08)}.themes .sw i{flex:1}
 .nfev{display:grid;gap:4px}.nfrow{align-items:flex-start!important;margin:0!important;padding:6px 0;border-bottom:1px solid var(--line)}.nfrow span{display:flex;flex-direction:column}.nfrow small{color:var(--ink2);font-size:12px}
 .rirow .cst{width:100%}.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
 .cmpopt{display:flex;flex-direction:column;gap:4px;align-items:stretch;border:2px solid var(--line);border-radius:12px;background:var(--surface);padding:6px;color:var(--ink)}
@@ -598,7 +627,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.34.2';
+const APP_VERSION = '1.35';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -624,6 +653,12 @@ const idb = (() => {
 const DEFAULT_SETTINGS = { provider: 'barcode', claudeKey: '', claudeModel: 'claude-sonnet-5-5', geminiKey: '', geminiModel: 'gemini-flash-latest', dbxAppKey: '', dbxRefresh: '', dbxFolder: null, tmdbKey: '', rawgKey: '', autoFill: true, sourcesAt: 0 };
 let settings = Object.assign({}, DEFAULT_SETTINGS, lsGet('mt_settings', {}));
 const saveSettings = () => lsSet('mt_settings', settings);
+const THEMES = Object.assign({ '': ['Terrakotta', '#c2410c', '#f6f2ea', '#efe8db', '#f97316', '#15130f'] }, {"rosa": ["Pastellrosa", "#d65f7e", "#fdf0f3", "#f8e1e7", "#f29bb1", "#1b1316"], "salbei": ["Salbei", "#4d7c55", "#eef2ea", "#e0e8d9", "#8fc79a", "#121612"], "ozean": ["Ozean", "#1d6fa8", "#edf3f8", "#dce7f0", "#5fb3ea", "#0f151b"], "lavendel": ["Lavendel", "#7c5cc4", "#f3f0f9", "#e6e0f3", "#b39ce8", "#15121c"], "sonne": ["Sonnengelb", "#b7860b", "#fbf6e6", "#f3eacb", "#f2c14e", "#17140b"], "graphit": ["Graphit", "#3f3f46", "#f2f2f1", "#e5e5e3", "#d4d4d8", "#101012"]});
+function applyTheme(theme = settings.theme || '', mode = settings.mode || '') {
+  const r = document.documentElement; theme ? r.dataset.theme = theme : delete r.dataset.theme; mode ? r.dataset.mode = mode : delete r.dataset.mode;
+  const dark = mode === 'dark' || (!mode && matchMedia('(prefers-color-scheme: dark)').matches);
+  const t = THEMES[theme] || THEMES['']; document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? t[5] : t[1]);
+}
 // "shared" wird über Dropbox mit synchronisiert (Namen, Pflichtfelder)
 let shared = { person1: '', person2: '', required: {}, updatedAt: 0 };
 
@@ -718,7 +753,7 @@ const TYPES = {
       { k: 'verlag', l: 'Verlag', t: 'text', f: 1, ai: 1 },
       { k: 'autor', l: 'Spieleautor/in', t: 'text', f: 1, ai: 1 },
       { k: 'jahr', l: 'Jahr', t: 'year', f: 1, ai: 1 },
-      { k: 'kategorie', l: 'Kategorie', t: 'select', o: ['Familienspiel', 'Strategiespiel', 'Kennerspiel', 'Kartenspiel', 'Partyspiel', 'Kooperativ', 'Kinderspiel', 'Würfelspiel', 'Quiz', 'Deduktion', 'Escape / Krimi', 'Legacy', 'Zwei-Personen', 'Sonstiges'], f: 1, ai: 1 },
+      { k: 'kategorie', l: 'Kategorie', t: 'select', o: ['Familienspiel', 'Strategiespiel', 'Kennerspiel', 'Kartenspiel', 'Partyspiel', 'Kooperativ', 'Kinderspiel', 'Würfelspiel', 'Quiz', 'Deduktion', 'Escape / Krimi', 'Legacy', 'Zwei-Personen', 'Sonstiges'], f: 1, ai: 1, multi: 1, l2: 'Kategorien' },
       { k: 'spielerMin', l: 'Spieler min.', t: 'number', ai: 1 },
       { k: 'spielerMax', l: 'Spieler max.', t: 'number', ai: 1 },
       { k: 'dauer', l: 'Spieldauer (Min.)', t: 'number', ai: 1 },
@@ -775,6 +810,15 @@ function kxFix(it) {
   return false;
 }
 const multiVals = v => String(v ?? '').split(/\s*[,;]\s*/).filter(Boolean);
+const hasKat = (it, k) => multiVals(it.kategorie).includes(k);
+const firstKat = it => multiVals(it.kategorie)[0] || '';
+// Auswahlwert prüfen: bei Mehrfachauswahl nur bekannte Werte behalten
+function selOk(f, v) {
+  if (f.t !== 'select') return v;
+  const o = optsOf(f);
+  if (f.multi) { const vals = [...new Set(multiVals(v).filter(x => o.includes(x)))]; return vals.length ? vals.join(', ') : null; }
+  return o.includes(String(v)) ? String(v) : null;
+}
 // BGG-Mechanismen auf Deutsch (häufige; seltene bleiben englisch)
 const MECH_DE = { 'Worker Placement': 'Worker Placement', 'Deck, Bag, and Pool Building': 'Deck-/Beutelbau', 'Hand Management': 'Kartenhand-Management', 'Set Collection': 'Sets sammeln', 'Tile Placement': 'Plättchen legen', 'Dice Rolling': 'Würfeln', 'Area Majority / Influence': 'Mehrheiten', 'Cooperative Game': 'Kooperativ', 'Card Drafting': 'Karten-Drafting', 'Open Drafting': 'Offenes Drafting', 'Closed Drafting': 'Verdecktes Drafting', 'Engine Building': 'Engine-Building', 'Variable Player Powers': 'Unterschiedliche Fähigkeiten', 'Variable Set-up': 'Variabler Aufbau', 'Pattern Building': 'Muster bilden', 'Pattern Recognition': 'Muster erkennen', 'Network and Route Building': 'Netzwerk-/Streckenbau', 'Push Your Luck': 'Push your Luck', 'Roll / Spin and Move': 'Würfeln & Ziehen', 'Trading': 'Handeln', 'Negotiation': 'Verhandeln', 'Auction / Bidding': 'Versteigern', 'Auction/Bidding': 'Versteigern', 'Bluffing': 'Bluffen', 'Hidden Roles': 'Geheime Rollen', 'Deduction': 'Deduktion', 'Memory': 'Gedächtnis', 'Simultaneous Action Selection': 'Gleichzeitige Aktionswahl', 'Action Points': 'Aktionspunkte', 'Action Drafting': 'Aktionswahl', 'Action Queue': 'Aktionsplanung', 'Take That': 'Ärgern (Take That)', 'Player Elimination': 'Ausscheiden', 'Team-Based Game': 'Teamspiel', 'Solo / Solitaire Game': 'Solo spielbar', 'Grid Movement': 'Rasterbewegung', 'Point to Point Movement': 'Punkt-zu-Punkt-Bewegung', 'Modular Board': 'Modularer Spielplan', 'Hexagon Grid': 'Hexfelder', 'Square Grid': 'Quadratraster', 'Grid Coverage': 'Flächen abdecken', 'Paper-and-Pencil': 'Papier & Stift', 'Roll and Write': 'Roll & Write', 'Flip and Write': 'Flip & Write', 'Trick-taking': 'Stiche', 'Ladder Climbing': 'Überbieten', 'Real-Time': 'Echtzeit', 'Storytelling': 'Geschichten erzählen', 'Voting': 'Abstimmen', 'Communication Limits': 'Eingeschränkte Kommunikation', 'Legacy Game': 'Legacy', 'Scenario / Mission / Campaign Game': 'Szenarien / Kampagne', 'Market': 'Markt', 'Income': 'Einkommen', 'End Game Bonuses': 'Endwertung', 'Victory Points as a Resource': 'Siegpunkte als Ressource', 'Tableau Building': 'Auslage bauen', 'Turn Order: Progressive': 'Wechselnder Startspieler', 'Turn Order: Claim Action': 'Zugreihenfolge wählen', 'Track Movement': 'Leisten-Bewegung', 'Rondel': 'Rondell', 'Dice Placement': 'Würfel einsetzen', 'Contracts': 'Aufträge', 'Enclosure': 'Einkreisen', 'Line Drawing': 'Linien zeichnen', 'Stacking and Balancing': 'Stapeln & Balancieren', 'Dexterity': 'Geschicklichkeit', 'Matching': 'Zuordnen', 'Programmed Movement': 'Programmierte Bewegung', 'Area Movement': 'Gebietsbewegung', 'Movement Points': 'Bewegungspunkte', 'Events': 'Ereignisse', 'Narrative Choice / Paragraph': 'Erzählerische Entscheidungen', 'Role Playing': 'Rollenspiel', 'Race': 'Rennen', 'Card Play Conflict Resolution': 'Konflikte mit Karten', 'Dice Rolling Conflict Resolution': 'Konflikte mit Würfeln', 'Hidden Movement': 'Verdeckte Bewegung', 'Traitor Game': 'Verräter', 'Sudden Death Ending': 'Sofortiges Spielende', 'Command Cards': 'Befehlskarten', 'Re-rolling and Locking': 'Neu würfeln & festlegen', 'Pick-up and Deliver': 'Abholen & Liefern', 'Action Retrieval': 'Aktionen zurückholen', 'Time Track': 'Zeitleiste', 'Investment': 'Investieren', 'Loans': 'Kredite', 'Hidden Victory Points': 'Verdeckte Siegpunkte', 'Deck Construction': 'Deck zusammenstellen', 'I Cut, You Choose': 'Ich teile, du wählst', 'Rock-Paper-Scissors': 'Schere-Stein-Papier', 'Questions and Answers': 'Fragen & Antworten', 'Acting': 'Darstellen', 'Drawing': 'Zeichnen', 'Singing': 'Singen', 'Spelling': 'Buchstabieren', 'Alliances': 'Allianzen', 'Catch the Leader': 'Führenden bremsen', 'Once-Per-Game Abilities': 'Einmalige Fähigkeiten', 'Variable Phase Order': 'Variable Phasen', 'Turn Order: Pass Order': 'Reihenfolge nach Passen', 'Increase Value of Unchosen Resources': 'Wertzuwachs liegengebliebener Ressourcen', 'Worker Placement, Different Worker Types': 'Worker Placement (verschiedene Arbeiter)', 'Worker Placement with Dice Workers': 'Worker Placement mit Würfeln', 'Melding and Splaying': 'Auslegen', 'Chaining': 'Verketten', 'Mancala': 'Mancala', 'Bingo': 'Bingo', 'Elapsed Real Time Ending': 'Zeitlimit', 'Speed Matching': 'Schnell zuordnen', 'Hot Potato': 'Heiße Kartoffel', 'Lose a Turn': 'Aussetzen', 'Player Judge': 'Spieler entscheidet', 'Predictive Bid': 'Vorhersage', 'Line of Sight': 'Sichtlinie', 'Zone of Control': 'Kontrollzonen', 'Critical Hits and Failures': 'Kritische Treffer', 'Map Addition': 'Karte erweitern', 'Secret Unit Deployment': 'Geheime Einheiten', 'Moving Multiple Units': 'Mehrere Einheiten bewegen', 'Stat Check Resolution': 'Wertprobe', 'Commodity Speculation': 'Spekulation', 'Stock Holding': 'Aktien', 'Ownership': 'Besitz', 'Tug of War': 'Tauziehen', 'King of the Hill': 'King of the Hill', 'Single Loser Game': 'Ein Verlierer', 'Physical Removal': 'Entfernen', 'Slide/Push': 'Schieben', 'Turn Order: Random': 'Zufällige Reihenfolge', 'Turn Order: Auction': 'Reihenfolge ersteigern', 'Turn Order: Stat-Based': 'Reihenfolge nach Werten', 'Turn Order: Role Order': 'Reihenfolge nach Rollen', 'Score-and-Reset Game': 'Wertung & Neustart', 'Automatic Resource Growth': 'Automatisches Wachstum', 'Targeted Clues': 'Gezielte Hinweise', 'Multiple Maps': 'Mehrere Spielpläne', 'Sequential Cooperation': 'Aufeinander aufbauend', 'Relative Movement': 'Relative Bewegung', 'Three Dimensional Movement': '3D-Bewegung', 'Measurement Movement': 'Bewegung mit Maßband', 'Delayed Purchase': 'Verzögerter Kauf', 'Different Dice Movement': 'Unterschiedliche Würfel', 'Closed Economy Auction': 'Geschlossene Ökonomie', 'Constrained Bidding': 'Eingeschränktes Bieten', 'Multiple-Lot Auction': 'Mehrfach-Auktion', 'Selection Order Bid': 'Reihenfolge ersteigern', 'Advantage Token': 'Vorteilsmarker', 'Interrupts': 'Unterbrechungen', 'Follow': 'Nachziehen', 'Layering': 'Schichten', 'Chit-Pull System': 'Chit-Pull', 'Impulse Movement': 'Impulsbewegung', 'Neighbor Scope': 'Nachbarn', 'Order Counters': 'Befehlsmarker', 'Action Timer': 'Aktions-Timer', 'Resource to Move': 'Ressourcen zum Bewegen', 'Kill Steal': 'Kill Steal', 'Prisoner\'s Dilemma': 'Gefangenendilemma', 'Static Capture': 'Schlagen', 'Ratio / Combat Results Table': 'Kampftabelle', 'Minimap Resolution': 'Minikarte', 'Highest-Lowest Scoring': 'Höchster-niedrigster Wert', 'Bias': 'Tendenz', 'Campaign / Battle Card Driven': 'Kampagne (Karten)', 'Turn Order: Time Track': 'Zeitleiste' };
 const mechDe = list => [...new Set((list || []).map(m => MECH_DE[m] || m))].join(', ');
@@ -1097,7 +1141,7 @@ function matchesFilters(it, filters) {
     if (k === '_players') { const n = +v, a = +it.spielerMin || +it.spielerMax || 0, b = +it.spielerMax || +it.spielerMin || 0; if (!(a && n >= a && n <= b)) return false; continue; }
     if (k === 'bewertung') { if ((+it.bewertung || 0) < +v) return false; continue; }
     if (k === 'digital') { if ((v === 'Ja') !== (it.digital === 'Ja')) return false; continue; }
-    if (k === 'mechanik') { if (!multiVals(it.mechanik).includes(String(v))) return false; continue; }
+    if (fieldDef(it.typ, k)?.multi) { if (!multiVals(it[k]).includes(String(v))) return false; continue; }
     if (String(it[k] ?? '') !== String(v)) return false;
   }
   return true;
@@ -1319,7 +1363,7 @@ function openGroupOrder(typ) {
 // ===== Brettspiel-Regal mit echten Maßen (cm) =====
 // Schachtel: B × H = Deckel, T = Dicke. Stehend sieht man die Seite (T breit, H hoch), liegend die lange Kante (H breit, T hoch).
 // „Drehen“ (r) tauscht B und H. Fachgröße in cm (für alle Fächer, im Regal „Wie zuhause“ auch je Fach).
-const BOX_DEF = it => it.kategorie === 'Kartenspiel' ? { B: 12, H: 19, T: 4 } : it.erweiterungVon ? { B: 29.5, H: 29.5, T: 5 } : it.kategorie === 'Kinderspiel' ? { B: 27, H: 27, T: 7 } : { B: 29.5, H: 29.5, T: 7.5 };
+const BOX_DEF = it => hasKat(it, 'Kartenspiel') ? { B: 12, H: 19, T: 4 } : it.erweiterungVon ? { B: 29.5, H: 29.5, T: 5 } : hasKat(it, 'Kinderspiel') ? { B: 27, H: 27, T: 7 } : { B: 29.5, H: 29.5, T: 7.5 };
 function boxCm(it) { const d = BOX_DEF(it); const B = +it.boxB || d.B, H = +it.boxH || d.H, T = +it.boxT || d.T; return { B, H, T, est: !(+it.boxB && +it.boxH && +it.boxT) }; }
 function placedCm(it, or) { const d = boxCm(it); const o = or?.o || 'st', side = or?.r ? d.B : d.H; return o === 'st' ? { w: d.T, h: side, o } : { w: side, h: d.T, o }; }
 const bgShelfSize = () => Object.assign({ w: 33, h: 33 }, shared.bgShelf);
@@ -1341,7 +1385,7 @@ function renderGameShelf(list) {
   const cmpT = (a, b) => (a.erweiterungVon || a.titel || '').localeCompare(b.erweiterungVon || b.titel || '', 'de') || (a.erweiterungVon ? 1 : -1);
   const tools = `<div class="bs-tools">Sortiert nach <div class="seg" style="width:auto">${[['titel', 'Titel'], ['kategorie', 'Kategorie'], ['verlag', 'Verlag'], ['groesse', 'Größe'], ...(VIEW ? [] : [['zuhause', '🏠 Wie zuhause']])].map(([k, l]) => `<button data-bgsort="${k}" aria-pressed="${s === k}">${l}</button>`).join('')}</div></div>`;
   if (s === 'zuhause' && !VIEW) return tools + renderBgHome(list);
-  if (s === 'kategorie') list.sort((a, b) => (a.kategorie || '~').localeCompare(b.kategorie || '~', 'de') || cmpT(a, b));
+  if (s === 'kategorie') list.sort((a, b) => (firstKat(a) || '~').localeCompare(firstKat(b) || '~', 'de') || cmpT(a, b));
   else if (s === 'verlag') list.sort((a, b) => (a.verlag || '~').localeCompare(b.verlag || '~', 'de') || cmpT(a, b));
   else if (s === 'groesse') list.sort((a, b) => boxCm(b).H - boxCm(a).H || boxCm(b).T - boxCm(a).T || cmpT(a, b));
   else list.sort(cmpT);
@@ -1928,14 +1972,14 @@ function openAuthor(name) {
 /* ----- Spieleladen ----- */
 const MEEPLE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a3.2 3.2 0 0 0-3.2 3.2c0 1 .5 1.9 1.2 2.5-2.9.6-6.9 1.9-6.9 4 0 1.3 2 1.6 3.6 1.4L4.6 20a1.4 1.4 0 0 0 1.3 2h3.4l2.7-4 2.7 4h3.4a1.4 1.4 0 0 0 1.3-2l-2.1-6.9c1.6.2 3.6-.1 3.6-1.4 0-2.1-4-3.4-6.9-4 .7-.6 1.2-1.5 1.2-2.5A3.2 3.2 0 0 0 12 2z"/></svg>';
 function boxDims(it) {
-  if (it.kategorie === 'Kartenspiel') return [84, 110];
+  if (hasKat(it, 'Kartenspiel')) return [84, 110];
   if (it.erweiterungVon) return [96, 96];
   if (['Gehobenes Kennerspiel', 'Expertenspiel', 'Schwer'].includes(it.komplexitaet)) return [128, 128];
-  if (['Familien- & Einstiegsspiel', 'Leicht'].includes(it.komplexitaet) || it.kategorie === 'Kinderspiel') return [104, 104];
+  if (['Familien- & Einstiegsspiel', 'Leicht'].includes(it.komplexitaet) || hasKat(it, 'Kinderspiel')) return [104, 104];
   return [116, 116];
 }
 function renderGameStore(list) {
-  const groups = groupBy(list, it => it.kategorie || 'Weitere Spiele').sort((a, b) => a[0].localeCompare(b[0], 'de'));
+  const groups = groupBy(list, it => firstKat(it) || 'Weitere Spiele').sort((a, b) => a[0].localeCompare(b[0], 'de'));
   const avail = contentWidth() - 48;
   let html = `<div class="gs"><div class="gs-sign"><b>Spieleladen</b><small>BRETTSPIELE · KARTEN · WÜRFEL</small></div>`;
   for (const [g, arr] of groups) {
@@ -2120,7 +2164,9 @@ function inputHTML(typ, f, val) {
   const req = isRequired(typ, f.k); const v = val ?? '';
   let inp;
   switch (f.t) {
-    case 'select': { const o = optsOf(f); if (v !== '' && !o.includes(String(v))) o.push(String(v)); inp = `<select name="${f.k}"><option value="">${f.k === 'komplexitaet' ? 'Automatisch (aus BGG-Wert)' : '—'}</option>${o.map(x => `<option ${String(v) === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`; break; }
+    case 'select': if (f.multi) { const o = optsOf(f), cur = multiVals(v); cur.forEach(x => { if (!o.includes(x)) o.push(x); });
+      inp = `<div class="mchips" data-mchips="${f.k}">${o.map(x => `<button type="button" data-mc="${esc(x)}" aria-pressed="${cur.includes(x)}">${esc(x)}</button>`).join('')}</div><input type="hidden" name="${f.k}" value="${esc(cur.join(', '))}">`; break; }
+    { const o = optsOf(f); if (v !== '' && !o.includes(String(v))) o.push(String(v)); inp = `<select name="${f.k}"><option value="">${f.k === 'komplexitaet' ? 'Automatisch (aus BGG-Wert)' : '—'}</option>${o.map(x => `<option ${String(v) === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`; break; }
     case 'textarea': inp = `<textarea name="${f.k}" rows="3">${esc(v)}</textarea>`; break;
     case 'rating': inp = `<div class="starsin" data-rating="${f.k}">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-star="${n}" class="${+v >= n ? 'on' : ''}">★</button>`).join('')}<input type="hidden" name="${f.k}" value="${esc(v)}"></div>`; break;
     case 'number': inp = `<input type="number" inputmode="decimal" step="${f.step || 1}" min="0" ${f.ph ? `placeholder="${esc(f.ph)}"` : ''} name="${f.k}" value="${esc(v)}">`; break;
@@ -2151,6 +2197,7 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     <div class="formfoot"><button class="btn" data-close>Abbrechen</button><button class="btn" id="fFill" title="Leere Felder aus dem Internet füllen">🌐 Ergänzen</button><button class="btn primary" id="fSave">Speichern</button></div>`);
   const form = $('#fForm', s);
   let autoKeys = new Set(item?.auto || prefill?._auto || []);
+  form.addEventListener('click', e => { const b = e.target.closest('[data-mc]'); if (!b) return; const box = b.closest('[data-mchips]'); b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true'); form.elements[box.dataset.mchips].value = $$('[data-mc][aria-pressed=true]', box).map(x => x.dataset.mc).join(', '); });
   function collect() {
     const fd = new FormData(form); const out = {};
     for (const [k, v] of fd.entries()) { const val = String(v).trim(); if (val === '') continue; const f = fieldDef(data.typ, k); out[k] = f && ['number', 'year', 'rating'].includes(f.t) ? +val.replace(',', '.') : val; }
@@ -2170,7 +2217,7 @@ function openForm({ item, prefill, typ, onSaved, title } = {}) {
     wireSuggest(form, data.typ, rec => {
       const cur = collect(); data = Object.assign({}, data, cur);
       const filled = [];
-      for (const [k, v] of Object.entries(rec || {})) { if (k === 'cover' || isEmpty(v)) continue; const f = fieldDef(data.typ, k); if (!f) continue; if (f.t === 'select' && !optsOf(f).includes(String(v))) continue; if (k === 'titel' || isEmpty(data[k])) { data[k] = v; if (k !== 'titel') filled.push(k); } }
+      for (const [k, v] of Object.entries(rec || {})) { if (k === 'cover' || isEmpty(v)) continue; const f = fieldDef(data.typ, k); if (!f) continue; if (f.t === 'select') { v = selOk(f, v); if (v == null) continue; } if (k === 'titel' || isEmpty(data[k])) { data[k] = v; if (k !== 'titel') filled.push(k); } }
       if (rec.cover && !coverData && !data.cover && !item?.coverLocal && !item?.cover) data.cover = rec.cover;
       filled.forEach(k => autoKeys.add(k)); draw();
       toast(`Übernommen: ${filled.length} Angaben${data.cover ? ' und Cover' : ''} – bitte kurz prüfen`);
@@ -2384,6 +2431,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.35', '02.11.2026', ['Brettspiele: mehrere Kategorien je Spiel (Auswahl per Antippen); BGG schlägt passende Kategorien vor; Filter findet jedes Spiel in allen seinen Kategorien', 'Einstellungen → Darstellung: Farbschemata Terrakotta, Pastellrosa, Salbei, Ozean, Lavendel, Sonnengelb, Graphit – dazu Hell/Dunkel/wie das Handy', 'Abstimmungs-Link ist jetzt kurz: Die Auswahl liegt als kleine Datei in eurer Dropbox; ändert ihr die Auswahl, sehen Gäste über denselben Link sofort die neue']],
   ['1.34.2', '28.10.2026', ['Fehler behoben: BGG-Komplexität und Schachtelmaße wurden beim Ergänzen auf ganze Zahlen abgeschnitten (2,91 → 2). Jetzt mit Nachkommastellen; bereits ergänzte Spiele werden automatisch korrigiert']],
   ['1.34.1', '27.10.2026', ['ntfy: Benachrichtigungen kommen jetzt mit hoher Priorität, damit Android sie als Pop-up oben am Bildschirm zeigt (einstellbar: Pop-up / nur Leiste / lautlos) – mit Hilfe, falls trotzdem kein Pop-up erscheint']],
   ['1.34', '27.10.2026', ['Benachrichtigungen über ntfy (optional): kommen aufs Handy, auch wenn die App geschlossen ist', 'Einzeln ein-/ausschaltbar: neue Ausleih-Anfrage, neue Stimme (beides sofort, direkt vom Gast), Erinnerung am Vortag eines Abends, Verliehenes lange weg (Zeit einstellbar), Geliehenes bald/überfällig zurückgeben, Sicherung überfällig', 'Jedes Ereignis wird nur einmal gemeldet – auch wenn beide Handys die App offen haben']],
@@ -2720,7 +2768,7 @@ function openPhoto(opts = {}) {
   $('#pCam', s).onchange = go; $('#pGal', s).onchange = go;
 }
 function aiPrompt(mode, hint, barcode, orient, known) {
-  const schema = TYPE_KEYS.map(t => `- "${t}" (${TYPES[t].single}): ` + fieldsOf(t).filter(f => f.ai && !['titel', 'inhalt'].includes(f.k)).map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]` : f.k).join(', ')).join('\n');
+  const schema = TYPE_KEYS.map(t => `- "${t}" (${TYPES[t].single}): ` + fieldsOf(t).filter(f => f.ai && !['titel', 'inhalt'].includes(f.k)).map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]${f.multi ? ' (mehrere möglich, kommagetrennt)' : ''}` : f.k).join(', ')).join('\n');
   return `Du hilfst beim Katalogisieren einer privaten Mediensammlung (Blu-rays/DVDs, Bücher, Videospiele, Brettspiele).
 ${mode === 'multi' ? 'Auf dem Foto sind MEHRERE Medien, z. B. Buchrücken im Regal oder ein Stapel. Erkenne JEDES einzelne erkennbare Medium und liste alle in Lesereihenfolge (links nach rechts, oben nach unten). Lass keines aus, auch wenn nur der Rücken zu sehen ist.' : 'Auf dem Foto ist EIN Medium (Cover, Rückseite oder Rücken). Erkenne genau dieses.'}
 ${hint ? `Alle Medien auf dem Foto sind vom Typ "${hint}".` : ''}${known ? `\nDie Medien auf dem Foto gehören bereits zu dieser Sammlung. Verwende als "titel" GENAU die Schreibweise aus dieser Liste, wenn ein Eintrag passt (Format: typ | titel):\n${known}` : ''}${orient === 'seite' ? '\nVon allen Medien ist nur die SEITE bzw. der RÜCKEN zu sehen (schmale Kante der Hülle/Schachtel, stehend oder liegend). Die "box" umschließt genau diese eine Seite.' : orient === 'cover' ? '\nVon allen Medien ist das COVER (Vorderseite) zu sehen. Die "box" umschließt genau dieses eine Cover.' : ''}${barcode ? `\nDer Barcode/EAN des Mediums lautet ${barcode}.` : ''}
@@ -2889,7 +2937,7 @@ function openFieldCompare(id, rec, { mode, code } = {}) {
   for (const f of fieldsOf(cur.typ)) {
     const k = f.k; if (skip.includes(k) || f.own || f.wish || f.borrow || f.t === 'lend' || f.t === 'bool' || f.t === 'url') continue;
     const nv = rec[k]; if (isEmpty(nv)) continue;
-    if (f.t === 'select' && !optsOf(f).includes(String(nv))) continue;
+    if (f.t === 'select' && selOk(f, nv) == null) continue;
     const ov = cur[k];
     if (isEmpty(ov)) rows.push({ k, f, ov, nv, def: 'neu' });
     else if (mode === 'back') { if (k === 'titel' ? normDup(ov) !== normDup(nv) : !sameVal(ov, nv)) rows.push({ k, f, ov, nv, def: (cur.auto || []).includes(k) && k !== 'titel' ? 'neu' : 'alt' }); }
@@ -2939,7 +2987,7 @@ async function readBackside(id, btn) {
     const prompt = `Das Foto zeigt die RÜCKSEITE (oder Unterseite/Innenklappe) eines Mediums aus einer privaten Sammlung: ${TYPES[it.typ].single} „${it.titel}“.
 Bisher gespeichert: ${known || '–'}
 Lies ab, was auf dem Foto steht, und gib die Angaben in diesen Feldern zurück (bei [..] genau einen dieser Werte):
-${fields.map(f => `- ${f.k} (${f.l})${f.t === 'select' ? ' [' + optsOf(f).join(' | ') + ']' : ''}`).join('\n')}
+${fields.map(f => `- ${f.k} (${f.l})${f.t === 'select' ? ' [' + optsOf(f).join(' | ') + ']' + (f.multi ? ' (mehrere möglich, kommagetrennt)' : '') : ''}`).join('\n')}
 Regeln:
 - Antworte NUR mit JSON: {"felder":{"feld":"wert"},"hinweis":"…"}
 - NUR Angaben, die auf dem Foto zu sehen oder eindeutig daraus ableitbar sind (z. B. Spieleranzahl-Symbol, Altersangabe, Spieldauer, Laufzeit, FSK-Logo, Barcode-/ISBN-Ziffern unter dem Strichcode, Verlag/Studio, Seitenzahl, Format-Logos wie „4K Ultra HD“/„Blu-ray“/„DVD“). Nichts raten, nichts aus Allgemeinwissen.
@@ -2996,7 +3044,7 @@ function fillMissing(rec, src, filled) {
     if (f.t === 'year') { val = parseInt(v, 10); if (!val) continue; }
     else if (f.t === 'number') { val = parseFloat(String(v).replace(',', '.')); if (!val) continue; if (!f.step || f.step === 1) val = Math.round(val); } // Kommazahlen (z. B. BGG-Komplexität 2,91) behalten
     else val = String(v).trim();
-    if (f.t === 'select' && !optsOf(f).includes(String(val))) continue;
+    if (f.t === 'select') { val = selOk(f, val); if (val == null) continue; }
     if (f.t === 'url' && !validLink(f, val)) continue;
     rec[k] = val; filled.add(k);
   }
@@ -3189,11 +3237,12 @@ async function keyTest(kind) {
 }
 // --- BGG-Vorschläge beim Tippen des Titels (Formular für Brettspiele) ---
 function bggKategorie(t) {
-  const c = (t.cats || []).join('|') + '|' + (t.mechs || []).join('|');
-  if (/Legacy/i.test(c)) return 'Legacy'; if (/Cooperative/i.test(c)) return 'Kooperativ'; if (/Children's Game/i.test(c)) return 'Kinderspiel';
-  if (/Party Game/i.test(c)) return 'Partyspiel'; if (/Trivia/i.test(c)) return 'Quiz'; if (/Deduction/i.test(c)) return 'Deduktion'; if (/Murder|Mystery|Puzzle/i.test(c) && /Escape|Murder|Mystery/i.test(c)) return 'Escape / Krimi';
-  if (t.maxp === 2 && t.minp === 2) return 'Zwei-Personen'; const light = !t.weight || t.weight < 1.9; if (light && /Card Game/i.test(c)) return 'Kartenspiel'; if (light && /Dice/i.test(c)) return 'Würfelspiel';
-  if (t.weight >= 3.2) return 'Strategiespiel'; if (t.weight >= 2.3) return 'Kennerspiel'; if (t.weight) return 'Familienspiel'; return undefined;
+  const c = (t.cats || []).join('|') + '|' + (t.mechs || []).join('|'); const out = [];
+  if (/Legacy/i.test(c)) out.push('Legacy'); if (/Cooperative/i.test(c)) out.push('Kooperativ'); if (/Children's Game/i.test(c)) out.push('Kinderspiel');
+  if (/Party Game/i.test(c)) out.push('Partyspiel'); if (/Trivia/i.test(c)) out.push('Quiz'); if (/Deduction/i.test(c)) out.push('Deduktion'); if (/Murder|Mystery/i.test(c)) out.push('Escape / Krimi');
+  if (t.maxp === 2 && t.minp === 2) out.push('Zwei-Personen'); const light = !t.weight || t.weight < 1.9; if (light && /Card Game/i.test(c)) out.push('Kartenspiel'); if (light && /Dice/i.test(c)) out.push('Würfelspiel');
+  if (t.weight >= 3.2) out.push('Strategiespiel'); else if (t.weight >= 2.3) out.push('Kennerspiel'); else if (t.weight && !out.includes('Kinderspiel') && !out.includes('Partyspiel')) out.push('Familienspiel');
+  return out.length ? [...new Set(out)].join(', ') : undefined;
 }
 async function bggSuggest(q) {
   q = q.trim(); if (q.length < 3) return [];
@@ -3363,7 +3412,7 @@ async function aiComplete(rec, fields) {
   const known = {}; for (const f of fieldsOf(rec.typ)) if (!isEmpty(rec[f.k]) && f.k !== 'notizen') known[f.k] = rec[f.k];
   const prompt = `Ergänze fehlende Angaben zu einem Medium aus einer privaten Sammlung. Medientyp: ${TYPES[rec.typ].single}.
 Bekannte Angaben: ${JSON.stringify(known)}
-Fehlende Felder (bei [..] genau einen dieser Werte verwenden): ${fields.map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]` : f.aiDesc ? `${f.k} (${f.aiDesc})` : f.k).join(', ')}
+Fehlende Felder (bei [..] genau einen dieser Werte verwenden): ${fields.map(f => f.t === 'select' ? `${f.k} [${optsOf(f).join(' | ')}]${f.multi ? ' (mehrere möglich, kommagetrennt)' : ''}` : f.aiDesc ? `${f.k} (${f.aiDesc})` : f.k).join(', ')}
 Regeln: Fülle nur Felder, bei denen du dir sicher bist (allgemein bekannte Fakten zu genau diesem Titel). Sonst weglassen. Zahlen als Zahlen. Antworte NUR mit JSON: {"felder":{...}}`;
   const text = await aiCall(prompt, null, 800);
   const a = text.indexOf('{'), b = text.lastIndexOf('}'); if (a < 0) return null;
@@ -4448,6 +4497,12 @@ function openSettings() {
   const prov = settings.provider;
   const s = openSheet(`${sheetHead('Einstellungen')}<div class="set">
     <div class="setquick"><button class="btn" id="sHelp">❓ Hilfe</button><button class="btn" id="sTabs">🗂 Tabs & Ansicht</button></div>
+    <h3>Darstellung</h3>
+    <div class="card"><div class="hint" style="margin:0">Farbschema (gilt für dieses Handy)</div>
+      <div class="themes" id="thPick">${Object.entries(THEMES).map(([k, t]) => `<button data-th="${k}" aria-pressed="${(settings.theme || '') === k}"><span class="sw"><i style="background:${t[2]}"></i><i style="background:${t[3]}"></i><i style="background:${t[1]}"></i></span>${esc(t[0])}</button>`).join('')}</div>
+      <div class="hint" style="margin:6px 0 0">Hell oder dunkel</div>
+      <div class="seg" id="thMode">${[['', 'Wie das Handy'], ['light', '☀️ Hell'], ['dark', '🌙 Dunkel']].map(([k, l]) => `<button data-md="${k}" aria-pressed="${(settings.mode || '') === k}">${l}</button>`).join('')}</div></div>
+
     <h3>Wir zwei</h3>
     <div class="card"><div class="form">
       <label class="fld"><span>Name 1</span><input id="sP1" value="${esc(shared.person1)}" placeholder="z. B. Thomas"></label>
@@ -4597,6 +4652,8 @@ function openSettings() {
   $('#sBgg', s).oninput = e => { settings.bggToken = e.target.value.trim(); settings.sourcesAt = Date.now(); saveSettings(); };
   $('#sBggTest', s).onclick = async e => { const b = e.currentTarget; if (!settings.bggToken) return toast('Bitte zuerst den Token einfügen'); b.disabled = true; b.textContent = 'Teste … (BGG erlaubt nur langsame Abfragen)'; const [ok, msg] = await bggTest(); b.disabled = false; b.textContent = 'BGG-Verbindung testen'; ok ? toast('✓ ' + msg, 4000) : alert(msg); };
   drawBackupCard($('#bkCard', s));
+  $('#thPick', s).onclick = e => { const b = e.target.closest('[data-th]'); if (!b) return; settings.theme = b.dataset.th; saveSettings(); applyTheme(); $$('#thPick [data-th]', s).forEach(x => x.setAttribute('aria-pressed', x === b)); };
+  $('#thMode', s).onclick = e => { const b = e.target.closest('[data-md]'); if (!b) return; settings.mode = b.dataset.md; saveSettings(); applyTheme(); $$('#thMode [data-md]', s).forEach(x => x.setAttribute('aria-pressed', x === b)); };
 
   $('#sClean', s).onclick = () => closeSheet().then(openCleanup);
   $('#sCovers', s).onclick = () => closeSheet().then(() => searchCoversBulk());
@@ -4607,7 +4664,7 @@ function openSettings() {
   drawShare($('#shareCard', s)); drawMailbox($('#mboxCard', s)); drawNtfy($('#ntfyCard', s));
   fillDeviceInfo($('#inDev', s)); $('#inUpd', s).onclick = e => checkForUpdate(e.currentTarget);
   // Abschnitte aufklappbar machen (übersichtlicher)
-  const ICONS = { 'Info': 'ℹ️', 'Anfragen direkt empfangen': '📬', 'Benachrichtigungen (ntfy)': '🔔', 'Wir zwei': '👫', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Sicherung & Wiederherstellen': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
+  const ICONS = { 'Info': 'ℹ️', 'Anfragen direkt empfangen': '📬', 'Benachrichtigungen (ntfy)': '🔔', 'Wir zwei': '👫', 'Darstellung': '🎨', 'Foto-Erkennung': '📷', 'Fehlende Angaben ergänzen': '🌐', 'Dropbox-Synchronisierung': '☁️', 'Pflichtfelder': '✳️', 'Daten': '📊', 'Sicherung & Wiederherstellen': '🗂', 'Sammlung teilen (nur ansehen)': '🔗', 'Weiteres Gerät einrichten': '📱' };
   const openKey = lsGet('mt_setopen', '');
   $$('.set > h3', s).forEach(h => {
     const card = h.nextElementSibling; const d = document.createElement('details'); d.className = 'setsec';
@@ -4782,7 +4839,7 @@ function openStats() {
     ['Top-Autor/innen', top(ofType('buch'), 'autor', 5, true)], ['Top-Genres Bücher', top(ofType('buch'), 'genre')],
     ['Plattformen', top(ofType('game'), 'plattform', 6)], ['Top-Genres Games', top(ofType('game'), 'genre')],
     ['Top-Interpreten', top(ofType('vinyl'), 'interpret', 5, true)], ['Vinyl-Genres', top(ofType('vinyl'), 'genre')],
-    ['Brettspiel-Kategorien', top(ofType('brettspiel'), 'kategorie')], ['Brettspiel-Verlage', top(ofType('brettspiel'), 'verlag')],
+    ['Brettspiel-Kategorien', top(ofType('brettspiel'), 'kategorie', 5, true)], ['Brettspiel-Verlage', top(ofType('brettspiel'), 'verlag')],
   ].filter(([, r]) => r.length);
   const s = openSheet(`${sheetHead('Statistik')}
     <div class="tiles">${tile(n, 'Medien in der Sammlung')}${VIEW ? '' : tile(priced.length ? euro(total) : '–', priced.length ? `Sammlungswert (${priced.length} von ${n} mit Preis)` : 'Sammlungswert (noch keine Preise)')}${!VIEW ? `<button class="tile" id="stWert" style="text-align:left;cursor:pointer"><div class="v">${est.length ? euro(estSum) : '?'}</div><div class="l">${est.length ? `geschätzter Wert heute (${est.length} von ${n})${estDig ? `, davon ${euro(estDig)} digital` : ''} ›` : 'Was ist die Sammlung wert? ›'}</div></button>` : ''}${tile(lentNow, 'gerade verliehen')}${tile(wishes().length, 'auf der Wunschliste')}${!VIEW && xLive('abgang').some(a => a.preis) ? tile(euro(xLive('abgang').reduce((a, x) => a + (+x.preis || 0), 0)), `Erlös aus ${xLive('abgang').filter(a => a.preis).length} Verkäufen`) : ''}</div>
@@ -5225,39 +5282,47 @@ function openAbendEditor(ab) {
     const tips = [...st.tips].filter(id => ids.includes(id));
     const rec = await upsertExtra(Object.assign(ab || { id: 'a_' + uid(), kind: 'abend', createdAt: Date.now() }, { titel, datum: $('#aeD', s).value, zeit: $('#aeZ', s).value, bis: $('#aeZ', s).value ? $('#aeZ2', s).value : '', ort: $('#aeO', s).value.trim().slice(0, 160), typ: st.typ, filters: st.filters, itemIds: ids, titles, tips, customs: st.customs, note: $('#aeN', s).value.trim().slice(0, 300) }));
     await closeSheet(); render(); openAbendDetail(rec.id, !ab);
+    if (rec.pubRaw) abendPublish(rec).catch(e => console.warn('Abend-Datei', e)); // geteilter Link zeigt gleich die neue Auswahl
   };
 }
-// Eigene Cover (fotografiert/hochgeladen) passen nicht in den Link → als kleine Datei über Dropbox freigeben
-async function abendCoverFile(ab, its) {
-  const own = its.filter(it => !/^https:/.test(it.cover || '') && it.coverLocal && !it.coverSpine);
-  if (!own.length || !dbxReady()) return '';
-  try {
-    const c = {}; for (const it of own) { const t = await shareThumb(it); if (t) c[it.id] = t; }
-    if (!Object.keys(c).length) return '';
-    const path = P('/freigabe/abend_' + ab.id.replace(/[^\w-]/g, '') + '.json');
-    await dbxUpload(path, JSON.stringify({ app: 'mediathek-abend', a: ab.id, c }), { '.tag': 'overwrite' });
-    if (ab.cvRaw) return ab.cvRaw;
+// Abstimmung als kleine Datei in eurer Dropbox (inkl. eigener Cover) → der Link bleibt kurz und immer aktuell
+async function abendPayload(ab) {
+  const tips = new Set(ab.tips || []);
+  const its = ab.itemIds.map(id => byId(id)).filter(Boolean).sort((a, b) => (tips.has(b.id) ? 1 : 0) - (tips.has(a.id) ? 1 : 0)).slice(0, 150);
+  const rows = [...(ab.customs || []).map(c => [c.id, c.titel, 'eigen', c.info || 'Nicht aus unserer Sammlung', '', 1]),
+    ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, it.bgg || '', it.youtube || '', +it.gewicht || 0, it.komplexitaet || ''])];
+  const mb = shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined; // Gäste dürfen nur einwerfen
+  return { its, data: { k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', z: ab.zeit || '', b: ab.bis || '', l: ab.ort || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb, y: ntfyGuest('stimme'), th: settings.theme || '' } };
+}
+const abendPath = ab => P('/freigabe/abend_' + ab.id.replace(/[^\w-]/g, '') + '.json');
+async function abendPublish(ab) {
+  if (!dbxReady()) return '';
+  const { its, data } = await abendPayload(ab);
+  const c = {}; for (const it of its.filter(it => !/^https:/.test(it.cover || '') && it.coverLocal && !it.coverSpine)) { const t = await shareThumb(it); if (t) c[it.id] = t; }
+  const path = abendPath(ab);
+  await dbxUpload(path, JSON.stringify(Object.assign({ app: 'mediathek-abend' }, data, { c })), { '.tag': 'overwrite' });
+  let raw = ab.pubRaw || ab.cvRaw;
+  if (!raw) {
     let url;
     try { url = (await dbxRpc('sharing/create_shared_link_with_settings', { path, settings: { requested_visibility: 'public', audience: 'public', access: 'viewer' } })).url; }
     catch (e) { if (/shared_link_already_exists/.test(e.summary || e.message)) url = (await dbxRpc('sharing/list_shared_links', { path, direct_only: true })).links?.[0]?.url; else throw e; }
     if (!url) return '';
-    const u = new URL(url); u.hostname = 'dl.dropboxusercontent.com'; u.searchParams.delete('dl');
-    ab.cvRaw = u.toString(); await upsertExtra(ab); return ab.cvRaw;
-  } catch (e) { console.warn('Abend-Cover', e); return ''; }
+    const u = new URL(url); u.hostname = 'dl.dropboxusercontent.com'; u.searchParams.delete('dl'); raw = u.toString();
+  }
+  if (ab.pubRaw !== raw) { ab.pubRaw = raw; await upsertExtra(ab); }
+  return raw;
 }
 async function abendLink(ab) {
-  const tips = new Set(ab.tips || []);
-  const its = ab.itemIds.map(id => byId(id)).filter(Boolean).sort((a, b) => (tips.has(b.id) ? 1 : 0) - (tips.has(a.id) ? 1 : 0)).slice(0, 80);
-  const rows = [...(ab.customs || []).map(c => [c.id, c.titel, 'eigen', c.info || 'Nicht aus unserer Sammlung', '', 1]),
-    ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, it.bgg || '', it.youtube || '', +it.gewicht || 0, it.komplexitaet || ''])];
-  const mb = shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined; // Gäste dürfen nur einwerfen
-  const cv = await abendCoverFile(ab, its);
-  const code = await packObj({ c: cv || undefined, k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', z: ab.zeit || '', b: ab.bis || '', l: ab.ort || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb, y: ntfyGuest('stimme') });
-  return baseURL() + '#abend=' + code;
+  try { const raw = await abendPublish(ab); if (raw) { const u = new URL(raw); return baseURL() + '#ab=' + u.pathname + u.search; } }
+  catch (e) { console.warn('Abend-Datei', e); }
+  // Ohne Dropbox: alles steckt im (langen) Link
+  const { data } = await abendPayload(ab); data.i = data.i.slice(0, 80);
+  return baseURL() + '#abend=' + await packObj(data);
 }
 async function shareAbend(ab) {
   const btn = $('#adShare'); if (btn) { btn.disabled = true; btn.textContent = 'Bereite Link vor …'; }
   const url = await abendLink(ab).finally(() => { if (btn) { btn.disabled = false; btn.textContent = '📤 Abstimmungs-Link teilen'; } });
+  if (/#abend=/.test(url)) toast('Tipp: Mit verbundener Dropbox wird der Link kurz', 4000);
   shareOut({ title: 'Abstimmung teilen', intro: `${abCount(ab)} Titel zur Auswahl${(ab.tips || []).length + (ab.customs || []).length ? `, davon ${(ab.tips || []).length + (ab.customs || []).length} eure Vorschläge (⭐)` : ''}. Schick den Link an eure Gäste oder in die Gruppe.`,
     text: `🎲 ${ab.titel}${abWhen(ab) ? '\n🗓 ' + abWhen(ab) : ''}${ab.ort ? '\n📍 ' + ab.ort : ''}\nWas wollen wir ${ab.typ === 'brettspiel' ? 'spielen' : ab.typ === 'bluray' ? 'gucken' : ab.typ === 'vinyl' ? 'hören' : 'machen'}? Wähl deine Top 3 aus:`, url });
 }
@@ -5285,9 +5350,12 @@ function openAbendDetail(id, fresh) {
   s.addEventListener('click', async e => { const b = e.target.closest('[data-delvote]'); if (!b) return; const v = extra.find(x => x.id === b.dataset.delvote); if (!v || !confirm(`Stimme von ${v.n} löschen?`)) return; v.deleted = true; await upsertExtra(v); await closeSheet(); render(); openAbendDetail(id); });
 }
 // Abstimmungsseite für Gäste (ohne Konto, ohne Daten von euch außer der Auswahl)
-async function initVote(code) {
+async function initVote(code, short) {
   document.body.classList.add('vote');
-  let d; try { d = await unpackObj(code); } catch { d = null; }
+  let d = null;
+  if (short) { $('#content').innerHTML = '<div class="spinner"></div><p class="hint" style="text-align:center">Lade Abstimmung …</p>'; try { const r = await fetch('https://dl.dropboxusercontent.com' + short, { cache: 'no-store' }); if (r.ok) d = await r.json(); } catch { } if (d?.c) { for (const x of d.i || []) if (!x[4] && /^data:image\/jpeg;base64,/.test(d.c[x[0]] || '')) x[4] = d.c[x[0]]; delete d.c; } }
+  else { try { d = await unpackObj(code); } catch { d = null; } }
+  if (d?.th && THEMES[d.th] && !settings.theme) applyTheme(d.th, settings.mode || '');
   if (!d?.i?.length) { $('#content').innerHTML = '<div class="empty"><div class="big">Link unvollständig</div>Bitte den Link noch einmal komplett öffnen.</div>'; return; }
   VIEW = { vote: true }; history.replaceState({ sheet: 0 }, '');
   $('.brand').firstChild.textContent = '🎲 ' + d.t + ' ';
@@ -5944,11 +6012,14 @@ addEventListener('hashchange', () => {
 });
 
 /* ---------- Start ---------- */
+applyTheme(); try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme()); } catch { }
 (async function init() {
   const sm = location.hash.match(/^#sammlung=([A-Za-z0-9_-]+)/);
   if (sm) return initView(sm[1]);
   const vm = location.hash.match(/^#abend=([A-Za-z0-9_-]+)/);
   if (vm) return initVote(vm[1]);
+  const vs = location.hash.match(/^#ab=(\/[A-Za-z0-9_\-./?=&%]+)$/);
+  if (vs) return initVote('', vs[1]);
   const incoming = location.hash.match(/^#(stimme|anfrage)=([A-Za-z0-9_-]+)/);
   items = (await idb.get('items')) || [];
   meta = Object.assign(meta, (await idb.get('meta')) || {});
