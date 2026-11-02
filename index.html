@@ -295,6 +295,8 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
 .ytbox .lbl{position:absolute;left:10px;bottom:8px;color:#fff;font-weight:600;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .mini{font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;background:#ff5100;color:#fff;text-decoration:none;letter-spacing:.02em}
 .mini.yt{background:#ff0000}
+.timerow{display:grid;grid-template-columns:1fr;gap:8px}@media (min-width:520px){.timerow{grid-template-columns:1fr 1fr}}
+.tsel{display:flex;align-items:center;gap:6px}.tsel select{flex:1;min-width:0;height:46px;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:0 8px;font-size:16px}.tsel span{color:var(--ink2);font-size:14px}
 .mchips{display:flex;flex-wrap:wrap;gap:6px}.mchips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
 .mchips button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.mchips button[aria-pressed=true]::before{content:'✓ '}
 .themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}.themes button{border:2px solid var(--line);border-radius:12px;padding:8px;background:var(--surface);display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:700}
@@ -627,7 +629,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.35';
+const APP_VERSION = '1.35.1';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2431,6 +2433,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.35.1', '02.11.2026', ['Abendplaner: Uhrzeit wird mit zwei Auswahlfeldern (Stunde/Minute) eingestellt – passt auf jedes Handy', 'Abstimmungsseite: YouTube-Knopf „▶ YouTube“ erscheint zuverlässig, auch bei Links ohne https oder von m.youtube.com']],
   ['1.35', '02.11.2026', ['Brettspiele: mehrere Kategorien je Spiel (Auswahl per Antippen); BGG schlägt passende Kategorien vor; Filter findet jedes Spiel in allen seinen Kategorien', 'Einstellungen → Darstellung: Farbschemata Terrakotta, Pastellrosa, Salbei, Ozean, Lavendel, Sonnengelb, Graphit – dazu Hell/Dunkel/wie das Handy', 'Abstimmungs-Link ist jetzt kurz: Die Auswahl liegt als kleine Datei in eurer Dropbox; ändert ihr die Auswahl, sehen Gäste über denselben Link sofort die neue']],
   ['1.34.2', '28.10.2026', ['Fehler behoben: BGG-Komplexität und Schachtelmaße wurden beim Ergänzen auf ganze Zahlen abgeschnitten (2,91 → 2). Jetzt mit Nachkommastellen; bereits ergänzte Spiele werden automatisch korrigiert']],
   ['1.34.1', '27.10.2026', ['ntfy: Benachrichtigungen kommen jetzt mit hoher Priorität, damit Android sie als Pop-up oben am Bildschirm zeigt (einstellbar: Pop-up / nur Leiste / lautlos) – mit Hilfe, falls trotzdem kein Pop-up erscheint']],
@@ -5211,7 +5214,7 @@ function openAbendEditor(ab) {
   const s = openSheet(`${sheetHead(ab ? 'Auswahl bearbeiten' : 'Neuer Abend')}
     <div class="form"><label class="fld"><span>Name des Abends *</span><input id="aeT" value="${esc(ab?.titel || '')}" placeholder="z. B. Spieleabend Freitag"></label>
     <label class="fld"><span>Datum</span><input type="date" id="aeD" value="${esc(ab?.datum || '')}"></label>
-    <div class="inrow" style="gap:8px"><label class="fld" style="flex:1"><span>Uhrzeit</span><input type="time" id="aeZ" value="${esc(ab?.zeit || '')}"></label><label class="fld" style="flex:1"><span>bis (optional)</span><input type="time" id="aeZ2" value="${esc(ab?.bis || '')}"></label></div>
+    <div class="timerow"><div class="fld"><span>Uhrzeit</span>${timeSel('aeZ', ab?.zeit)}</div><div class="fld"><span>bis (optional)</span>${timeSel('aeZ2', ab?.bis)}</div></div>
     <label class="fld"><span>Ort</span><input id="aeO" value="${esc(ab?.ort || '')}" placeholder="z. B. bei uns, Musterstraße 5, Köln" autocomplete="street-address"></label></div>
     <div class="hint" style="margin:14px 0 6px">Was steht zur Wahl?</div>
     <div class="seg" id="aeTyp">${[...TYPE_KEYS, 'alle'].map(t => `<button data-t="${t}" aria-pressed="${st.typ === t}">${t === 'alle' ? 'Gemischt' : TYPES[t].label}</button>`).join('')}</div>
@@ -5280,17 +5283,25 @@ function openAbendEditor(ab) {
     const ids = [...st.sel].filter(id => byId(id)); if (ids.length + st.customs.length < 2) return toast('Bitte mindestens 2 Titel auswählen oder vorschlagen');
     const titles = {}; ids.forEach(id => titles[id] = byId(id).titel); st.customs.forEach(c => titles[c.id] = c.titel);
     const tips = [...st.tips].filter(id => ids.includes(id));
-    const rec = await upsertExtra(Object.assign(ab || { id: 'a_' + uid(), kind: 'abend', createdAt: Date.now() }, { titel, datum: $('#aeD', s).value, zeit: $('#aeZ', s).value, bis: $('#aeZ', s).value ? $('#aeZ2', s).value : '', ort: $('#aeO', s).value.trim().slice(0, 160), typ: st.typ, filters: st.filters, itemIds: ids, titles, tips, customs: st.customs, note: $('#aeN', s).value.trim().slice(0, 300) }));
+    const rec = await upsertExtra(Object.assign(ab || { id: 'a_' + uid(), kind: 'abend', createdAt: Date.now() }, { titel, datum: $('#aeD', s).value, zeit: timeVal(s, 'aeZ'), bis: timeVal(s, 'aeZ') ? timeVal(s, 'aeZ2') : '', ort: $('#aeO', s).value.trim().slice(0, 160), typ: st.typ, filters: st.filters, itemIds: ids, titles, tips, customs: st.customs, note: $('#aeN', s).value.trim().slice(0, 300) }));
     await closeSheet(); render(); openAbendDetail(rec.id, !ab);
     if (rec.pubRaw) abendPublish(rec).catch(e => console.warn('Abend-Datei', e)); // geteilter Link zeigt gleich die neue Auswahl
   };
 }
 // Abstimmung als kleine Datei in eurer Dropbox (inkl. eigener Cover) → der Link bleibt kurz und immer aktuell
+// Uhrzeit als zwei Auswahlfelder (Stunde/Minute) – passt auf jedes Handy, anders als die Uhr des Browsers
+function timeSel(id, v) {
+  const [h, m] = String(v || '').split(':'); const mins = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']; if (m && !mins.includes(m)) mins.push(m);
+  return `<div class="tsel"><select id="${id}H" aria-label="Stunde"><option value="">––</option>${Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(x => `<option ${x === h ? 'selected' : ''}>${x}</option>`).join('')}</select><b>:</b><select id="${id}M" aria-label="Minute">${mins.sort().map(x => `<option ${x === (m || '00') ? 'selected' : ''}>${x}</option>`).join('')}</select><span>Uhr</span></div>`;
+}
+const timeVal = (root, id) => { const h = $('#' + id + 'H', root)?.value; return h ? h + ':' + ($('#' + id + 'M', root)?.value || '00') : ''; };
+const ytNorm = v => { if (!v) return ''; try { const u = new URL(normLink(v)); if (!/(^|\.)(youtube\.com|youtu\.be)$/.test(u.hostname)) return ''; u.protocol = 'https:'; return u.toString(); } catch { return ''; } };
+const bggNorm = v => { if (!v) return ''; try { const u = new URL(normLink(v)); if (!/(^|\.)boardgamegeek\.com$/.test(u.hostname)) return ''; u.protocol = 'https:'; return u.toString(); } catch { return ''; } };
 async function abendPayload(ab) {
   const tips = new Set(ab.tips || []);
   const its = ab.itemIds.map(id => byId(id)).filter(Boolean).sort((a, b) => (tips.has(b.id) ? 1 : 0) - (tips.has(a.id) ? 1 : 0)).slice(0, 150);
   const rows = [...(ab.customs || []).map(c => [c.id, c.titel, 'eigen', c.info || 'Nicht aus unserer Sammlung', '', 1]),
-    ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, it.bgg || '', it.youtube || '', +it.gewicht || 0, it.komplexitaet || ''])];
+    ...its.map(it => [it.id, it.titel, it.typ, subtitle(it), /^https:/.test(it.cover || '') ? it.cover : '', tips.has(it.id) ? 1 : 0, bggNorm(it.bgg), ytNorm(it.youtube), +it.gewicht || 0, it.komplexitaet || ''])];
   const mb = shared.mbox?.key && shared.mbox?.guest ? { k: shared.mbox.key, r: shared.mbox.guest } : undefined; // Gäste dürfen nur einwerfen
   return { its, data: { k: 'e', a: ab.id, t: ab.titel, d: ab.datum || '', z: ab.zeit || '', b: ab.bis || '', l: ab.ort || '', o: ownersTitle(), n: ab.note || '', i: rows, m: mb, y: ntfyGuest('stimme'), th: settings.theme || '' } };
 }
@@ -5374,7 +5385,7 @@ async function initVote(code, short) {
   const draw = () => {
     const card = ([id, t, typ, sub, cov, tip, bgg, yt, kw, ks]) => {
       const r = picks.indexOf(id) + 1; const c = colorFor(t);
-      const lk = `${/^https:\/\/([\w-]+\.)?boardgamegeek\.com\//.test(bgg || '') ? `<a class="vlink bgg" href="${esc(bgg)}" target="_blank" rel="noopener">ℹ️ Infos (BGG)</a>` : ''}${/^https:\/\/([\w-]+\.)?(youtube\.com|youtu\.be)\//.test(yt || '') ? `<a class="vlink yt" href="${esc(yt)}" target="_blank" rel="noopener">▶ YouTube</a>` : ''}`;
+      const lk = `${/^https:\/\/([\w-]+\.)?boardgamegeek\.com\//.test(bgg || '') ? `<a class="vlink bgg" href="${esc(bgg)}" target="_blank" rel="noopener">ℹ️ Infos (BGG)</a>` : ''}${ /^https?:\/\/([\w-]+\.)?(youtube\.com|youtu\.be)\//.test(yt || '') ? `<a class="vlink yt" href="${esc(yt)}" target="_blank" rel="noopener">▶ YouTube</a>` : ''}`;
       return `<div role="button" tabindex="0" class="vcard${r ? ' r' + r : ''}${tip ? ' tip' : ''}" data-v="${esc(id)}">${r ? `<span class="rk r${r}">${r}</span>` : ''}${tip ? '<span class="tipb">⭐ Vorschlag</span>' : ''}<div class="cv" style="background:${c};color:${textOn(c)}">${cov ? `<img src="${esc(cov)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.replaceWith(document.createTextNode(this.dataset.i))" data-i="${esc(initials(t))}">` : esc(initials(t))}</div><div class="t">${esc(t)}</div><div class="s">${esc(sub || '')}</div>${kw || ks ? `<div class="vkx">⚖ ${kw ? kxNum(kw) + ' / 5' : ''}${kw && ks ? ' · ' : ''}${esc(ks || '')}</div>` : ''}${lk ? `<div class="vlinks">${lk}</div>` : ''}</div>`;
     };
     const tipsL = d.i.filter(x => x[5]), rest = d.i.filter(x => !x[5]);
