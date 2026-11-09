@@ -636,7 +636,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.36.1';
+const APP_VERSION = '1.36.2';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2441,6 +2441,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.36.2', '09.11.2026', ['Abendplaner: Titel mit Kommentaren sind standardmäßig aufgeklappt – bei euch und bei den Gästen']],
   ['1.36.1', '09.11.2026', ['Fehler behoben: Beim Antippen eines Titel-Vorschlags (BGG, Bücher, Filme …) blieb auf dem Handy der getippte Text stehen – der Vorschlag wird jetzt zuverlässig übernommen']],
   ['1.36', '09.11.2026', ['Abendplaner: Kommentare zu jedem vorgeschlagenen Titel – ihr schreibt vorab (z. B. „Spiel ist auf Englisch“), eure Gäste können auf der Abstimmungsseite antworten', 'Kommentare erscheinen als Verlauf unter dem Titel, neue Gäste-Kommentare im 📬 Postfach (und per ntfy, wenn gewünscht)', 'Die Kommentare gehören nur zum Abend und tauchen nicht in der Detailansicht des Mediums auf']],
   ['1.35.1', '02.11.2026', ['Abendplaner: Uhrzeit wird mit zwei Auswahlfeldern (Stunde/Minute) eingestellt – passt auf jedes Handy', 'Abstimmungsseite: YouTube-Knopf „▶ YouTube“ erscheint zuverlässig, auch bei Links ohne https oder von m.youtube.com']],
@@ -5392,7 +5393,7 @@ function openAbendDetail(id, fresh) {
     ${votes.length ? `<h3 style="font:800 17px Fraunces,serif;margin:18px 0 6px">Wer hat was gewählt</h3><div class="votelist">${votes.map(v => `<div><span><b>${esc(v.n)}</b>: ${v.p.map((id, k) => `${k + 1}. ${esc(byId(id)?.titel || ab.titles?.[id] || '?')}`).join(' · ')}${v.m ? `<span class="vmsg">💬 „${esc(v.m)}“</span>` : ''}</span><button class="btn ghost" data-delvote="${v.id}" style="height:28px;padding:0 6px" aria-label="Stimme löschen">✕</button></div>`).join('')}</div>` : ''}
     <h3 style="font:800 17px Fraunces,serif;margin:18px 0 6px">💬 Kommentare zu den Titeln</h3>
     <p class="hint" style="margin:0 0 8px">Nur für diesen Abend – z. B. „Spiel ist auf Englisch“. Eure Gäste sehen die Kommentare und können selbst etwas schreiben.</p>
-    <div class="comlist">${abTitles(ab).map(([iid, t]) => { const l = abComs(ab.id, iid); const nn = l.filter(c => c.neu).length; return `<details class="vcom" data-ci="${esc(iid)}" ${nn ? 'open' : ''}><summary><span>${esc(t)}</span><span class="ccount${nn ? ' new' : ''}">💬 ${l.length}${nn ? ' · neu' : ''}</span></summary>${comThreadHTML(l.map(c => [c.n, c.m, c.at, c.host, c.id]), 'data-cdel')}<div class="cform"><input data-cin="${esc(iid)}" maxlength="500" placeholder="Kommentar schreiben …"><button class="btn primary" data-csend="${esc(iid)}">Senden</button></div></details>`; }).join('')}</div>
+    <div class="comlist">${abTitles(ab).map(([iid, t]) => { const l = abComs(ab.id, iid); const nn = l.filter(c => c.neu).length; return `<details class="vcom" data-ci="${esc(iid)}" ${l.length ? 'open' : ''}><summary><span>${esc(t)}</span><span class="ccount${nn ? ' new' : ''}">💬 ${l.length}${nn ? ' · neu' : ''}</span></summary>${comThreadHTML(l.map(c => [c.n, c.m, c.at, c.host, c.id]), 'data-cdel')}<div class="cform"><input data-cin="${esc(iid)}" maxlength="500" placeholder="Kommentar schreiben …"><button class="btn primary" data-csend="${esc(iid)}">Senden</button></div></details>`; }).join('')}</div>
     <div class="formfoot"><button class="btn danger" id="adDel">Löschen</button><button class="btn" id="adPaste">🔗 Antwort einfügen</button><button class="btn" id="adEdit">Auswahl ändern</button></div>`);
   $('#adShare', s).onclick = () => shareAbend(ab);
   const ac = $('#adCal', s); if (ac) ac.onclick = () => openCalendar({ titel: ab.titel, datum: ab.datum, zeit: ab.zeit, bis: ab.bis, ort: ab.ort, info: ab.note, uid: ab.id });
@@ -5437,10 +5438,10 @@ async function initVote(code, short) {
   // Kommentare: aus der Datei (alle) + eigene, die noch nicht in der Datei stehen
   const myComs = lsGet('mt_com_' + d.a, []).filter(c => Date.now() - c[2] < 60 * 864e5);
   const comsFor = iid => { const l = [...((d.cm || {})[iid] || [])]; for (const c of myComs) if (c[5] === iid && !l.some(x => x[4] === c[4])) l.push(c.slice(0, 5)); return l.sort((a, b) => a[2] - b[2]); };
-  const openComs = new Set();
+  const openComs = new Set(), closedComs = new Set(); // mit Kommentaren: standardmäßig offen (bis man zuklappt)
   const comBox = (iid, t) => { const l = comsFor(iid); const canSend = d.m?.k && d.m?.r;
     if (!l.length && !canSend) return '';
-    return `<details class="vcom" data-com="${esc(iid)}" ${openComs.has(iid) ? 'open' : ''}><summary><span>💬 ${l.length ? l.length + ' Kommentar' + (l.length > 1 ? 'e' : '') : 'Kommentieren'}</span></summary>${comThreadHTML(l)}${canSend ? `<div class="cform"><input data-cin="${esc(iid)}" maxlength="500" placeholder="z. B. „Kenne ich schon“ …"><button class="btn primary" data-csend="${esc(iid)}" data-ct="${esc(t)}">Senden</button></div>` : ''}</details>`; };
+    return `<details class="vcom" data-com="${esc(iid)}" ${openComs.has(iid) || (l.length && !closedComs.has(iid)) ? 'open' : ''}><summary><span>💬 ${l.length ? l.length + ' Kommentar' + (l.length > 1 ? 'e' : '') : 'Kommentieren'}</span></summary>${comThreadHTML(l)}${canSend ? `<div class="cform"><input data-cin="${esc(iid)}" maxlength="500" placeholder="z. B. „Kenne ich schon“ …"><button class="btn primary" data-csend="${esc(iid)}" data-ct="${esc(t)}">Senden</button></div>` : ''}</details>`; };
   const draw = () => {
     const card = ([id, t, typ, sub, cov, tip, bgg, yt, kw, ks]) => {
       const r = picks.indexOf(id) + 1; const c = colorFor(t);
@@ -5456,7 +5457,7 @@ async function initVote(code, short) {
     $('#vSend', el).disabled = picks.length < need;
   };
   draw();
-  $('#vg', el).addEventListener('toggle', e => { const dd = e.target.closest?.('[data-com]'); if (dd) dd.open ? openComs.add(dd.dataset.com) : openComs.delete(dd.dataset.com); }, true);
+  $('#vg', el).addEventListener('toggle', e => { const dd = e.target.closest?.('[data-com]'); if (dd) { if (dd.open) { openComs.add(dd.dataset.com); closedComs.delete(dd.dataset.com); } else { openComs.delete(dd.dataset.com); closedComs.add(dd.dataset.com); } } }, true);
   $('#vg', el).addEventListener('keydown', e => { if (e.target.matches('[data-cin]')) { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); el.querySelector(`[data-csend="${CSS.escape(e.target.dataset.cin)}"]`)?.click(); } } });
   $('#vg', el).addEventListener('click', async e => {
     const b = e.target.closest('[data-csend]'); if (!b) return; e.stopPropagation();
