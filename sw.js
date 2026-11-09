@@ -1,5 +1,5 @@
 // Offline-Cache für die App selbst. Daten liegen in IndexedDB + Dropbox, nicht hier.
-const CACHE = 'mediathek-v57';
+const CACHE = 'mediathek-v58';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -26,7 +26,8 @@ self.addEventListener('fetch', e => {
   if (!sameOrigin && !cdn) return; // APIs (Dropbox, KI, Buchdaten) nie cachen
   if (sameOrigin && (e.request.mode === 'navigate' || url.pathname.endsWith('.html'))) {
     // App-Seite: erst Netz (für Updates), sonst Cache
-    e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; })
+    // cache:'no-cache' = beim Server nachfragen, statt bis zu 10 Min. eine alte Fassung aus dem Browser-Zwischenspeicher zu nehmen
+    e.respondWith(fetch(e.request, { cache: 'no-cache' }).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; })
       .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html'))));
     return;
   }

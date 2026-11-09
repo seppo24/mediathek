@@ -636,7 +636,7 @@ body.vote .chips,body.vote .toolbar,body.vote #activeFilters,body.vote .topbar .
    Mediathek – Web-App zum Katalogisieren von Medien
    Daten: lokal (IndexedDB) + Dropbox (App-Ordner) als Sync
    ========================================================= */
-const APP_VERSION = '1.36.2';
+const APP_VERSION = '1.36.3';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2441,6 +2441,7 @@ function openImageEditor(src, { kind = 'cover' } = {}) {
 /* ---------- Info: Versionsverlauf, Gerät, Datenschutz, Quellen ---------- */
 const APP_DATE = '21.10.2026';
 const CHANGELOG = [
+  ['1.36.3', '09.11.2026', ['Updates kommen schneller an: Die App fragt beim Öffnen immer nach der neuesten Fassung (vorher bis zu 10 Minuten alte Fassung möglich); Gäste-Seiten laden bei einem Update automatisch neu', 'Abstimmungsseite zeigt unten klein die Versionsnummer']],
   ['1.36.2', '09.11.2026', ['Abendplaner: Titel mit Kommentaren sind standardmäßig aufgeklappt – bei euch und bei den Gästen']],
   ['1.36.1', '09.11.2026', ['Fehler behoben: Beim Antippen eines Titel-Vorschlags (BGG, Bücher, Filme …) blieb auf dem Handy der getippte Text stehen – der Vorschlag wird jetzt zuverlässig übernommen']],
   ['1.36', '09.11.2026', ['Abendplaner: Kommentare zu jedem vorgeschlagenen Titel – ihr schreibt vorab (z. B. „Spiel ist auf Englisch“), eure Gäste können auf der Abstimmungsseite antworten', 'Kommentare erscheinen als Verlauf unter dem Titel, neue Gäste-Kommentare im 📬 Postfach (und per ntfy, wenn gewünscht)', 'Die Kommentare gehören nur zum Abend und tauchen nicht in der Detailansicht des Mediums auf']],
@@ -5434,6 +5435,7 @@ async function initVote(code, short) {
   el.innerHTML = `${d.n ? `<div class="hostmsg"><span class="who">💬 Nachricht${d.o ? ' von ' + esc(d.o) : ''}</span>${esc(d.n)}</div>` : ''}${evBoxHTML(ev, 'vCal')}<p style="margin:4px 0 14px">${d.o ? `<b>${esc(d.o)}</b> fragen: ` : ''}Was wollt ihr ${d.i.filter(x => x[2] !== 'eigen').every(x => x[2] === 'brettspiel') ? 'spielen' : d.i.filter(x => x[2] !== 'eigen').every(x => x[2] === 'bluray') ? 'gucken' : 'machen'}? Tippe deine <b>Top ${need}</b> in der Reihenfolge an: zuerst deinen Favoriten.</p><div class="vgrid" id="vg"></div>
     <div class="votebar"><div class="in"><div class="sum" id="vSum"></div><input id="vName" placeholder="Dein Name" value="${esc(lsGet('mt_myname', ''))}" autocomplete="name"><button class="btn primary" id="vSend" style="height:46px">Abstimmen & senden</button><input id="vMsg" placeholder="Nachricht dazu (optional), z. B. „Ich bringe Chips mit“" maxlength="300" value="${esc(lsGet('mt_vote_' + d.a, null)?.m || '')}"></div></div>`;
   const vc = $('#vCal', el); if (vc) vc.onclick = () => openCalendar(ev);
+  el.insertAdjacentHTML('beforeend', `<p class="hint" style="text-align:center;font-size:11px;opacity:.6;margin:18px 0 0">Mediathek ${APP_VERSION}</p>`);
   if (/^https:\/\/[a-z0-9.-]*dropbox(usercontent)?\.com\//.test(d.c || '')) fetch(d.c, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (!j?.c) return; let n = 0; for (const x of d.i) if (!x[4] && /^data:image\/jpeg;base64,/.test(j.c[x[0]] || '')) { x[4] = j.c[x[0]]; n++; } if (n) draw(); }).catch(() => { });
   // Kommentare: aus der Datei (alle) + eigene, die noch nicht in der Datei stehen
   const myComs = lsGet('mt_com_' + d.a, []).filter(c => Date.now() - c[2] < 60 * 864e5);
@@ -6139,7 +6141,12 @@ applyTheme(); try { matchMedia('(prefers-color-scheme: dark)').addEventListener(
   if (incoming) handleIncoming(incoming[1], incoming[2]);
   mbxSyncSW(); setTimeout(() => pollMailbox(), 2500);
   setTimeout(showWhatsNew, 1200);
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => { });
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    const hadCtl = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').then(r => r.update?.()).catch(() => { });
+    // Gäste-Seiten (Abstimmung/Sammlung): kommt eine neue App-Version an, einmal neu laden – dort gibt es nichts zu verlieren
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadCtl && VIEW && !sessionStorage.getItem('mt_swreload')) { sessionStorage.setItem('mt_swreload', '1'); location.reload(); } });
+  }
 })();
 
 /* ---------- Beispieldaten (nur mit ?demo in der Adresse) ---------- */
